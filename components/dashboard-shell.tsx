@@ -15,8 +15,11 @@ import {
   Users,
   Warehouse,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
 import type { AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -31,6 +34,7 @@ type DashboardShellProps = {
 type SidebarItem = {
   label: string;
   icon: LucideIcon;
+  href?: string;
   active?: boolean;
 };
 
@@ -45,11 +49,12 @@ const pinnedItems: SidebarItem[] = [
   {
     label: "Dashboard",
     icon: LayoutDashboard,
-    active: true,
+    href: "/dashboard",
   },
   {
     label: "My Profile",
     icon: User,
+    href: "/profile",
   },
 ];
 
@@ -148,6 +153,7 @@ export function DashboardShell({
   children,
 }: DashboardShellProps) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const pathname = usePathname();
 
   function toggleGroup(title: string) {
     setOpenGroups((current) => ({
@@ -156,19 +162,36 @@ export function DashboardShell({
     }));
   }
 
+  function isActive(item: SidebarItem) {
+    if (!item.href) {
+      return item.active === true;
+    }
+
+    if (item.href === "/dashboard") {
+      return pathname === item.href;
+    }
+
+    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_right,_color-mix(in_oklab,var(--color-primary)_9%,transparent)_0%,_transparent_30%),linear-gradient(180deg,var(--color-background),color-mix(in_oklab,var(--color-muted)_25%,var(--color-background)))]">
       <div className="grid min-h-screen lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="border-b border-border/70 bg-card/80 px-4 py-6 backdrop-blur-xl lg:sticky lg:top-0 lg:h-screen lg:overflow-hidden lg:border-b-0 lg:border-r lg:px-5">
           <div className="flex h-full min-h-0 flex-col gap-6">
             <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm shadow-black/10">
-                  <ShieldCheck className="size-5" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm shadow-black/10">
+                    <ShieldCheck className="size-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold tracking-tight">
+                      HCMIS
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold tracking-tight">HCMIS</p>
-                </div>
+                <ThemeToggle />
               </div>
             </div>
 
@@ -181,24 +204,23 @@ export function DashboardShell({
               <section className="space-y-2">
                 {pinnedItems.map((item) => {
                   const ItemIcon = item.icon;
-                  const isActive = item.active === true;
+                  const active = isActive(item);
+                  const itemClasses = cn(
+                    "flex items-center gap-3 rounded-2xl border px-3 py-2",
+                    active
+                      ? "border-primary/30 bg-primary/5"
+                      : "border-border/70 bg-background/70 transition-colors hover:bg-muted/60",
+                  );
+                  const iconClasses = cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground",
+                  );
 
-                  return (
-                    <div
-                      key={item.label}
-                      className={
-                        isActive
-                          ? "flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-3 py-2"
-                          : "flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 transition-colors hover:bg-muted/60"
-                      }
-                    >
-                      <div
-                        className={
-                          isActive
-                            ? "flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"
-                            : "flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
-                        }
-                      >
+                  const itemContent = (
+                    <>
+                      <div className={iconClasses}>
                         <ItemIcon className="size-4" />
                       </div>
 
@@ -207,6 +229,25 @@ export function DashboardShell({
                           {item.label}
                         </p>
                       </div>
+                    </>
+                  );
+
+                  if (item.href) {
+                    return (
+                      <Link
+                        key={item.label}
+                        href={item.href}
+                        aria-current={active ? "page" : undefined}
+                        className={itemClasses}
+                      >
+                        {itemContent}
+                      </Link>
+                    );
+                  }
+
+                  return (
+                    <div key={item.label} className={itemClasses}>
+                      {itemContent}
                     </div>
                   );
                 })}
@@ -246,19 +287,20 @@ export function DashboardShell({
                       <div className="space-y-2">
                         {group.items.map((item) => {
                           const ItemIcon = item.icon;
+                          const active = isActive(item);
 
                           return (
                             <div
                               key={item.label}
                               className={
-                                item.active === true
+                                active
                                   ? "flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-3 py-2"
                                   : "flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 transition-colors hover:bg-muted/60"
                               }
                             >
                               <div
                                 className={
-                                  item.active === true
+                                  active
                                     ? "flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"
                                     : "flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
                                 }

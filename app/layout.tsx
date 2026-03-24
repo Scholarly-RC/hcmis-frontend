@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import type { CSSProperties } from "react";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -31,11 +32,19 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
       style={{ "--font-sans": "var(--font-geist-sans)" } as CSSProperties}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <Toaster position="top-right" />
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Toaster position="top-right" />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

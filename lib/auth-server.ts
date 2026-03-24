@@ -1,6 +1,10 @@
 export { AUTH_COOKIE_NAME } from "@/lib/auth";
 
-import type { AuthLoginResponse, AuthUser } from "@/lib/auth";
+import type {
+  AuthLoginResponse,
+  AuthUser,
+  AuthUserProfileUpdate,
+} from "@/lib/auth";
 
 const DEFAULT_BACKEND_URL = "http://localhost:8000";
 
@@ -85,6 +89,35 @@ export async function fetchCurrentUser(
   }
 
   return readJson<AuthUser>(response);
+}
+
+export async function updateCurrentUserProfile(
+  token: string,
+  payload: AuthUserProfileUpdate,
+): Promise<AuthUser> {
+  const response = await fetch(buildBackendUrl("/profile/me"), {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  const responsePayload = await readJson<
+    Partial<AuthUser> & { detail?: string }
+  >(response);
+
+  if (!response.ok) {
+    throw new Error(responsePayload?.detail ?? "Unable to update profile.");
+  }
+
+  if (!responsePayload) {
+    throw new Error("Unable to update profile.");
+  }
+
+  return responsePayload as AuthUser;
 }
 
 export function getAuthCookieOptions(token: string) {
