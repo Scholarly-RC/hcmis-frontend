@@ -10,9 +10,14 @@ type DashboardPageFrameProps = {
   children: (user: AuthUser) => ReactNode;
 };
 
-export async function DashboardPageFrame({
-  children,
-}: DashboardPageFrameProps) {
+export type DashboardSession = {
+  user: AuthUser;
+  displayName: string;
+  isHr: boolean;
+  token: string;
+};
+
+export async function getDashboardSession(): Promise<DashboardSession> {
   const cookieStore = await cookies();
   const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
 
@@ -31,6 +36,19 @@ export async function DashboardPageFrame({
     .join(" ")
     .trim();
   const isHr = user.role?.trim().toUpperCase() === "HR";
+
+  return {
+    user,
+    displayName,
+    isHr,
+    token,
+  };
+}
+
+export async function DashboardPageFrame({
+  children,
+}: DashboardPageFrameProps) {
+  const { user, displayName, isHr } = await getDashboardSession();
 
   return (
     <DashboardShell user={user} displayName={displayName} isHr={isHr}>

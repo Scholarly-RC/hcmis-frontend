@@ -20,6 +20,12 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import type { AuthUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -93,14 +99,17 @@ const sidebarGroups: SidebarGroup[] = [
       {
         label: "User Management",
         icon: Users,
+        href: "/hr/users",
       },
       {
         label: "Shift Management",
         icon: ClipboardList,
+        href: "/hr/shift-management",
       },
       {
         label: "User Attendance Management",
         icon: Activity,
+        href: "/hr/user-attendance-management",
       },
       {
         label: "Overtime Management",
@@ -154,13 +163,6 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
-
-  function toggleGroup(title: string) {
-    setOpenGroups((current) => ({
-      ...current,
-      [title]: !current[title],
-    }));
-  }
 
   function isActive(item: SidebarItem) {
     if (!item.href) {
@@ -262,63 +264,89 @@ export function DashboardShell({
                 const isOpen = openGroups[group.title] ?? false;
 
                 return (
-                  <section key={group.title} className="space-y-3">
-                    <button
-                      type="button"
-                      onClick={() => toggleGroup(group.title)}
-                      aria-expanded={isOpen}
-                      className="flex w-full items-center justify-between gap-3 rounded-2xl px-1 py-1 text-left transition-colors hover:bg-muted/40"
-                    >
-                      <div className="flex items-center gap-2">
-                        <GroupIcon className="size-4 text-muted-foreground" />
-                        <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
-                          {group.title}
-                        </h2>
-                      </div>
-                      <ChevronDown
-                        className={cn(
-                          "size-4 text-muted-foreground transition-transform",
-                          isOpen ? "rotate-180" : null,
-                        )}
-                      />
-                    </button>
+                  <Collapsible
+                    key={group.title}
+                    open={isOpen}
+                    onOpenChange={(nextOpen) =>
+                      setOpenGroups((current) => ({
+                        ...current,
+                        [group.title]: nextOpen,
+                      }))
+                    }
+                    className="space-y-3"
+                  >
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl px-1 py-1 text-left transition-colors hover:bg-muted/40"
+                      >
+                        <div className="flex items-center gap-2">
+                          <GroupIcon className="size-4 text-muted-foreground" />
+                          <h2 className="text-xs font-semibold uppercase tracking-[0.24em] text-muted-foreground">
+                            {group.title}
+                          </h2>
+                        </div>
+                        <ChevronDown
+                          className={cn(
+                            "size-4 text-muted-foreground transition-transform",
+                            isOpen ? "rotate-180" : null,
+                          )}
+                        />
+                      </Button>
+                    </CollapsibleTrigger>
 
-                    {isOpen ? (
-                      <div className="space-y-2">
-                        {group.items.map((item) => {
-                          const ItemIcon = item.icon;
-                          const active = isActive(item);
-
-                          return (
-                            <div
-                              key={item.label}
-                              className={
-                                active
-                                  ? "flex items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-3 py-2"
-                                  : "flex items-center gap-3 rounded-2xl border border-border/70 bg-background/70 px-3 py-2 transition-colors hover:bg-muted/60"
-                              }
-                            >
-                              <div
-                                className={
-                                  active
-                                    ? "flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"
-                                    : "flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-foreground"
-                                }
-                              >
-                                <ItemIcon className="size-4" />
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium leading-none text-foreground">
-                                  {item.label}
-                                </p>
-                              </div>
+                    <CollapsibleContent className="space-y-2">
+                      {group.items.map((item) => {
+                        const ItemIcon = item.icon;
+                        const active = isActive(item);
+                        const itemClasses = cn(
+                          "flex items-center gap-3 rounded-2xl border px-3 py-2",
+                          active
+                            ? "border-primary/30 bg-primary/5"
+                            : "border-border/70 bg-background/70 transition-colors hover:bg-muted/60",
+                        );
+                        const iconClasses = cn(
+                          "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-foreground",
+                        );
+                        const itemContent = (
+                          <>
+                            <div className={iconClasses}>
+                              <ItemIcon className="size-4" />
                             </div>
+
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium leading-none text-foreground">
+                                {item.label}
+                              </p>
+                            </div>
+                          </>
+                        );
+
+                        if (item.href) {
+                          return (
+                            <Link
+                              key={item.label}
+                              href={item.href}
+                              aria-current={active ? "page" : undefined}
+                              className={itemClasses}
+                            >
+                              {itemContent}
+                            </Link>
                           );
-                        })}
-                      </div>
-                    ) : null}
-                  </section>
+                        }
+
+                        return (
+                          <div key={item.label} className={itemClasses}>
+                            {itemContent}
+                          </div>
+                        );
+                      })}
+                    </CollapsibleContent>
+                  </Collapsible>
                 );
               })}
             </nav>

@@ -52,6 +52,8 @@ export function ConfirmationModal({
     try {
       await onConfirm();
       setOpen(false);
+    } catch {
+      // Keep the dialog open so the caller can surface the failure.
     } finally {
       setIsConfirming(false);
     }

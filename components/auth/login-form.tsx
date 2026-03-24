@@ -1,8 +1,11 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,29 +18,34 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Enter your email.")
+    .email("Enter a valid email address."),
+  password: z.string().min(1, "Enter your password."),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
+
 export function LoginForm() {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (isSubmitting) {
-      return;
-    }
-
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
-
-    if (!email || !password) {
-      setError("Enter both your email and password.");
-      return;
-    }
-
-    setIsSubmitting(true);
+  async function onSubmit(values: LoginFormValues) {
     setError(null);
 
     try {
@@ -46,7 +54,7 @@ export function LoginForm() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(values),
       });
 
       const payload = (await response.json().catch(() => null)) as {
@@ -62,8 +70,6 @@ export function LoginForm() {
       router.refresh();
     } catch {
       setError("Unable to reach the authentication service.");
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -76,17 +82,23 @@ export function LoginForm() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
-              name="email"
               type="email"
               autoComplete="email"
               placeholder="name@hcmis.org"
               disabled={isSubmitting}
+              aria-invalid={errors.email ? "true" : "false"}
+              {...register("email")}
             />
+            {errors.email ? (
+              <p className="text-xs text-destructive" role="alert">
+                {errors.email.message}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">
@@ -94,12 +106,13 @@ export function LoginForm() {
             <div className="relative">
               <Input
                 id="password"
-                name="password"
                 type={isPasswordVisible ? "text" : "password"}
                 autoComplete="current-password"
                 placeholder="••••••••"
                 className="pr-10"
                 disabled={isSubmitting}
+                aria-invalid={errors.password ? "true" : "false"}
+                {...register("password")}
               />
               <Button
                 type="button"
@@ -119,6 +132,11 @@ export function LoginForm() {
                 )}
               </Button>
             </div>
+            {errors.password ? (
+              <p className="text-xs text-destructive" role="alert">
+                {errors.password.message}
+              </p>
+            ) : null}
           </div>
 
           {error ? (

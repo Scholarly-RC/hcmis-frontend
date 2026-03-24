@@ -5,16 +5,7 @@ import type {
   AuthUser,
   AuthUserProfileUpdate,
 } from "@/lib/auth";
-
-const DEFAULT_BACKEND_URL = "http://localhost:8000";
-
-function getBackendBaseUrl() {
-  return process.env.HCMIS_BACKEND_URL ?? DEFAULT_BACKEND_URL;
-}
-
-function buildBackendUrl(pathname: string) {
-  return new URL(pathname, getBackendBaseUrl()).toString();
-}
+import { buildBackendUrl, readBackendJson } from "@/lib/backend";
 
 function getTokenExpiryDate(token: string) {
   const [, payload] = token.split(".");
@@ -38,14 +29,6 @@ function getTokenExpiryDate(token: string) {
   }
 }
 
-async function readJson<T>(response: Response): Promise<T | null> {
-  try {
-    return (await response.json()) as T;
-  } catch {
-    return null;
-  }
-}
-
 export async function loginWithBackend(
   email: string,
   password: string,
@@ -59,7 +42,7 @@ export async function loginWithBackend(
     cache: "no-store",
   });
 
-  const payload = await readJson<
+  const payload = await readBackendJson<
     Partial<AuthLoginResponse> & { detail?: string }
   >(response);
 
@@ -88,7 +71,7 @@ export async function fetchCurrentUser(
     return null;
   }
 
-  return readJson<AuthUser>(response);
+  return readBackendJson<AuthUser>(response);
 }
 
 export async function updateCurrentUserProfile(
@@ -105,7 +88,7 @@ export async function updateCurrentUserProfile(
     cache: "no-store",
   });
 
-  const responsePayload = await readJson<
+  const responsePayload = await readBackendJson<
     Partial<AuthUser> & { detail?: string }
   >(response);
 

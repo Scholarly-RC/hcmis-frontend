@@ -36,10 +36,11 @@ Follow these rules before making changes.
 ## Required Engineering Workflow
 
 1. Read relevant files and route structure before editing.
-2. Make the smallest change that fully satisfies the request.
-3. Reuse existing UI primitives before creating new abstractions.
-4. Run checks (`pnpm build`, then `pnpm lint` when feasible).
-5. Summarize changed files, behavior impact, and any residual risks.
+2. Scan `components/ui/` and nearby shared components for an existing shadcn primitive before introducing custom UI.
+3. Make the smallest change that fully satisfies the request.
+4. Reuse existing UI primitives before creating new abstractions.
+5. Run checks (`pnpm build`, then `pnpm lint` when feasible).
+6. Summarize changed files, behavior impact, and any residual risks.
 
 ## Project Structure Rules
 
@@ -78,6 +79,8 @@ Follow these rules before making changes.
 - Prefer existing shadcn components before custom one-off UI.
 - Add components with the shadcn CLI/MCP flow; avoid hand-copying registry code.
 - Keep generated primitives in `components/ui/` and compose them in feature code.
+- Default to shadcn primitives for interactive UI and form controls instead of raw HTML when a matching primitive exists, including dialogs, menus, tables, textareas, collapsibles, popovers, sheets, and similar building blocks.
+- If the needed primitive is missing, add it through the shadcn CLI/MCP flow before building a custom alternative.
 - If a shadcn component requires provider wiring (for example `TooltipProvider`), ensure it is added in `app/layout.tsx` or the appropriate shared layout.
 
 ## Styling Rules
@@ -90,7 +93,8 @@ Follow these rules before making changes.
 ## State, Data, And Side Effects
 
 - Keep pages presentational unless the task needs data wiring.
-- For forms, start simple and add schema/validation only when required.
+- For forms, use React Hook Form + Zod for non-trivial or validated forms; keep very small forms simple only when there is no meaningful validation/state complexity.
+- Prefer a consistent form pattern over ad hoc `useState` validation when a form has multiple fields, derived state, or server error handling.
 - Isolate async/data-fetch logic so rendering remains easy to follow.
 - Handle empty/loading/error states for non-trivial data views.
 

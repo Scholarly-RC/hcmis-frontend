@@ -1,8 +1,11 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Save } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type ReactNode, useState } from "react";
+import { type Control, Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { AuthUser } from "@/lib/auth";
 import {
   CIVIL_STATUS_OPTIONS,
@@ -23,20 +27,22 @@ import {
   RELIGION_OPTIONS,
 } from "@/lib/profile-options";
 
-type ProfileFormState = {
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  gender: string;
-  education: string;
-  civil_status: string;
-  religion: string;
-  rank: string;
-  phone_number: string;
-  address: string;
-  date_of_birth: string;
-  date_of_hiring: string;
-};
+const profileSchema = z.object({
+  first_name: z.string().trim().min(1, "First name is required."),
+  middle_name: z.string(),
+  last_name: z.string().trim().min(1, "Last name is required."),
+  gender: z.string(),
+  education: z.string(),
+  civil_status: z.string(),
+  religion: z.string(),
+  rank: z.string(),
+  phone_number: z.string(),
+  address: z.string(),
+  date_of_birth: z.string(),
+  date_of_hiring: z.string(),
+});
+
+type ProfileFormValues = z.infer<typeof profileSchema>;
 
 function toInputDate(value: string | null) {
   if (!value) {
@@ -46,7 +52,7 @@ function toInputDate(value: string | null) {
   return value.slice(0, 10);
 }
 
-function createInitialState(user: AuthUser): ProfileFormState {
+function createInitialValues(user: AuthUser): ProfileFormValues {
   return {
     first_name: user.first_name ?? "",
     middle_name: user.middle_name ?? "",
@@ -63,80 +69,139 @@ function createInitialState(user: AuthUser): ProfileFormState {
   };
 }
 
-function hasFormChanges(current: ProfileFormState, initial: ProfileFormState) {
-  return (Object.keys(initial) as Array<keyof ProfileFormState>).some(
-    (field) => current[field] !== initial[field],
-  );
+function toNullableText(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 type TextFieldProps = {
-  id: keyof ProfileFormState;
+  control: Control<ProfileFormValues>;
+  id: keyof ProfileFormValues;
   label: string;
-  value: string;
-  onChange: (field: keyof ProfileFormState, value: string) => void;
   type?: string;
   placeholder?: string;
 };
 
 function TextField({
+  control,
   id,
   label,
-  value,
-  onChange,
   type = "text",
   placeholder,
 }: TextFieldProps) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        name={id}
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(id, event.target.value)}
-      />
-    </div>
+    <Controller
+      control={control}
+      name={id}
+      render={({ field, fieldState }) => (
+        <div className="space-y-2">
+          <Label htmlFor={id}>{label}</Label>
+          <Input
+            id={id}
+            name={id}
+            type={type}
+            value={field.value}
+            placeholder={placeholder}
+            onBlur={field.onBlur}
+            onChange={(event) => field.onChange(event.target.value)}
+            aria-invalid={fieldState.invalid ? "true" : "false"}
+          />
+          {fieldState.error ? (
+            <p className="text-xs text-destructive" role="alert">
+              {fieldState.error.message}
+            </p>
+          ) : null}
+        </div>
+      )}
+    />
   );
 }
 
 type SelectFieldProps = {
-  id: keyof ProfileFormState;
+  control: Control<ProfileFormValues>;
+  id: keyof ProfileFormValues;
   label: string;
-  value: string;
-  onChange: (field: keyof ProfileFormState, value: string) => void;
   options: ProfileOption[];
   placeholder: string;
 };
 
 function SelectField({
+  control,
   id,
   label,
-  value,
-  onChange,
   options,
   placeholder,
 }: SelectFieldProps) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Select
-        value={value}
-        onValueChange={(nextValue) => onChange(id, nextValue)}
-      >
-        <SelectTrigger id={id} name={id} className="h-10 w-full">
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent position="popper">
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Controller
+      control={control}
+      name={id}
+      render={({ field, fieldState }) => (
+        <div className="space-y-2">
+          <Label htmlFor={id}>{label}</Label>
+          <Select value={field.value} onValueChange={field.onChange}>
+            <SelectTrigger id={id} name={id} className="h-10 w-full">
+              <SelectValue placeholder={placeholder} />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {fieldState.error ? (
+            <p className="text-xs text-destructive" role="alert">
+              {fieldState.error.message}
+            </p>
+          ) : null}
+        </div>
+      )}
+    />
+  );
+}
+
+type TextAreaFieldProps = {
+  control: Control<ProfileFormValues>;
+  id: keyof ProfileFormValues;
+  label: string;
+  placeholder?: string;
+  className?: string;
+};
+
+function TextAreaField({
+  control,
+  id,
+  label,
+  placeholder,
+  className,
+}: TextAreaFieldProps) {
+  return (
+    <Controller
+      control={control}
+      name={id}
+      render={({ field, fieldState }) => (
+        <div className="space-y-2">
+          <Label htmlFor={id}>{label}</Label>
+          <Textarea
+            id={id}
+            name={id}
+            value={field.value}
+            placeholder={placeholder}
+            onBlur={field.onBlur}
+            onChange={(event) => field.onChange(event.target.value)}
+            className={className}
+            aria-invalid={fieldState.invalid ? "true" : "false"}
+          />
+          {fieldState.error ? (
+            <p className="text-xs text-destructive" role="alert">
+              {fieldState.error.message}
+            </p>
+          ) : null}
+        </div>
+      )}
+    />
   );
 }
 
@@ -167,26 +232,20 @@ type ProfileEditFormProps = {
 
 export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
   const router = useRouter();
-  const initialState = createInitialState(user);
-  const [formState, setFormState] = useState(initialState);
-  const [isSaving, setIsSaving] = useState(false);
-  const isDirty = hasFormChanges(formState, initialState);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const initialValues = createInitialValues(user);
+  const {
+    control,
+    handleSubmit,
+    formState: { isDirty, isSubmitting },
+  } = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: initialValues,
+    mode: "onSubmit",
+  });
 
-  function updateField(field: keyof ProfileFormState, value: string) {
-    setFormState((current) => ({
-      ...current,
-      [field]: value,
-    }));
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (isSaving) {
-      return;
-    }
-
-    setIsSaving(true);
+  async function onSubmit(values: ProfileFormValues) {
+    setSubmitError(null);
 
     try {
       const response = await fetch("/api/profile/me", {
@@ -195,18 +254,18 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          first_name: formState.first_name,
-          middle_name: formState.middle_name || null,
-          last_name: formState.last_name,
-          gender: formState.gender || null,
-          education: formState.education || null,
-          civil_status: formState.civil_status || null,
-          religion: formState.religion || null,
-          rank: formState.rank || null,
-          phone_number: formState.phone_number || null,
-          address: formState.address || null,
-          date_of_birth: formState.date_of_birth || null,
-          date_of_hiring: formState.date_of_hiring || null,
+          first_name: values.first_name.trim(),
+          middle_name: toNullableText(values.middle_name),
+          last_name: values.last_name.trim(),
+          gender: toNullableText(values.gender),
+          education: toNullableText(values.education),
+          civil_status: toNullableText(values.civil_status),
+          religion: toNullableText(values.religion),
+          rank: toNullableText(values.rank),
+          phone_number: toNullableText(values.phone_number),
+          address: toNullableText(values.address),
+          date_of_birth: toNullableText(values.date_of_birth),
+          date_of_hiring: toNullableText(values.date_of_hiring),
         }),
       });
 
@@ -220,78 +279,79 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
 
       onSaved?.();
       router.refresh();
-    } catch {
-      // Keep the modal focused on the form; the parent can re-open if needed.
-    } finally {
-      setIsSaving(false);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Unable to update profile.",
+      );
     }
   }
 
   return (
-    <form className="flex min-h-full flex-col" onSubmit={handleSubmit}>
+    <form
+      className="flex min-h-full flex-col"
+      onSubmit={handleSubmit(onSubmit)}
+    >
       <div className="space-y-4 pb-4">
+        {submitError ? (
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            {submitError}
+          </div>
+        ) : null}
+
         <ProfileSection
           title="Personal details"
           description="These fields identify the person behind the account."
         >
           <div className="grid gap-4 md:grid-cols-2">
             <TextField
+              control={control}
               id="first_name"
               label="First name"
-              value={formState.first_name}
-              onChange={updateField}
               placeholder="First name"
             />
             <TextField
+              control={control}
               id="middle_name"
               label="Middle name"
-              value={formState.middle_name}
-              onChange={updateField}
               placeholder="Middle name"
             />
             <TextField
+              control={control}
               id="last_name"
               label="Last name"
-              value={formState.last_name}
-              onChange={updateField}
               placeholder="Last name"
             />
             <TextField
+              control={control}
               id="date_of_birth"
               label="Date of birth"
-              value={formState.date_of_birth}
-              onChange={updateField}
               type="date"
             />
             <SelectField
+              control={control}
               id="gender"
               label="Gender"
-              value={formState.gender}
-              onChange={updateField}
               options={GENDER_OPTIONS}
               placeholder="Choose gender..."
             />
             <SelectField
+              control={control}
               id="civil_status"
               label="Civil status"
-              value={formState.civil_status}
-              onChange={updateField}
               options={CIVIL_STATUS_OPTIONS}
               placeholder="Choose civil status..."
             />
             <SelectField
+              control={control}
               id="religion"
               label="Religion"
-              value={formState.religion}
-              onChange={updateField}
               options={RELIGION_OPTIONS}
               placeholder="Choose religion..."
             />
             <SelectField
+              control={control}
               id="education"
               label="Education"
-              value={formState.education}
-              onChange={updateField}
               options={EDUCATION_OPTIONS}
               placeholder="Choose education..."
             />
@@ -304,21 +364,18 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
         >
           <div className="grid gap-4 md:grid-cols-2">
             <TextField
+              control={control}
               id="phone_number"
               label="Phone number"
-              value={formState.phone_number}
-              onChange={updateField}
               placeholder="Phone number"
             />
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="address">Address</Label>
-              <textarea
+              <TextAreaField
+                control={control}
                 id="address"
-                name="address"
-                value={formState.address}
-                onChange={(event) => updateField("address", event.target.value)}
+                label="Address"
                 placeholder="Home address"
-                className="min-h-28 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-base transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30"
+                className="min-h-28"
               />
             </div>
           </div>
@@ -330,17 +387,15 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
         >
           <div className="grid gap-4 md:grid-cols-2">
             <TextField
+              control={control}
               id="rank"
               label="Rank"
-              value={formState.rank}
-              onChange={updateField}
               placeholder="Rank"
             />
             <TextField
+              control={control}
               id="date_of_hiring"
               label="Date of hiring"
-              value={formState.date_of_hiring}
-              onChange={updateField}
               type="date"
             />
           </div>
@@ -349,9 +404,9 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
 
       <div className="sticky bottom-0 z-10 -mx-5 border-t border-border/70 bg-background/95 px-5 py-3 shadow-[0_-12px_24px_-18px_rgba(0,0,0,0.35)] backdrop-blur-sm sm:-mx-6 sm:px-6">
         <div className="flex justify-end">
-          <Button type="submit" disabled={isSaving || !isDirty}>
+          <Button type="submit" disabled={isSubmitting || !isDirty}>
             <Save className="size-4" />
-            {isSaving ? "Saving..." : "Save changes"}
+            {isSubmitting ? "Saving..." : "Save changes"}
           </Button>
         </div>
       </div>
