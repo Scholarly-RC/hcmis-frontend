@@ -1,8 +1,13 @@
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { ProfileEditModal } from "@/app/profile/_components/profile-edit-modal";
 import { ProfileHeader } from "@/app/profile/_components/profile-header";
-import { Card, CardContent } from "@/components/ui/card";
 import type { AuthUser } from "@/lib/auth";
+import {
+  CIVIL_STATUS_OPTIONS,
+  EDUCATION_OPTIONS,
+  GENDER_OPTIONS,
+  RELIGION_OPTIONS,
+} from "@/lib/profile-options";
 
 export const metadata = {
   title: "My Profile",
@@ -105,6 +110,17 @@ function buildInitials(user: AuthUser) {
   return `${firstInitial}${lastInitial}`.trim().toUpperCase() || "U";
 }
 
+function getOptionLabel(
+  value: string | null,
+  options: { value: string; label: string }[],
+) {
+  if (!value) {
+    return "Not provided";
+  }
+
+  return options.find((option) => option.value === value)?.label ?? value;
+}
+
 function DetailRow({ label, value }: DetailItem) {
   return (
     <div className="flex items-start justify-between gap-6 border-b border-border/60 py-3 last:border-b-0">
@@ -169,15 +185,21 @@ export default function ProfilePage() {
             label: "Age",
             value: age ? `${age} years old` : "Not provided",
           },
-          { label: "Gender", value: user.gender?.trim() || "Not provided" },
+          {
+            label: "Gender",
+            value: getOptionLabel(user.gender, GENDER_OPTIONS),
+          },
           {
             label: "Civil status",
-            value: user.civil_status?.trim() || "Not provided",
+            value: getOptionLabel(user.civil_status, CIVIL_STATUS_OPTIONS),
           },
-          { label: "Religion", value: user.religion?.trim() || "Not provided" },
+          {
+            label: "Religion",
+            value: getOptionLabel(user.religion, RELIGION_OPTIONS),
+          },
           {
             label: "Education",
-            value: user.education?.trim() || "Not provided",
+            value: getOptionLabel(user.education, EDUCATION_OPTIONS),
           },
         ];
 
@@ -204,33 +226,6 @@ export default function ProfilePage() {
             label: "Tenure",
             value: getTenure(user.date_of_hiring),
           },
-          {
-            label: "Account status",
-            value: user.is_active ? "Active" : "Inactive",
-          },
-          {
-            label: "Superuser",
-            value: user.is_superuser ? "Yes" : "No",
-          },
-          {
-            label: "Shift permission",
-            value: user.can_modify_shift ? "Can modify shifts" : "Read only",
-          },
-          {
-            label: "Biometric UID",
-            value:
-              user.biometric_uid !== null
-                ? String(user.biometric_uid)
-                : "Not enrolled",
-          },
-          {
-            label: "Profile created",
-            value: formatDate(user.created_at),
-          },
-          {
-            label: "Last updated",
-            value: formatDate(user.updated_at),
-          },
         ];
 
         return (
@@ -255,22 +250,18 @@ export default function ProfilePage() {
                 <ProfileEditModal user={user} />
               </div>
 
-              <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-                <CardContent className="p-6">
-                  <div className="grid gap-6 xl:grid-cols-2">
-                    <DetailGroup
-                      title="Personal & contact"
-                      description="The information used for communication and identity checks."
-                      items={personalItems}
-                    />
-                    <DetailGroup
-                      title="Employment & access"
-                      description="The information that defines your role and account behavior."
-                      items={employmentItems}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid gap-6 xl:grid-cols-2">
+                <DetailGroup
+                  title="Personal & contact"
+                  description="The information used for communication and identity checks."
+                  items={personalItems}
+                />
+                <DetailGroup
+                  title="Employment details"
+                  description="The information that defines your role and job record."
+                  items={employmentItems}
+                />
+              </div>
             </section>
           </div>
         );
