@@ -6,6 +6,7 @@ import { useEffect, useRef } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { SelectField } from "@/components/form-select-field";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -13,6 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { debounce } from "@/lib/debounce";
@@ -27,6 +33,7 @@ type AttendanceFiltersProps = {
   userId: string;
   year: number;
   month: number;
+  tab: string;
   employees: EmployeeOption[];
 };
 
@@ -35,6 +42,7 @@ type FilterState = {
   userId: string;
   year: string;
   month: string;
+  tab: string;
 };
 
 type DebouncedUpdate = {
@@ -47,6 +55,7 @@ const attendanceFiltersSchema = z.object({
   userId: z.string(),
   year: z.string(),
   month: z.string(),
+  tab: z.string(),
 });
 
 const MONTH_NAMES = [
@@ -82,6 +91,9 @@ function buildUrl(pathname: string, state: FilterState) {
   if (state.month.trim().length > 0) {
     searchParams.set("month", state.month.trim());
   }
+  if (state.tab.trim().length > 0) {
+    searchParams.set("tab", state.tab.trim());
+  }
 
   const queryString = searchParams.toString();
   return queryString.length > 0 ? `${pathname}?${queryString}` : pathname;
@@ -92,8 +104,10 @@ export function AttendanceFilters({
   userId,
   year,
   month,
+  tab,
   employees,
 }: AttendanceFiltersProps) {
+  const currentDate = new Date();
   const router = useRouter();
   const pathname = usePathname();
   const debouncedUpdateRef = useRef<DebouncedUpdate | null>(null);
@@ -105,6 +119,7 @@ export function AttendanceFilters({
       userId,
       year: year.toString(),
       month: month.toString(),
+      tab,
     },
     mode: "onChange",
   });
@@ -130,8 +145,9 @@ export function AttendanceFilters({
       userId,
       year: year.toString(),
       month: month.toString(),
+      tab,
     });
-  }, [month, query, reset, userId, year]);
+  }, [month, query, reset, tab, userId, year]);
 
   useEffect(() => {
     if (!hasMountedRef.current) {
@@ -148,6 +164,7 @@ export function AttendanceFilters({
       userId: watchedValues.userId ?? "",
       year: watchedValues.year ?? "",
       month: watchedValues.month ?? "",
+      tab: watchedValues.tab ?? "",
     });
   }, [watchedValues]);
 
@@ -156,72 +173,123 @@ export function AttendanceFilters({
       <CardHeader className="space-y-2">
         <CardTitle>Filters</CardTitle>
         <CardDescription>
-          Search for an employee, then choose the month you want to review.
+          Start with employee search, then expand advanced filters only when
+          needed.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form
-          className="grid gap-4 xl:grid-cols-[1.4fr_1.4fr_0.8fr_0.8fr]"
+          className="space-y-4"
           onSubmit={(event) => event.preventDefault()}
         >
-          <div className="space-y-2 xl:col-span-1">
-            <Label htmlFor="q">Employee search</Label>
-            <Input
-              id="q"
-              className="h-10"
-              placeholder="Name, email, or employee number"
-              {...register("query")}
-            />
-          </div>
-
-          <Controller
-            control={control}
-            name="userId"
-            render={({ field }) => (
-              <SelectField
-                id="user"
-                label="Employee"
-                value={field.value}
-                onChange={(_, value) => field.onChange(value)}
-                options={employees.map((employee) => ({
-                  value: employee.id.toString(),
-                  label: employee.label,
-                }))}
-                placeholder="Select employee"
-                className="xl:col-span-1"
-              />
-            )}
-          />
-
-          <div className="grid grid-cols-2 gap-3 xl:col-span-1">
+          <div className="grid gap-4 xl:grid-cols-[1.1fr_1.6fr_0.9fr]">
             <div className="space-y-2">
-              <Label htmlFor="year">Year</Label>
+              <Label htmlFor="q">Employee search</Label>
               <Input
-                id="year"
-                type="number"
-                min={2020}
+                id="q"
                 className="h-10"
-                {...register("year")}
+                placeholder="Name, email, or employee number"
+                {...register("query")}
               />
             </div>
+
             <Controller
               control={control}
-              name="month"
+              name="userId"
               render={({ field }) => (
                 <SelectField
-                  id="month"
-                  label="Month"
+                  id="user"
+                  label="Employee"
                   value={field.value}
                   onChange={(_, value) => field.onChange(value)}
-                  options={MONTH_NAMES.map((label, index) => ({
-                    value: (index + 1).toString(),
-                    label,
+                  options={employees.map((employee) => ({
+                    value: employee.id.toString(),
+                    label: employee.label,
                   }))}
-                  placeholder="Select month"
+                  placeholder="Select employee"
                 />
               )}
             />
+
+            <div className="space-y-2">
+              <Label htmlFor="filter-actions" className="text-transparent">
+                Filter actions
+              </Label>
+              <div id="filter-actions" className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10"
+                  onClick={() => {
+                    reset({
+                      query: "",
+                      userId,
+                      year: currentDate.getFullYear().toString(),
+                      month: (currentDate.getMonth() + 1).toString(),
+                    });
+                  }}
+                >
+                  Today
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-10"
+                  onClick={() =>
+                    reset({
+                      query: "",
+                      userId: "",
+                      year: currentDate.getFullYear().toString(),
+                      month: (currentDate.getMonth() + 1).toString(),
+                    })
+                  }
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
           </div>
+
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                More filters
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="year">Year</Label>
+                <Input
+                  id="year"
+                  type="number"
+                  min={2020}
+                  className="h-10"
+                  {...register("year")}
+                />
+              </div>
+              <Controller
+                control={control}
+                name="month"
+                render={({ field }) => (
+                  <SelectField
+                    id="month"
+                    label="Month"
+                    value={field.value}
+                    onChange={(_, value) => field.onChange(value)}
+                    options={MONTH_NAMES.map((label, index) => ({
+                      value: (index + 1).toString(),
+                      label,
+                    }))}
+                    placeholder="Select month"
+                  />
+                )}
+              />
+            </CollapsibleContent>
+          </Collapsible>
         </form>
       </CardContent>
     </Card>

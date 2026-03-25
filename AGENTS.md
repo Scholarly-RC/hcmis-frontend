@@ -31,6 +31,7 @@ Follow these rules before making changes.
 - Run dev server: `pnpm dev`
 - Build: `pnpm build`
 - Lint: `pnpm lint`
+- Type check: `pnpm exec tsc --noEmit`
 - Format: `pnpm format`
 
 ## Required Engineering Workflow
@@ -39,8 +40,19 @@ Follow these rules before making changes.
 2. Scan `components/ui/` and nearby shared components for an existing shadcn primitive before introducing custom UI.
 3. Make the smallest change that fully satisfies the request.
 4. Reuse existing UI primitives before creating new abstractions.
-5. Run checks (`pnpm build`, then `pnpm lint` when feasible).
+5. Run checks (`pnpm lint` and `pnpm exec tsc --noEmit` by default).
 6. Summarize changed files, behavior impact, and any residual risks.
+
+## Lean Ctx Tooling Preference
+
+- Prefer `lean_ctx` MCP tools for repo exploration, reads, search, and command output analysis.
+- Default command-to-tool mapping:
+- `ctx_tree` for project structure inspection.
+- `ctx_search` for locating symbols, strings, and usage sites.
+- `ctx_read` and `ctx_multi_read` for file reading (prefer compressed modes unless full file context is required).
+- `ctx_shell` for command execution when summarized output is sufficient.
+- Use `ctx_cache` and `ctx_metrics` to keep iterative work token-efficient.
+- Use raw shell utilities only when `lean_ctx` cannot fulfill the operation.
 
 ## Project Structure Rules
 
@@ -131,10 +143,12 @@ Follow these rules before making changes.
 - Do not silently alter route paths or navigation structure without explicit request.
 - Do not hardcode secrets or environment-specific endpoints in components.
 - Do not revert unrelated user changes.
+- Do not run `pnpm build` for routine integration work unless explicitly requested.
 
 ## Definition Of Done
 
 - Requested UI/behavior is implemented.
-- Build succeeds (`pnpm build`).
-- Lint/format status is reported (`pnpm lint` and/or `pnpm format` when relevant).
+- Lint and typecheck pass (`pnpm lint` and `pnpm exec tsc --noEmit`) unless the task explicitly requires a build.
+- Build status is reported only when `pnpm build` is explicitly requested or required by the task.
+- Format status is reported when relevant (`pnpm format`).
 - File structure and component boundaries remain clean and maintainable.

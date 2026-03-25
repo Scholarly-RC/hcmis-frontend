@@ -1,9 +1,12 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
-
 import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-frame";
 import { AttendanceManagementClient } from "@/app/dashboard/user-attendance-management/_components/attendance-management-client";
+import type { DepartmentShiftPolicy } from "@/app/hr/shift-management/_components/shift-management-client";
 import { AttendanceFilters } from "@/app/hr/user-attendance-management/_components/attendance-filters";
+import { ShiftAssignmentManager } from "@/app/hr/user-attendance-management/_components/shift-assignment-manager";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -14,6 +17,7 @@ import {
 import type { AttendanceSummary } from "@/lib/attendance";
 import type { AuthUser } from "@/lib/auth";
 import { buildBackendUrl, readBackendJson } from "@/lib/backend";
+import { cn } from "@/lib/utils";
 
 export const metadata = {
   title: "User Attendance Management",
@@ -77,6 +81,18 @@ function buildUserLabel(user: AuthUser) {
   return `${name} - ${department} - ${role}`;
 }
 
+type AttendanceTab = "today" | "monthly" | "shifts";
+
+function parseTab(value: string): AttendanceTab {
+  if (value === "monthly" || value === "shifts") {
+    return value;
+  }
+  if (value === "history") {
+    return "monthly";
+  }
+  return "today";
+}
+
 async function fetchBackendJson<T>(
   token: string,
   pathname: string,
@@ -117,6 +133,7 @@ export default async function UserAttendanceManagementPage({
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth() + 1;
+  const currentDay = currentDate.getDate();
   const params = (await searchParams) ?? {};
 
   const query = firstValue(params.q).trim();
@@ -124,10 +141,14 @@ export default async function UserAttendanceManagementPage({
   const requestedUserId = Number.parseInt(firstValue(params.user), 10);
   const year = parsePositiveInteger(firstValue(params.year), currentYear);
   const month = parseMonth(firstValue(params.month), currentMonth);
+  const activeTab = parseTab(firstValue(params.tab));
+  const focusDay =
+    year === currentYear && month === currentMonth ? currentDay : null;
 
   let users: AuthUser[] = [];
   let summary: AttendanceSummary | null = null;
   let selectedUser: AuthUser | null = null;
+  let departmentShiftPolicy: DepartmentShiftPolicy | null = null;
   let loadError: string | null = null;
 
   try {
@@ -149,10 +170,21 @@ export default async function UserAttendanceManagementPage({
       users.find((user) => user.id === requestedUserId) ?? users[0] ?? null;
 
     if (selectedUser) {
-      summary = await fetchBackendJson<AttendanceSummary>(
-        session.token,
-        `/attendance/users/${selectedUser.id}/${year}/${month}`,
-      );
+      const [summaryResponse, shiftPolicyResponse] = await Promise.all([
+        fetchBackendJson<AttendanceSummary>(
+          session.token,
+          `/attendance/users/${selectedUser.id}/${year}/${month}`,
+        ),
+        selectedUser.department_id
+          ? fetchBackendJson<DepartmentShiftPolicy>(
+              session.token,
+              `/attendance/departments/${selectedUser.department_id}/shift-policy`,
+            ).catch(() => null)
+          : Promise.resolve(null),
+      ]);
+
+      summary = summaryResponse;
+      departmentShiftPolicy = shiftPolicyResponse;
     }
   } catch (error) {
     loadError =
@@ -166,6 +198,25 @@ export default async function UserAttendanceManagementPage({
     id: user.id,
     label: buildUserLabel(user),
   }));
+  const availableTabs: { key: AttendanceTab; label: string }[] = [
+    { key: "today", label: "Today" },
+    { key: "monthly", label: "Monthly" },
+    { key: "shifts", label: "Shift Assignments" },
+  ];
+
+  function buildTabHref(tab: AttendanceTab) {
+    const search = new URLSearchParams();
+    if (query.length > 0) {
+      search.set("q", query);
+    }
+    if (selectedUser?.id) {
+      search.set("user", selectedUser.id.toString());
+    }
+    search.set("year", year.toString());
+    search.set("month", month.toString());
+    search.set("tab", tab);
+    return `/hr/user-attendance-management?${search.toString()}`;
+  }
 
   return (
     <DashboardShell
@@ -175,14 +226,34 @@ export default async function UserAttendanceManagementPage({
     >
       <div className="flex w-full flex-col gap-6">
         <section className="space-y-3">
-          <div className="space-y-2">
-            <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">
-              User Attendance Management
-            </h1>
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Review monthly attendance, inspect daily punches, and correct
-              clock-in or clock-out records for employees.
-            </p>
+          <div className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-lg shadow-black/5 sm:p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-2">
+                <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">
+                  User Attendance Management
+                </h1>
+                <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                  Review daily punches, resolve corrections, and manage monthly
+                  attendance workflows with fewer on-screen actions.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {availableTabs.map((tab) => (
+                <Button
+                  key={tab.key}
+                  asChild
+                  type="button"
+                  variant={activeTab === tab.key ? "default" : "outline"}
+                  className={cn(
+                    "h-9",
+                    activeTab === tab.key ? "shadow-sm" : "bg-background",
+                  )}
+                >
+                  <Link href={buildTabHref(tab.key)}>{tab.label}</Link>
+                </Button>
+              ))}
+            </div>
           </div>
 
           <AttendanceFilters
@@ -191,6 +262,7 @@ export default async function UserAttendanceManagementPage({
             userId={selectedUser?.id?.toString() ?? ""}
             year={year}
             month={month}
+            tab={activeTab}
             employees={employeeOptions}
           />
         </section>
@@ -203,13 +275,32 @@ export default async function UserAttendanceManagementPage({
             </CardHeader>
           </Card>
         ) : selectedUser && summary ? (
-          <AttendanceManagementClient
-            key={`${selectedUser.id}-${summary.year}-${summary.month}`}
-            user={selectedUser}
-            summary={summary}
-            monthLabel={getMonthLabel(month)}
-            year={year}
-          />
+          <>
+            {activeTab === "shifts" ? (
+              <ShiftAssignmentManager
+                key={`assign-${selectedUser.id}-${summary.year}-${summary.month}`}
+                user={selectedUser}
+                summary={summary}
+                departmentShiftPolicy={departmentShiftPolicy}
+              />
+            ) : null}
+            {activeTab !== "shifts" ? (
+              <AttendanceManagementClient
+                key={`${selectedUser.id}-${summary.year}-${summary.month}-${activeTab}`}
+                user={selectedUser}
+                summary={summary}
+                monthLabel={getMonthLabel(month)}
+                year={year}
+                mode={activeTab === "today" ? "today" : "history"}
+                focusDay={focusDay}
+                referenceDate={{
+                  year: currentYear,
+                  month: currentMonth,
+                  day: currentDay,
+                }}
+              />
+            ) : null}
+          </>
         ) : (
           <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
             <CardHeader>

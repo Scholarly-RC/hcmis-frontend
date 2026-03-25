@@ -4,10 +4,10 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { buildBackendUrl, readBackendJson } from "@/lib/backend";
 
 import {
-  type DepartmentSchedule,
+  type DepartmentShiftPolicy,
   type DepartmentSummary,
   ShiftManagementClient,
-  type ShiftRecord,
+  type ShiftTemplateRecord,
 } from "./_components/shift-management-client";
 
 export const metadata = {
@@ -49,18 +49,21 @@ export default async function ShiftManagementPage() {
   }
 
   let departments: DepartmentSummary[] = [];
-  let shifts: ShiftRecord[] = [];
-  let initialDepartmentSchedule: DepartmentSchedule | null = null;
+  let shiftTemplates: ShiftTemplateRecord[] = [];
+  let initialDepartmentShiftPolicy: DepartmentShiftPolicy | null = null;
   let loadError: string | null = null;
 
   try {
     const [departmentResponse, shiftResponse] = await Promise.all([
       fetchBackendJson<DepartmentSummary[]>(session.token, "/departments"),
-      fetchBackendJson<ShiftRecord[]>(session.token, "/attendance/shifts"),
+      fetchBackendJson<ShiftTemplateRecord[]>(
+        session.token,
+        "/attendance/shift-templates",
+      ),
     ]);
 
     departments = departmentResponse;
-    shifts = shiftResponse;
+    shiftTemplates = shiftResponse;
 
     const selectedDepartment =
       departments.find((department) => department.is_active) ??
@@ -69,12 +72,13 @@ export default async function ShiftManagementPage() {
 
     if (selectedDepartment) {
       try {
-        initialDepartmentSchedule = await fetchBackendJson<DepartmentSchedule>(
-          session.token,
-          `/attendance/departments/${selectedDepartment.id}/schedule`,
-        );
+        initialDepartmentShiftPolicy =
+          await fetchBackendJson<DepartmentShiftPolicy>(
+            session.token,
+            `/attendance/departments/${selectedDepartment.id}/shift-policy`,
+          );
       } catch {
-        initialDepartmentSchedule = null;
+        initialDepartmentShiftPolicy = null;
       }
     }
   } catch (error) {
@@ -102,16 +106,16 @@ export default async function ShiftManagementPage() {
       ) : (
         <ShiftManagementClient
           departments={departments}
-          shifts={shifts}
+          shiftTemplates={shiftTemplates}
           initialDepartmentId={
-            initialDepartmentSchedule?.id.toString() ??
+            initialDepartmentShiftPolicy?.id.toString() ??
             departments
               .find((department) => department.is_active)
               ?.id.toString() ??
             departments[0]?.id.toString() ??
             ""
           }
-          initialDepartmentSchedule={initialDepartmentSchedule}
+          initialDepartmentShiftPolicy={initialDepartmentShiftPolicy}
         />
       )}
     </DashboardShell>

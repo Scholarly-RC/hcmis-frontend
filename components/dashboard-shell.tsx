@@ -49,6 +49,7 @@ type SidebarGroup = {
   icon: LucideIcon;
   items: SidebarItem[];
   requiresHr?: boolean;
+  routePrefixes?: string[];
 };
 
 const pinnedItems: SidebarItem[] = [
@@ -68,6 +69,7 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Account Modules",
     icon: ShieldCheck,
+    routePrefixes: ["/account", "/dashboard/user-attendance-management"],
     items: [
       {
         label: "Attendance",
@@ -95,6 +97,7 @@ const sidebarGroups: SidebarGroup[] = [
     title: "HR Modules",
     icon: Users,
     requiresHr: true,
+    routePrefixes: ["/hr", "/dashboard/hr"],
     items: [
       {
         label: "User Management",
@@ -174,6 +177,21 @@ export function DashboardShell({
     }
 
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
+  }
+
+  function isGroupActive(group: SidebarGroup) {
+    const hasActiveItem = group.items.some((item) => isActive(item));
+    if (hasActiveItem) {
+      return true;
+    }
+
+    if (!group.routePrefixes || group.routePrefixes.length === 0) {
+      return false;
+    }
+
+    return group.routePrefixes.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    );
   }
 
   return (
@@ -261,7 +279,7 @@ export function DashboardShell({
                 }
 
                 const GroupIcon = group.icon;
-                const isOpen = openGroups[group.title] ?? false;
+                const isOpen = openGroups[group.title] ?? isGroupActive(group);
 
                 return (
                   <Collapsible

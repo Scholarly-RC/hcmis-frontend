@@ -11,7 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type ComponentType, useState } from "react";
+import { type ComponentType, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ConfirmationModal } from "@/components/confirmation-modal";
@@ -55,6 +55,7 @@ import type {
 } from "@/lib/attendance";
 import type { AuthUser } from "@/lib/auth";
 import { toast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 
 type DraftState =
   | {
@@ -86,6 +87,13 @@ type AttendanceManagementClientProps = {
   summary: AttendanceSummary;
   year: number;
   monthLabel: string;
+  mode: "today" | "history";
+  focusDay: number | null;
+  referenceDate: {
+    year: number;
+    month: number;
+    day: number;
+  };
 };
 
 function pad(value: number) {
@@ -98,11 +106,9 @@ function formatDateKey(year: number, month: number, day: number) {
 
 function getLocalTimeInputValue(timestamp: string) {
   const date = new Date(timestamp);
-
   if (Number.isNaN(date.getTime())) {
     return "";
   }
-
   return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
@@ -159,16 +165,13 @@ function getSummaryStats(summary: AttendanceSummary) {
     if (day.shift) {
       daysWithShifts += 1;
     }
-
     if (day.attendance_records.length > 0) {
       daysWithPunches += 1;
       totalPunches += day.attendance_records.length;
     }
-
     if (day.holidays.length > 0) {
       holidayDays += 1;
     }
-
     if (day.overtime_approved) {
       overtimeDays += 1;
     }
@@ -189,6 +192,110 @@ function buildDraftInitialValues(draft: DraftState): AttendanceDraftFormValues {
     clockedTime: draft.clockedTime,
     punch: draft.punch,
   };
+}
+
+function parseScheduledStart(
+  summary: AttendanceSummary,
+  day: AttendanceSummaryDay,
+): Date | null {
+  const startTime = day.shift?.shift?.start_time;
+  if (!startTime) {
+    return null;
+  }
+
+  const [hoursText, minutesText] = startTime.split(":");
+  const hours = Number.parseInt(hoursText ?? "", 10);
+  const minutes = Number.parseInt(minutesText ?? "", 10);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+
+  const startDate = new Date(summary.year, summary.month - 1, day.day);
+  startDate.setHours(hours, minutes, 0, 0);
+  return startDate;
+}
+
+function isPastDay(
+  summary: AttendanceSummary,
+  day: AttendanceSummaryDay,
+  referenceDate: { year: number; month: number; day: number },
+) {
+  const dayDate = new Date(summary.year, summary.month - 1, day.day);
+  dayDate.setHours(0, 0, 0, 0);
+
+  const reference = new Date(
+    referenceDate.year,
+    referenceDate.month - 1,
+    referenceDate.day,
+  );
+  reference.setHours(0, 0, 0, 0);
+
+  return dayDate.getTime() < reference.getTime();
+}
+
+function getDayStatus(
+  summary: AttendanceSummary,
+  day: AttendanceSummaryDay,
+  referenceDate: { year: number; month: number; day: number },
+): {
+  label: string;
+  variant: "default" | "secondary" | "outline" | "destructive";
+} {
+  if (day.holidays.length > 0) {
+    return { label: "Holiday", variant: "secondary" };
+  }
+
+  const records = [...day.attendance_records].sort((a, b) =>
+    a.timestamp.localeCompare(b.timestamp),
+  );
+
+  if (day.shift && records.length === 0) {
+    return isPastDay(summary, day, referenceDate)
+      ? { label: "Absent", variant: "destructive" }
+      : { label: "Pending", variant: "outline" };
+  }
+
+  if (day.shift && records.length === 1) {
+    return { label: "Pending correction", variant: "outline" };
+  }
+
+  const firstClockIn = records.find((record) => record.punch === "IN");
+  const scheduledStart = parseScheduledStart(summary, day);
+  if (firstClockIn && scheduledStart) {
+    const firstClockInTime = new Date(firstClockIn.timestamp).getTime();
+    if (
+      Number.isFinite(firstClockInTime) &&
+      firstClockInTime > scheduledStart.getTime()
+    ) {
+      return { label: "Late", variant: "secondary" };
+    }
+  }
+
+  return records.length > 0
+    ? { label: "Present", variant: "default" }
+    : { label: "No shift", variant: "outline" };
+}
+
+function getDaysForMode(
+  summary: AttendanceSummary,
+  mode: "today" | "history",
+  focusDay: number | null,
+): AttendanceSummaryDay[] {
+  if (mode === "history") {
+    return summary.days;
+  }
+
+  if (focusDay !== null) {
+    const day = summary.days.find((item) => item.day === focusDay);
+    if (day) {
+      return [day];
+    }
+  }
+
+  const firstWithPunches = summary.days.find(
+    (day) => day.attendance_records.length > 0,
+  );
+  return firstWithPunches ? [firstWithPunches] : summary.days.slice(0, 1);
 }
 
 function AttendanceDraftForm({
@@ -217,7 +324,6 @@ function AttendanceDraftForm({
 
   async function handleFormSubmit(values: AttendanceDraftFormValues) {
     setIsSaving(true);
-
     const dateKey = formatDateKey(summary.year, summary.month, draft.day.day);
     const body =
       draft.mode === "create"
@@ -238,9 +344,7 @@ function AttendanceDraftForm({
           : `/api/attendance/records/${draft.record.id}`,
         {
           method: draft.mode === "create" ? "POST" : "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         },
       );
@@ -400,6 +504,9 @@ export function AttendanceManagementClient({
   summary,
   year,
   monthLabel,
+  mode,
+  focusDay,
+  referenceDate,
 }: AttendanceManagementClientProps) {
   const router = useRouter();
   const [selectedDayNumber, setSelectedDayNumber] = useState<number | null>(
@@ -408,10 +515,24 @@ export function AttendanceManagementClient({
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const stats = getSummaryStats(summary);
+  const filteredDays = getDaysForMode(summary, mode, focusDay);
   const selectedDay =
     selectedDayNumber === null
       ? null
-      : (summary.days.find((day) => day.day === selectedDayNumber) ?? null);
+      : (filteredDays.find((day) => day.day === selectedDayNumber) ?? null);
+
+  useEffect(() => {
+    if (filteredDays.length === 0) {
+      setSelectedDayNumber(null);
+      return;
+    }
+    const hasSelectedDay = filteredDays.some(
+      (day) => day.day === selectedDayNumber,
+    );
+    if (!hasSelectedDay) {
+      setSelectedDayNumber(filteredDays[0].day);
+    }
+  }, [filteredDays, selectedDayNumber]);
 
   function openDay(day: AttendanceSummaryDay) {
     setSelectedDayNumber(day.day);
@@ -441,14 +562,12 @@ export function AttendanceManagementClient({
     if (isSaving) {
       return;
     }
-
     setIsSaving(true);
 
     try {
       const response = await fetch(`/api/attendance/records/${recordId}`, {
         method: "DELETE",
       });
-
       const payload = (await response.json().catch(() => null)) as {
         detail?: string;
       } | null;
@@ -466,20 +585,8 @@ export function AttendanceManagementClient({
       toast.error("Unable to delete attendance record.");
       return;
     }
-    setIsSaving(false);
-  }
 
-  if (!summary) {
-    return (
-      <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-        <CardHeader>
-          <CardTitle>Attendance data unavailable</CardTitle>
-          <CardDescription>
-            Select an employee to load the monthly attendance view.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    setIsSaving(false);
   }
 
   return (
@@ -517,10 +624,12 @@ export function AttendanceManagementClient({
         />
       </section>
 
-      <section className="space-y-6">
+      <section className="grid gap-4 xl:grid-cols-[2fr_1fr]">
         <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardHeader className="space-y-2">
-            <CardTitle>Monthly attendance</CardTitle>
+          <CardHeader>
+            <CardTitle>
+              {mode === "today" ? "Today view" : "Monthly attendance"}
+            </CardTitle>
             <CardDescription>
               {user.department
                 ? `${user.department.name} - ${monthLabel} ${year}`
@@ -531,9 +640,11 @@ export function AttendanceManagementClient({
             <div className="overflow-hidden rounded-2xl border border-border/70">
               <div className="max-h-[38rem] overflow-auto">
                 <Table className="min-w-full">
-                  <TableHeader className="sticky top-0 z-10 bg-muted/95 backdrop-blur">
+                  <TableHeader className="sticky top-0 z-20 bg-muted/95 backdrop-blur">
                     <TableRow className="text-left text-xs uppercase tracking-[0.18em] text-muted-foreground hover:bg-transparent">
-                      <TableHead className="px-4 py-3">Day</TableHead>
+                      <TableHead className="sticky left-0 z-30 bg-muted/95 px-4 py-3">
+                        Day
+                      </TableHead>
                       <TableHead className="px-4 py-3">Shift</TableHead>
                       <TableHead className="px-4 py-3">Punches</TableHead>
                       <TableHead className="px-4 py-3">Status</TableHead>
@@ -543,121 +654,117 @@ export function AttendanceManagementClient({
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-border/70 bg-background">
-                    {summary.days.map((day) => (
-                      <TableRow
-                        key={day.day}
-                        className="cursor-pointer transition-colors hover:bg-muted/50"
-                        onClick={() => openDay(day)}
-                      >
-                        <TableCell className="px-4 py-4 align-top">
-                          <div className="space-y-1">
-                            <p className="text-base font-semibold text-foreground">
-                              {day.day}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {day.day_name}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-4 py-4 align-top">
-                          <p className="max-w-[16rem] text-sm font-medium text-foreground">
-                            {day.shift?.shift?.description ?? "No shift"}
-                          </p>
-                          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                            {getShiftRangeLabel(day.shift)}
-                          </p>
-                        </TableCell>
-                        <TableCell className="px-4 py-4 align-top">
-                          <div className="space-y-2">
-                            {day.attendance_records.length > 0 ? (
-                              day.attendance_records.map((record) => (
-                                <div
-                                  key={record.id}
-                                  className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm"
-                                >
-                                  <span className="font-medium">
-                                    {record.punch}
-                                  </span>
-                                  <span className="text-muted-foreground">
-                                    {formatTimeLabel(record.timestamp)}
-                                  </span>
-                                </div>
-                              ))
-                            ) : (
-                              <p className="text-sm text-muted-foreground">
-                                No punch records
-                              </p>
+                    {filteredDays.length > 0 ? (
+                      filteredDays.map((day) => {
+                        const status = getDayStatus(
+                          summary,
+                          day,
+                          referenceDate,
+                        );
+                        return (
+                          <TableRow
+                            key={day.day}
+                            className={cn(
+                              "cursor-pointer border-l-2 border-transparent transition-colors",
+                              mode === "history" &&
+                                selectedDayNumber === day.day
+                                ? "border-l-primary bg-muted/70 hover:bg-muted/70"
+                                : "hover:bg-muted/50",
                             )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-4 py-4 align-top">
-                          <div className="flex flex-wrap gap-2">
-                            {day.holidays.length > 0 ? (
-                              <MiniBadge variant="secondary">Holiday</MiniBadge>
-                            ) : null}
-                            {day.overtime_approved ? (
-                              <MiniBadge>Overtime approved</MiniBadge>
-                            ) : null}
-                            {day.attendance_records.length > 0 ? (
-                              <MiniBadge variant="outline">
-                                {`${day.attendance_records.length} punch${day.attendance_records.length === 1 ? "" : "es"}`}
-                              </MiniBadge>
-                            ) : (
-                              <MiniBadge variant="outline">
-                                No punches
-                              </MiniBadge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-4 py-4 align-top text-right">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openDay(day);
-                            }}
+                            onClick={() => openDay(day)}
                           >
-                            View details
-                          </Button>
+                            <TableCell className="sticky left-0 z-10 bg-background px-4 py-4 align-top">
+                              <div className="space-y-1">
+                                <p className="text-base font-semibold text-foreground">
+                                  {day.day}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {day.day_name}
+                                </p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-4 py-4 align-top">
+                              <p className="max-w-[16rem] text-sm font-medium text-foreground">
+                                {day.shift?.shift?.description ?? "No shift"}
+                              </p>
+                              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                                {getShiftRangeLabel(day.shift)}
+                              </p>
+                            </TableCell>
+                            <TableCell className="px-4 py-4 align-top">
+                              <div className="space-y-2">
+                                {day.attendance_records.length > 0 ? (
+                                  day.attendance_records.map((record) => (
+                                    <div
+                                      key={record.id}
+                                      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm"
+                                    >
+                                      <span className="font-medium">
+                                        {record.punch}
+                                      </span>
+                                      <span className="text-muted-foreground">
+                                        {formatTimeLabel(record.timestamp)}
+                                      </span>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p className="text-sm text-muted-foreground">
+                                    No punch records
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="px-4 py-4 align-top">
+                              <MiniBadge variant={status.variant}>
+                                {status.label}
+                              </MiniBadge>
+                            </TableCell>
+                            <TableCell className="px-4 py-4 align-top text-right">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openDay(day);
+                                }}
+                              >
+                                View details
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={5}
+                          className="px-4 py-8 text-center text-sm text-muted-foreground"
+                        >
+                          No rows for this view.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </div>
             </div>
           </CardContent>
         </Card>
-      </section>
 
-      <Dialog
-        open={selectedDay !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedDayNumber(null);
-          }
-        }}
-      >
-        <DialogContent className="!left-auto !right-0 !top-0 !h-[100dvh] !w-full !max-w-none !translate-x-0 !translate-y-0 overflow-hidden rounded-none border-l p-0 sm:!w-[32rem] md:!w-[40rem] lg:!w-[46rem]">
-          {selectedDay ? (
-            <div className="flex h-full flex-col overflow-hidden bg-background">
-              <div className="min-h-0 flex-1 overflow-y-auto border-b border-border/70 bg-muted/20 p-6">
-                <DialogHeader>
-                  <DialogTitle className="text-2xl">
-                    {formatDateLabel(
-                      summary.year,
-                      summary.month,
-                      selectedDay.day,
-                    )}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {selectedDay.day_name} - {monthLabel} {year}
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="mt-5 flex flex-wrap gap-2">
+        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5 xl:sticky xl:top-4 xl:h-fit">
+          <CardHeader>
+            <CardTitle>Selected day</CardTitle>
+            <CardDescription>
+              {selectedDay
+                ? `${formatDateLabel(summary.year, summary.month, selectedDay.day)}`
+                : "Select a row to review details and manage punches."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {selectedDay ? (
+              <>
+                <div className="flex flex-wrap gap-2">
                   {selectedDay.shift ? (
                     <MiniBadge variant="secondary">Shift assigned</MiniBadge>
                   ) : (
@@ -671,97 +778,99 @@ export function AttendanceManagementClient({
                   ) : null}
                 </div>
 
-                <div className="mt-6 space-y-4">
-                  <div className="rounded-2xl border border-border/70 bg-background p-4">
-                    <p className="text-sm text-muted-foreground">Shift</p>
-                    <p className="mt-1 font-medium text-foreground">
-                      {selectedDay.shift?.shift?.description ?? "No shift"}
-                    </p>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      {getShiftRangeLabel(selectedDay.shift)}
-                    </p>
+                <div className="rounded-2xl border border-border/70 bg-background p-4">
+                  <p className="text-sm text-muted-foreground">Shift</p>
+                  <p className="mt-1 font-medium text-foreground">
+                    {selectedDay.shift?.shift?.description ?? "No shift"}
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {getShiftRangeLabel(selectedDay.shift)}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-border/70 bg-background p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Punch history
+                      </p>
+                      <p className="mt-1 font-medium text-foreground">
+                        {selectedDay.attendance_records.length} records
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => startCreate(selectedDay)}
+                    >
+                      <Plus className="size-4" />
+                      Add punch
+                    </Button>
                   </div>
 
-                  <div className="rounded-2xl border border-border/70 bg-background p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm text-muted-foreground">
-                          Punch history
-                        </p>
-                        <p className="mt-1 font-medium text-foreground">
-                          {selectedDay.attendance_records.length} records
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        onClick={() => startCreate(selectedDay)}
-                      >
-                        <Plus className="size-4" />
-                        Add punch
-                      </Button>
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      {selectedDay.attendance_records.length > 0 ? (
-                        selectedDay.attendance_records.map((record) => (
-                          <div
-                            key={record.id}
-                            className="rounded-2xl border border-border/70 bg-muted/40 p-4"
-                          >
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div>
-                                <p className="text-sm text-muted-foreground">
-                                  {record.punch}
-                                </p>
-                                <p className="text-lg font-semibold text-foreground">
-                                  {formatTimeLabel(record.timestamp)}
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => startEdit(selectedDay, record)}
-                                >
-                                  <PencilLine className="size-4" />
-                                  Edit
-                                </Button>
-                                <ConfirmationModal
-                                  trigger={
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="destructive"
-                                      disabled={isSaving}
-                                    >
-                                      <Trash2 className="size-4" />
-                                      Delete
-                                    </Button>
-                                  }
-                                  title={`Delete ${record.punch} punch?`}
-                                  description={`This will remove the ${record.punch.toLowerCase()} record at ${formatTimeLabel(record.timestamp)}.`}
-                                  confirmLabel="Delete"
-                                  onConfirm={() => deleteRecord(record.id)}
-                                />
-                              </div>
+                  <div className="mt-4 space-y-3">
+                    {selectedDay.attendance_records.length > 0 ? (
+                      selectedDay.attendance_records.map((record) => (
+                        <div
+                          key={record.id}
+                          className="rounded-2xl border border-border/70 bg-muted/40 p-4"
+                        >
+                          <div className="flex flex-col gap-3">
+                            <div>
+                              <p className="text-sm text-muted-foreground">
+                                {record.punch}
+                              </p>
+                              <p className="text-lg font-semibold text-foreground">
+                                {formatTimeLabel(record.timestamp)}
+                              </p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => startEdit(selectedDay, record)}
+                              >
+                                <PencilLine className="size-4" />
+                                Edit
+                              </Button>
+                              <ConfirmationModal
+                                trigger={
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={isSaving}
+                                  >
+                                    <Trash2 className="size-4" />
+                                    Delete
+                                  </Button>
+                                }
+                                title={`Delete ${record.punch} punch?`}
+                                description={`This will remove the ${record.punch.toLowerCase()} record at ${formatTimeLabel(record.timestamp)}.`}
+                                confirmLabel="Delete"
+                                onConfirm={() => deleteRecord(record.id)}
+                              />
                             </div>
                           </div>
-                        ))
-                      ) : (
-                        <p className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
-                          No punches have been recorded for this day yet.
-                        </p>
-                      )}
-                    </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm leading-6 text-muted-foreground">
+                        No punches have been recorded for this day yet.
+                      </p>
+                    )}
                   </div>
                 </div>
-              </div>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+              </>
+            ) : (
+              <p className="rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
+                Choose a day from the table to open the detail panel.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </section>
 
       <Dialog
         open={draft !== null}

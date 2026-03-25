@@ -46,7 +46,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
-export type ShiftRecord = {
+export type ShiftTemplateRecord = {
   id: number;
   description: string;
   start_time: string | null;
@@ -66,8 +66,8 @@ export type DepartmentSummary = {
   is_active: boolean;
 };
 
-export type DepartmentSchedule = DepartmentSummary & {
-  shifts: ShiftRecord[];
+export type DepartmentShiftPolicy = DepartmentSummary & {
+  shifts: ShiftTemplateRecord[];
 };
 
 type ShiftEditorMode = "create" | "edit";
@@ -214,9 +214,9 @@ type ShiftPayload = {
 
 type ShiftManagementClientProps = {
   departments: DepartmentSummary[];
-  shifts: ShiftRecord[];
+  shiftTemplates: ShiftTemplateRecord[];
   initialDepartmentId: string;
-  initialDepartmentSchedule: DepartmentSchedule | null;
+  initialDepartmentShiftPolicy: DepartmentShiftPolicy | null;
 };
 
 const WORKWEEK_DAYS = [
@@ -238,7 +238,7 @@ class ApiError extends Error {
   }
 }
 
-function sortShifts(items: ShiftRecord[]) {
+function sortShifts(items: ShiftTemplateRecord[]) {
   return [...items].sort((left, right) => {
     const leftActive = left.is_active ? 0 : 1;
     const rightActive = right.is_active ? 0 : 1;
@@ -276,7 +276,7 @@ function formatTime(value: string | null) {
   }).format(parsed);
 }
 
-function formatShiftRange(shift: ShiftRecord) {
+function formatShiftRange(shift: ShiftTemplateRecord) {
   const parts = [
     shift.start_time,
     shift.end_time,
@@ -293,14 +293,16 @@ function formatShiftRange(shift: ShiftRecord) {
   return parts.join(" - ");
 }
 
-function buildShiftSummary(shift: ShiftRecord) {
+function buildShiftSummary(shift: ShiftTemplateRecord) {
   const range = formatShiftRange(shift);
   return range === "No time range configured"
     ? shift.description
     : `${shift.description} · ${range}`;
 }
 
-function buildShiftFormState(shift: ShiftRecord | null): ShiftFormState {
+function buildShiftFormState(
+  shift: ShiftTemplateRecord | null,
+): ShiftFormState {
   return {
     description: shift?.description ?? "",
     start_time: shift?.start_time ?? "",
@@ -312,8 +314,8 @@ function buildShiftFormState(shift: ShiftRecord | null): ShiftFormState {
 }
 
 function syncScheduleShifts(
-  schedule: DepartmentSchedule,
-  shiftCatalog: ShiftRecord[],
+  schedule: DepartmentShiftPolicy,
+  shiftCatalog: ShiftTemplateRecord[],
 ) {
   const shiftById = new Map(shiftCatalog.map((shift) => [shift.id, shift]));
 
@@ -389,7 +391,7 @@ function ShiftEditorDialog({
 }: {
   open: boolean;
   mode: ShiftEditorMode;
-  shift: ShiftRecord | null;
+  shift: ShiftTemplateRecord | null;
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: ShiftPayload) => Promise<void>;
 }) {
@@ -524,9 +526,9 @@ function ShiftCard({
   onEdit,
   onDelete,
 }: {
-  shift: ShiftRecord;
-  onEdit: (shift: ShiftRecord) => void;
-  onDelete: (shift: ShiftRecord) => Promise<void>;
+  shift: ShiftTemplateRecord;
+  onEdit: (shift: ShiftTemplateRecord) => void;
+  onDelete: (shift: ShiftTemplateRecord) => Promise<void>;
 }) {
   return (
     <div className="rounded-2xl border border-border/70 bg-background/70 p-4 transition-colors hover:bg-background">
@@ -606,30 +608,32 @@ function DepartmentWorkweekToggle({
 
 export function ShiftManagementClient({
   departments,
-  shifts,
+  shiftTemplates,
   initialDepartmentId,
-  initialDepartmentSchedule,
+  initialDepartmentShiftPolicy,
 }: ShiftManagementClientProps) {
-  const [shiftCatalog, setShiftCatalog] = useState<ShiftRecord[]>(
-    sortShifts(shifts),
+  const [shiftCatalog, setShiftCatalog] = useState<ShiftTemplateRecord[]>(
+    sortShifts(shiftTemplates),
   );
   const [selectedDepartmentId, setSelectedDepartmentId] =
     useState(initialDepartmentId);
-  const [selectedSchedule, setSelectedSchedule] =
-    useState<DepartmentSchedule | null>(initialDepartmentSchedule);
+  const [selectedPolicy, setSelectedPolicy] =
+    useState<DepartmentShiftPolicy | null>(initialDepartmentShiftPolicy);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [isShiftEditorOpen, setIsShiftEditorOpen] = useState(false);
   const [shiftEditorMode, setShiftEditorMode] =
     useState<ShiftEditorMode>("create");
-  const [editingShift, setEditingShift] = useState<ShiftRecord | null>(null);
+  const [editingShift, setEditingShift] = useState<ShiftTemplateRecord | null>(
+    null,
+  );
 
   const initialScheduleRequested = useRef(false);
 
   useEffect(() => {
-    setShiftCatalog(sortShifts(shifts));
-  }, [shifts]);
+    setShiftCatalog(sortShifts(shiftTemplates));
+  }, [shiftTemplates]);
 
   function getDepartmentLabel(department: DepartmentSummary) {
     return `${department.name} (${department.code})`;
@@ -640,59 +644,68 @@ export function ShiftManagementClient({
     label: getDepartmentLabel(department),
   }));
 
-  function shiftSync(nextShifts: ShiftRecord[]) {
-    setSelectedSchedule((current) =>
+  function shiftSync(nextShifts: ShiftTemplateRecord[]) {
+    setSelectedPolicy((current) =>
       current ? syncScheduleShifts(current, nextShifts) : current,
     );
   }
 
   async function loadShiftCatalog() {
     const nextShifts = sortShifts(
-      await requestJson<ShiftRecord[]>("/api/attendance/shifts"),
+      await requestJson<ShiftTemplateRecord[]>(
+        "/api/attendance/shift-templates",
+      ),
     );
     setShiftCatalog(nextShifts);
     shiftSync(nextShifts);
     return nextShifts;
   }
 
-  const loadDepartmentSchedule = useCallback(async (departmentId: string) => {
-    if (!departmentId) {
-      setSelectedSchedule(null);
+  const loadDepartmentShiftPolicy = useCallback(
+    async (departmentId: string) => {
+      if (!departmentId) {
+        setSelectedPolicy(null);
+        setScheduleError(null);
+        return;
+      }
+
+      setIsLoadingSchedule(true);
       setScheduleError(null);
-      return;
-    }
+      setSelectedPolicy(null);
 
-    setIsLoadingSchedule(true);
-    setScheduleError(null);
-    setSelectedSchedule(null);
-
-    try {
-      const nextSchedule = await requestJson<DepartmentSchedule>(
-        `/api/attendance/departments/${departmentId}/schedule`,
-      );
-      setSelectedSchedule(nextSchedule);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to load the selected department schedule.";
-      setScheduleError(message);
-      toast.error(message);
-    } finally {
-      setIsLoadingSchedule(false);
-    }
-  }, []);
+      try {
+        const nextPolicy = await requestJson<DepartmentShiftPolicy>(
+          `/api/attendance/departments/${departmentId}/shift-policy`,
+        );
+        setSelectedPolicy(nextPolicy);
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to load the selected department shift policy.";
+        setScheduleError(message);
+        toast.error(message);
+      } finally {
+        setIsLoadingSchedule(false);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (
       !initialScheduleRequested.current &&
       selectedDepartmentId &&
-      initialDepartmentSchedule === null
+      initialDepartmentShiftPolicy === null
     ) {
       initialScheduleRequested.current = true;
-      void loadDepartmentSchedule(selectedDepartmentId);
+      void loadDepartmentShiftPolicy(selectedDepartmentId);
     }
-  }, [initialDepartmentSchedule, selectedDepartmentId, loadDepartmentSchedule]);
+  }, [
+    initialDepartmentShiftPolicy,
+    selectedDepartmentId,
+    loadDepartmentShiftPolicy,
+  ]);
 
   function openCreateShift() {
     setShiftEditorMode("create");
@@ -700,7 +713,7 @@ export function ShiftManagementClient({
     setIsShiftEditorOpen(true);
   }
 
-  function openEditShift(shift: ShiftRecord) {
+  function openEditShift(shift: ShiftTemplateRecord) {
     setShiftEditorMode("edit");
     setEditingShift(shift);
     setIsShiftEditorOpen(true);
@@ -708,10 +721,10 @@ export function ShiftManagementClient({
 
   async function saveShift(payload: ShiftPayload) {
     const isEditing = shiftEditorMode === "edit" && editingShift !== null;
-    await requestJson<ShiftRecord>(
+    await requestJson<ShiftTemplateRecord>(
       isEditing
-        ? `/api/attendance/shifts/${editingShift.id}`
-        : "/api/attendance/shifts",
+        ? `/api/attendance/shift-templates/${editingShift.id}`
+        : "/api/attendance/shift-templates",
       {
         method: isEditing ? "PATCH" : "POST",
         body: JSON.stringify(payload),
@@ -724,9 +737,9 @@ export function ShiftManagementClient({
     );
   }
 
-  async function deleteShift(shift: ShiftRecord) {
+  async function deleteShift(shift: ShiftTemplateRecord) {
     try {
-      await requestJson<string>(`/api/attendance/shifts/${shift.id}`, {
+      await requestJson<string>(`/api/attendance/shift-templates/${shift.id}`, {
         method: "DELETE",
       });
 
@@ -741,7 +754,7 @@ export function ShiftManagementClient({
   }
 
   async function saveDepartmentSchedule() {
-    if (!selectedSchedule || !selectedDepartmentId) {
+    if (!selectedPolicy || !selectedDepartmentId) {
       return;
     }
 
@@ -749,24 +762,24 @@ export function ShiftManagementClient({
     setScheduleError(null);
 
     try {
-      const nextSchedule = await requestJson<DepartmentSchedule>(
-        `/api/attendance/departments/${selectedDepartmentId}/schedule`,
+      const nextPolicy = await requestJson<DepartmentShiftPolicy>(
+        `/api/attendance/departments/${selectedDepartmentId}/shift-policy`,
         {
           method: "PATCH",
           body: JSON.stringify({
-            workweek: selectedSchedule.workweek,
-            shift_ids: selectedSchedule.shifts.map((shift) => shift.id),
+            workweek: selectedPolicy.workweek,
+            shift_ids: selectedPolicy.shifts.map((shift) => shift.id),
           }),
         },
       );
 
-      setSelectedSchedule(nextSchedule);
-      toast.success("Department schedule saved.");
+      setSelectedPolicy(nextPolicy);
+      toast.success("Department shift policy saved.");
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : "Unable to save the selected department schedule.";
+          : "Unable to save the selected department shift policy.";
       setScheduleError(message);
       toast.error(message);
     } finally {
@@ -775,9 +788,9 @@ export function ShiftManagementClient({
   }
 
   function updateSelectedSchedule(
-    updater: (current: DepartmentSchedule) => DepartmentSchedule,
+    updater: (current: DepartmentShiftPolicy) => DepartmentShiftPolicy,
   ) {
-    setSelectedSchedule((current) => (current ? updater(current) : current));
+    setSelectedPolicy((current) => (current ? updater(current) : current));
   }
 
   function toggleWorkweekDay(day: string, checked: boolean) {
@@ -789,7 +802,7 @@ export function ShiftManagementClient({
     }));
   }
 
-  function toggleShift(shift: ShiftRecord, checked: boolean) {
+  function toggleShift(shift: ShiftTemplateRecord, checked: boolean) {
     updateSelectedSchedule((current) => ({
       ...current,
       shifts: checked
@@ -800,7 +813,7 @@ export function ShiftManagementClient({
 
   function handleDepartmentChange(value: string) {
     setSelectedDepartmentId(value);
-    void loadDepartmentSchedule(value);
+    void loadDepartmentShiftPolicy(value);
   }
 
   const selectedDepartment =
@@ -810,8 +823,8 @@ export function ShiftManagementClient({
   const activeShiftCount = shiftCatalog.filter(
     (shift) => shift.is_active,
   ).length;
-  const selectedDepartmentShiftCount = selectedSchedule?.shifts.length ?? 0;
-  const selectedWorkweekCount = selectedSchedule?.workweek.length ?? 0;
+  const selectedDepartmentShiftCount = selectedPolicy?.shifts.length ?? 0;
+  const selectedWorkweekCount = selectedPolicy?.workweek.length ?? 0;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -821,35 +834,35 @@ export function ShiftManagementClient({
             Shift Management
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Keep the shift catalog compact, then assign the right set of shifts
-            and workweek days to each department from one place.
+            Keep shift templates compact, then define each department&apos;s
+            default workweek and allowed templates from one place.
           </p>
         </div>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MiniStatCard
-          label="Total shifts"
+          label="Total templates"
           value={shiftCatalog.length.toString()}
           helper="Shift templates in the catalog"
           icon={Clock3}
         />
         <MiniStatCard
-          label="Active shifts"
+          label="Active templates"
           value={activeShiftCount.toString()}
-          helper="Currently available to assign"
+          helper="Currently available for employee assignments"
           icon={Check}
         />
         <MiniStatCard
-          label="Selected department shifts"
+          label="Allowed templates"
           value={selectedDepartmentShiftCount.toString()}
-          helper="Shifts applied to the current department"
+          helper="Templates available to the current department"
           icon={Users}
         />
         <MiniStatCard
           label="Workweek days"
           value={selectedWorkweekCount.toString()}
-          helper="Days enabled for this department"
+          helper="Default days enabled for this department"
           icon={CalendarRange}
         />
       </section>
@@ -859,7 +872,7 @@ export function ShiftManagementClient({
           <CardHeader className="space-y-2">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
-                <CardTitle>Shift catalog</CardTitle>
+                <CardTitle>Shift templates</CardTitle>
                 <CardDescription>
                   Create reusable shift templates and keep the list easy to
                   scan.
@@ -898,10 +911,10 @@ export function ShiftManagementClient({
           <CardHeader className="space-y-2">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
-                <CardTitle>Department schedule</CardTitle>
+                <CardTitle>Department shift policy</CardTitle>
                 <CardDescription>
-                  Choose a department, then adjust its workweek and assigned
-                  shifts together.
+                  Choose a department, then adjust its default workweek and
+                  allowed templates together.
                 </CardDescription>
               </div>
               <Button
@@ -909,7 +922,7 @@ export function ShiftManagementClient({
                 variant="outline"
                 onClick={() =>
                   selectedDepartmentId
-                    ? void loadDepartmentSchedule(selectedDepartmentId)
+                    ? void loadDepartmentShiftPolicy(selectedDepartmentId)
                     : undefined
                 }
                 disabled={isLoadingSchedule}
@@ -942,9 +955,9 @@ export function ShiftManagementClient({
                           : "No department selected"}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {selectedSchedule
-                          ? "Workweek and shift coverage are ready to edit."
-                          : "Loading the selected department schedule."}
+                        {selectedPolicy
+                          ? "Default workweek and allowed templates are ready to edit."
+                          : "Loading the selected department shift policy."}
                       </p>
                     </div>
                     <Badge
@@ -965,9 +978,9 @@ export function ShiftManagementClient({
 
                 {isLoadingSchedule ? (
                   <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-                    Loading the selected department schedule...
+                    Loading the selected department shift policy...
                   </div>
-                ) : selectedSchedule ? (
+                ) : selectedPolicy ? (
                   <div className="space-y-4">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
@@ -975,7 +988,7 @@ export function ShiftManagementClient({
                           Workweek
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Pick the operating days for the department.
+                          Pick the default operating days for the department.
                         </p>
                       </div>
                       <div className="grid gap-2 sm:grid-cols-2">
@@ -983,7 +996,7 @@ export function ShiftManagementClient({
                           <DepartmentWorkweekToggle
                             key={day}
                             day={day}
-                            checked={selectedSchedule.workweek.includes(day)}
+                            checked={selectedPolicy.workweek.includes(day)}
                             onCheckedChange={(checked) =>
                               toggleWorkweekDay(day, checked)
                             }
@@ -995,18 +1008,18 @@ export function ShiftManagementClient({
                     <div className="space-y-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-sm font-medium text-foreground">
-                          Assigned shifts
+                          Allowed shift templates
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Select the shifts that should apply to this
-                          department.
+                          Select the templates this department is allowed to use
+                          when assigning employee shifts.
                         </p>
                       </div>
 
                       {shiftCatalog.length > 0 ? (
                         <div className="space-y-2">
                           {shiftCatalog.map((shift) => {
-                            const checked = selectedSchedule.shifts.some(
+                            const checked = selectedPolicy.shifts.some(
                               (item) => item.id === shift.id,
                             );
 
@@ -1042,7 +1055,7 @@ export function ShiftManagementClient({
                         </div>
                       ) : (
                         <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-                          Create at least one shift before assigning
+                          Create at least one template before assigning
                           departments.
                         </div>
                       )}
@@ -1051,25 +1064,27 @@ export function ShiftManagementClient({
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
                       <p className="text-sm text-muted-foreground">
                         Changes are saved per department, not per calendar
-                        month.
+                        month. Actual employee assignments are managed
+                        separately.
                       </p>
                       <Button
                         type="button"
                         onClick={() => void saveDepartmentSchedule()}
-                        disabled={isSavingSchedule || !selectedSchedule}
+                        disabled={isSavingSchedule || !selectedPolicy}
                       >
                         <Save className="size-4" />
-                        {isSavingSchedule ? "Saving..." : "Save schedule"}
+                        {isSavingSchedule ? "Saving..." : "Save shift policy"}
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
                     <p className="text-sm font-medium text-foreground">
-                      No schedule loaded.
+                      No shift policy loaded.
                     </p>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Choose a department to configure its workweek and shifts.
+                      Choose a department to configure its default workweek and
+                      allowed templates.
                     </p>
                   </div>
                 )}
