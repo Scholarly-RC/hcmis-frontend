@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-frame";
 import { DashboardShell } from "@/components/dashboard-shell";
-import { buildBackendUrl, readBackendJson } from "@/lib/backend";
+import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
 
 import {
   type DepartmentShiftPolicy,
@@ -15,36 +15,10 @@ export const metadata = {
   description: "Configure shift templates and department schedules",
 };
 
-async function fetchBackendJson<T>(
-  token: string,
-  pathname: string,
-): Promise<T> {
-  const response = await fetch(buildBackendUrl(pathname), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    cache: "no-store",
-  });
-
-  const payload = await readBackendJson<Partial<T> & { detail?: string }>(
-    response,
-  );
-
-  if (!response.ok) {
-    throw new Error(payload?.detail ?? "Unable to load shift management data.");
-  }
-
-  if (!payload) {
-    throw new Error("Unable to load shift management data.");
-  }
-
-  return payload as T;
-}
-
 export default async function ShiftManagementPage() {
   const session = await getDashboardSession();
 
-  if (!session.isHr && !session.user.is_superuser) {
+  if (!session.isHr) {
     redirect("/dashboard");
   }
 
@@ -55,11 +29,16 @@ export default async function ShiftManagementPage() {
 
   try {
     const [departmentResponse, shiftResponse] = await Promise.all([
-      fetchBackendJson<DepartmentSummary[]>(session.token, "/departments"),
-      fetchBackendJson<ShiftTemplateRecord[]>(
-        session.token,
-        "/attendance/shift-templates",
-      ),
+      fetchBackendJsonWithAuth<DepartmentSummary[]>({
+        token: session.token,
+        pathname: "/departments",
+        fallbackMessage: "Unable to load shift management data.",
+      }),
+      fetchBackendJsonWithAuth<ShiftTemplateRecord[]>({
+        token: session.token,
+        pathname: "/attendance/shift-templates",
+        fallbackMessage: "Unable to load shift management data.",
+      }),
     ]);
 
     departments = departmentResponse;
@@ -73,10 +52,11 @@ export default async function ShiftManagementPage() {
     if (selectedDepartment) {
       try {
         initialDepartmentShiftPolicy =
-          await fetchBackendJson<DepartmentShiftPolicy>(
-            session.token,
-            `/attendance/departments/${selectedDepartment.id}/shift-policy`,
-          );
+          await fetchBackendJsonWithAuth<DepartmentShiftPolicy>({
+            token: session.token,
+            pathname: `/attendance/departments/${selectedDepartment.id}/shift-policy`,
+            fallbackMessage: "Unable to load shift management data.",
+          });
       } catch {
         initialDepartmentShiftPolicy = null;
       }

@@ -20,6 +20,7 @@ import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -28,6 +29,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Separator } from "@/components/ui/separator";
 import type { AuthUser } from "@/lib/auth";
+import { CAP_ACCESS_HR_WORKSPACE, can } from "@/lib/capabilities";
 import { cn } from "@/lib/utils";
 
 type DashboardShellProps = {
@@ -42,12 +44,15 @@ type SidebarItem = {
   icon: LucideIcon;
   href?: string;
   active?: boolean;
+  requiredCapabilities?: string[];
+  status?: "active" | "coming_soon" | "hidden";
 };
 
 type SidebarGroup = {
   title: string;
   icon: LucideIcon;
   items: SidebarItem[];
+  requiredCapabilities?: string[];
   requiresHr?: boolean;
   routePrefixes?: string[];
 };
@@ -69,90 +74,147 @@ const sidebarGroups: SidebarGroup[] = [
   {
     title: "Account Modules",
     icon: ShieldCheck,
-    routePrefixes: ["/account", "/dashboard/user-attendance-management"],
+    routePrefixes: ["/dashboard/leave", "/dashboard/my-payslips"],
     items: [
       {
         label: "Attendance",
         icon: Activity,
+        requiredCapabilities: ["view_attendance_self"],
+        status: "coming_soon",
       },
       {
         label: "Performance and Learning",
         icon: BarChart3,
+        href: "/dashboard/performance-evaluations",
+        requiredCapabilities: ["view_performance_self"],
+        status: "active",
       },
       {
         label: "Payroll",
         icon: Warehouse,
+        href: "/dashboard/my-payslips",
+        requiredCapabilities: ["view_payslips_self"],
+        status: "active",
       },
       {
         label: "Leave",
         icon: ClipboardList,
+        href: "/dashboard/leave",
+        requiredCapabilities: ["manage_leave_self"],
+        status: "active",
       },
       {
         label: "Reports and Analytics",
         icon: PackageOpen,
+        requiredCapabilities: ["view_reports"],
+        status: "coming_soon",
       },
     ],
   },
   {
     title: "HR Modules",
     icon: Users,
+    requiredCapabilities: [CAP_ACCESS_HR_WORKSPACE],
     requiresHr: true,
-    routePrefixes: ["/hr", "/dashboard/hr"],
+    routePrefixes: ["/hr"],
     items: [
       {
         label: "User Management",
         icon: Users,
         href: "/hr/users",
+        requiredCapabilities: ["manage_hr_users"],
+        status: "active",
       },
       {
         label: "Shift Management",
         icon: ClipboardList,
         href: "/hr/shift-management",
+        requiredCapabilities: ["manage_shift_templates"],
+        status: "active",
       },
       {
         label: "User Attendance Management",
         icon: Activity,
         href: "/hr/user-attendance-management",
+        requiredCapabilities: ["manage_attendance_records"],
+        status: "active",
       },
       {
         label: "Overtime Management",
         icon: Truck,
+        href: "/hr/overtime-management",
+        requiredCapabilities: ["manage_overtime_requests"],
+        status: "active",
       },
       {
         label: "User Evaluation Management",
         icon: BarChart3,
+        href: "/dashboard/performance-evaluations",
+        requiredCapabilities: [CAP_ACCESS_HR_WORKSPACE],
+        status: "active",
       },
       {
         label: "Peer Evaluation",
         icon: Users,
+        href: "/dashboard/performance-evaluations",
+        requiredCapabilities: [CAP_ACCESS_HR_WORKSPACE],
+        status: "active",
       },
       {
-        label: "Poll and Post Management",
+        label: "Announcements and Polls",
         icon: ClipboardList,
+        href: "/dashboard/announcements-and-polls",
+        requiredCapabilities: ["manage_announcements_polls"],
+        status: "active",
       },
       {
         label: "Shared Resources Management",
         icon: PackageOpen,
+        href: "/hr/shared-resources",
+        requiredCapabilities: ["manage_shared_resources"],
+        status: "active",
       },
       {
         label: "Salary and Rank Management",
         icon: Warehouse,
+        href: "/hr/salary-structure",
+        requiredCapabilities: ["manage_salary_structure"],
+        status: "active",
       },
       {
         label: "Payslip Management",
         icon: BarChart3,
+        href: "/hr/payslips",
+        requiredCapabilities: ["manage_payslips"],
+        status: "active",
+      },
+      {
+        label: "Payroll Settings",
+        icon: Settings2,
+        href: "/hr/payroll-settings",
+        requiredCapabilities: ["manage_payroll_settings"],
+        status: "active",
       },
       {
         label: "Leave Management",
         icon: ClipboardList,
+        href: "/hr/leave-management",
+        requiredCapabilities: ["manage_leave_requests"],
+        status: "active",
       },
       {
         label: "Reports and Analytics Management",
         icon: PackageOpen,
+        href: "/hr/reports",
+        requiredCapabilities: ["view_reports"],
+        status: "active",
       },
       {
         label: "App Logs",
         icon: Settings2,
+        href: "/hr/app-logs",
+        requiredCapabilities: ["view_app_logs"],
+        status: "active",
       },
     ],
   },
@@ -167,8 +229,32 @@ export function DashboardShell({
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
 
-  function isActive(item: SidebarItem) {
+  function hasRequiredCapabilities(requiredCapabilities?: string[]) {
+    if (!requiredCapabilities || requiredCapabilities.length === 0) {
+      return true;
+    }
+
+    return requiredCapabilities.every((capability) => can(user, capability));
+  }
+
+  function isItemVisible(item: SidebarItem) {
+    if (item.status === "hidden") {
+      return false;
+    }
+
+    return hasRequiredCapabilities(item.requiredCapabilities);
+  }
+
+  function isItemClickable(item: SidebarItem) {
     if (!item.href) {
+      return false;
+    }
+
+    return item.status !== "coming_soon";
+  }
+
+  function isActive(item: SidebarItem) {
+    if (!item.href || item.status === "coming_soon") {
       return item.active === true;
     }
 
@@ -180,7 +266,9 @@ export function DashboardShell({
   }
 
   function isGroupActive(group: SidebarGroup) {
-    const hasActiveItem = group.items.some((item) => isActive(item));
+    const hasActiveItem = group.items.some(
+      (item) => isItemVisible(item) && isActive(item),
+    );
     if (hasActiveItem) {
       return true;
     }
@@ -192,6 +280,17 @@ export function DashboardShell({
     return group.routePrefixes.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
     );
+  }
+
+  function shouldRenderGroup(group: SidebarGroup) {
+    if (
+      !hasRequiredCapabilities(group.requiredCapabilities) &&
+      !(group.requiresHr && isHr)
+    ) {
+      return false;
+    }
+
+    return group.items.some((item) => isItemVisible(item));
   }
 
   return (
@@ -274,7 +373,7 @@ export function DashboardShell({
               </section>
 
               {sidebarGroups.map((group) => {
-                if (group.requiresHr && !isHr) {
+                if (!shouldRenderGroup(group)) {
                   return null;
                 }
 
@@ -315,54 +414,74 @@ export function DashboardShell({
                     </CollapsibleTrigger>
 
                     <CollapsibleContent className="space-y-2">
-                      {group.items.map((item) => {
-                        const ItemIcon = item.icon;
-                        const active = isActive(item);
-                        const itemClasses = cn(
-                          "flex items-center gap-3 rounded-2xl border px-3 py-2",
-                          active
-                            ? "border-primary/30 bg-primary/5"
-                            : "border-border/70 bg-background/70 transition-colors hover:bg-muted/60",
-                        );
-                        const iconClasses = cn(
-                          "flex size-9 shrink-0 items-center justify-center rounded-xl",
-                          active
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-muted text-foreground",
-                        );
-                        const itemContent = (
-                          <>
-                            <div className={iconClasses}>
-                              <ItemIcon className="size-4" />
-                            </div>
+                      {group.items
+                        .filter((item) => isItemVisible(item))
+                        .map((item) => {
+                          const ItemIcon = item.icon;
+                          const active = isActive(item);
+                          const isComingSoon = item.status === "coming_soon";
+                          const itemClasses = cn(
+                            "flex items-center gap-3 rounded-2xl border px-3 py-2",
+                            active
+                              ? "border-primary/30 bg-primary/5"
+                              : isComingSoon
+                                ? "cursor-not-allowed border-dashed border-border/70 bg-muted/20 opacity-80"
+                                : "border-border/70 bg-background/70 transition-colors hover:bg-muted/60",
+                          );
+                          const iconClasses = cn(
+                            "flex size-9 shrink-0 items-center justify-center rounded-xl",
+                            active
+                              ? "bg-primary text-primary-foreground"
+                              : isComingSoon
+                                ? "bg-muted/70 text-muted-foreground"
+                                : "bg-muted text-foreground",
+                          );
+                          const itemContent = (
+                            <>
+                              <div className={iconClasses}>
+                                <ItemIcon className="size-4" />
+                              </div>
 
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium leading-none text-foreground">
-                                {item.label}
-                              </p>
-                            </div>
-                          </>
-                        );
+                              <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                                <p className="text-sm font-medium leading-none text-foreground">
+                                  {item.label}
+                                </p>
+                                {isComingSoon ? (
+                                  <Badge
+                                    variant="secondary"
+                                    className="rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide"
+                                  >
+                                    Soon
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            </>
+                          );
 
-                        if (item.href) {
+                          const href = item.href;
+                          if (isItemClickable(item) && href) {
+                            return (
+                              <Link
+                                key={item.label}
+                                href={href}
+                                aria-current={active ? "page" : undefined}
+                                className={itemClasses}
+                              >
+                                {itemContent}
+                              </Link>
+                            );
+                          }
+
                           return (
-                            <Link
+                            <div
                               key={item.label}
-                              href={item.href}
-                              aria-current={active ? "page" : undefined}
+                              aria-disabled="true"
                               className={itemClasses}
                             >
                               {itemContent}
-                            </Link>
+                            </div>
                           );
-                        }
-
-                        return (
-                          <div key={item.label} className={itemClasses}>
-                            {itemContent}
-                          </div>
-                        );
-                      })}
+                        })}
                     </CollapsibleContent>
                   </Collapsible>
                 );

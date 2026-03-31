@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
 import type { AuthUser } from "@/lib/auth";
 import { AUTH_COOKIE_NAME, fetchCurrentUser } from "@/lib/auth-server";
+import { isStaff } from "@/lib/capabilities";
 
 type DashboardPageFrameProps = {
   children: (user: AuthUser) => ReactNode;
@@ -35,7 +36,7 @@ export async function getDashboardSession(): Promise<DashboardSession> {
     .filter(Boolean)
     .join(" ")
     .trim();
-  const isHr = user.role?.trim().toUpperCase() === "HR";
+  const isHr = isStaff(user);
 
   return {
     user,

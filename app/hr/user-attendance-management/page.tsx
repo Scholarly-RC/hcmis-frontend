@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/card";
 import type { AttendanceSummary } from "@/lib/attendance";
 import type { AuthUser } from "@/lib/auth";
-import { buildBackendUrl, readBackendJson } from "@/lib/backend";
+import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -93,32 +93,6 @@ function parseTab(value: string): AttendanceTab {
   return "today";
 }
 
-async function fetchBackendJson<T>(
-  token: string,
-  pathname: string,
-): Promise<T> {
-  const response = await fetch(buildBackendUrl(pathname), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    cache: "no-store",
-  });
-
-  const payload = await readBackendJson<Partial<T> & { detail?: string }>(
-    response,
-  );
-
-  if (!response.ok) {
-    throw new Error(payload?.detail ?? "Unable to load attendance data.");
-  }
-
-  if (!payload) {
-    throw new Error("Unable to load attendance data.");
-  }
-
-  return payload as T;
-}
-
 export default async function UserAttendanceManagementPage({
   searchParams,
 }: {
@@ -161,25 +135,28 @@ export default async function UserAttendanceManagementPage({
       queryString.set("q", query);
     }
 
-    users = await fetchBackendJson<AuthUser[]>(
-      session.token,
-      `/users?${queryString.toString()}`,
-    );
+    users = await fetchBackendJsonWithAuth<AuthUser[]>({
+      token: session.token,
+      pathname: `/users?${queryString.toString()}`,
+      fallbackMessage: "Unable to load attendance data.",
+    });
 
     selectedUser =
       users.find((user) => user.id === requestedUserId) ?? users[0] ?? null;
 
     if (selectedUser) {
       const [summaryResponse, shiftPolicyResponse] = await Promise.all([
-        fetchBackendJson<AttendanceSummary>(
-          session.token,
-          `/attendance/users/${selectedUser.id}/${year}/${month}`,
-        ),
+        fetchBackendJsonWithAuth<AttendanceSummary>({
+          token: session.token,
+          pathname: `/attendance/users/${selectedUser.id}/${year}/${month}`,
+          fallbackMessage: "Unable to load attendance data.",
+        }),
         selectedUser.department_id
-          ? fetchBackendJson<DepartmentShiftPolicy>(
-              session.token,
-              `/attendance/departments/${selectedUser.department_id}/shift-policy`,
-            ).catch(() => null)
+          ? fetchBackendJsonWithAuth<DepartmentShiftPolicy>({
+              token: session.token,
+              pathname: `/attendance/departments/${selectedUser.department_id}/shift-policy`,
+              fallbackMessage: "Unable to load attendance data.",
+            }).catch(() => null)
           : Promise.resolve(null),
       ]);
 

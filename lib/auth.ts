@@ -29,6 +29,7 @@ export type AuthUser = {
   resignation_date: string | null;
   profile_picture_url: string | null;
   can_modify_shift: boolean;
+  capabilities?: string[];
   is_active: boolean;
   is_superuser: boolean;
   created_at: string;

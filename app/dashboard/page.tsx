@@ -1,14 +1,7 @@
-import {
-  Activity,
-  BarChart3,
-  Boxes,
-  ClipboardList,
-  PackageOpen,
-  Truck,
-  Warehouse,
-} from "lucide-react";
-
-import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
+import { Activity, BarChart3, ClipboardList, Wallet } from "lucide-react";
+import Link from "next/link";
+import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-frame";
+import { DashboardShell } from "@/components/dashboard-shell";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -18,264 +11,509 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import type { AttendanceSummary } from "@/lib/attendance";
+import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
+import type { LeaveCredit, LeaveRequestRecord } from "@/lib/leave";
+import type { PayrollPayslip } from "@/lib/payroll";
+import type { FeedItemRecord } from "@/lib/performance-updates";
 
 export const metadata = {
   title: "Dashboard",
-  description: "Overview of HCMIS operations",
+  description: "Role-based overview of HCMIS workflows",
 };
 
-const metrics = [
-  {
-    title: "Pending approvals",
-    value: "14",
-    delta: "+4 from yesterday",
-    icon: ClipboardList,
-  },
-  {
-    title: "Inbound deliveries",
-    value: "08",
-    delta: "3 arriving today",
-    icon: Truck,
-  },
-  {
-    title: "Low stock items",
-    value: "05",
-    delta: "2 flagged urgent",
-    icon: Boxes,
-  },
-  {
-    title: "Facilities online",
-    value: "26",
-    delta: "100% reporting",
-    icon: Warehouse,
-  },
-];
+type DashboardMetric = {
+  title: string;
+  value: string;
+  detail: string;
+  icon: typeof Activity;
+};
 
-const activity = [
-  {
-    label: "Requisition approved",
-    detail: "Central Pharmacy requested 120 units of amoxicillin.",
-    time: "5 minutes ago",
-    state: "Approved",
-  },
-  {
-    label: "Delivery received",
-    detail: "Warehouse A logged 18 cartons of syringes and safety boxes.",
-    time: "24 minutes ago",
-    state: "Received",
-  },
-  {
-    label: "Threshold alert",
-    detail: "Ward B is below minimum stock for IV sets.",
-    time: "1 hour ago",
-    state: "Attention",
-  },
-];
+type DashboardAction = {
+  label: string;
+  description: string;
+  href: string;
+};
 
-const shortcuts = [
-  {
-    label: "Review requisitions",
-    description: "Clear pending requests and confirm allocations.",
-  },
-  {
-    label: "Receive shipment",
-    description: "Log incoming goods against purchase orders.",
-  },
-  {
-    label: "Check stock levels",
-    description: "Open the latest balances for warehouses and wards.",
-  },
-];
+type DashboardTask = {
+  label: string;
+  detail: string;
+  href: string;
+};
 
-export default function DashboardPage() {
+async function tryFetch<T>(token: string, pathname: string, fallback: string) {
+  try {
+    return await fetchBackendJsonWithAuth<T>({
+      token,
+      pathname,
+      fallbackMessage: fallback,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function toMonthLabel(month: number | null, year: number | null) {
+  if (!month || !year) {
+    return "N/A";
+  }
+  const date = new Date(year, month - 1, 1);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+function summarizeEmployeeDay(summary: AttendanceSummary | null, day: number) {
+  const today = summary?.days.find((item) => item.day === day);
+  if (!today) {
+    return {
+      value: "No schedule",
+      detail: "No attendance schedule for today.",
+    };
+  }
+
+  const punches = today.attendance_records.length;
+  if (punches === 0) {
+    return {
+      value: "No punch yet",
+      detail: "No attendance record submitted today.",
+    };
+  }
+
+  return {
+    value: `${punches} punch${punches === 1 ? "" : "es"}`,
+    detail: "Attendance logs recorded today.",
+  };
+}
+
+function buildFeedSummary(item: FeedItemRecord) {
+  if (item.item_type === "announcement" && item.announcement) {
+    return {
+      label: item.announcement.title,
+      detail: item.announcement.summary ?? "Company announcement",
+      badge: "Announcement",
+    };
+  }
+
+  if (item.item_type === "poll" && item.poll) {
+    return {
+      label: item.poll.question,
+      detail: item.poll.description ?? "Team poll update",
+      badge: "Poll",
+    };
+  }
+
+  return {
+    label: "Update",
+    detail: "Recent activity update.",
+    badge: "Info",
+  };
+}
+
+function buildEmployeeDashboard(input: {
+  leaveCredit: LeaveCredit | null;
+  leaveRequests: LeaveRequestRecord[] | null;
+  attendanceSummary: AttendanceSummary | null;
+  payslips: PayrollPayslip[] | null;
+  currentDay: number;
+}): {
+  metrics: DashboardMetric[];
+  actions: DashboardAction[];
+  tasks: DashboardTask[];
+} {
+  const requests = input.leaveRequests ?? [];
+  const pendingLeaves = requests.filter(
+    (request) => request.status === "PENDING",
+  ).length;
+  const approvedLeaves = requests.filter(
+    (request) => request.status === "APPROVED",
+  ).length;
+  const attendanceToday = summarizeEmployeeDay(
+    input.attendanceSummary,
+    input.currentDay,
+  );
+  const latestPayslip = (input.payslips ?? [])[0] ?? null;
+
+  const metrics: DashboardMetric[] = [
+    {
+      title: "Leave Balance",
+      value: input.leaveCredit
+        ? `${input.leaveCredit.remaining_credits}`
+        : "--",
+      detail: input.leaveCredit
+        ? `${input.leaveCredit.used_credits} used credits`
+        : "Leave credits unavailable",
+      icon: Wallet,
+    },
+    {
+      title: "Pending Leave Requests",
+      value: pendingLeaves.toString(),
+      detail: `${approvedLeaves} approved in current selection`,
+      icon: ClipboardList,
+    },
+    {
+      title: "Today's Attendance",
+      value: attendanceToday.value,
+      detail: attendanceToday.detail,
+      icon: Activity,
+    },
+    {
+      title: "Latest Payslip",
+      value: latestPayslip?.released ? "Released" : "Not released",
+      detail: latestPayslip
+        ? `${toMonthLabel(latestPayslip.month, latestPayslip.year)} ${latestPayslip.period ?? ""}`.trim()
+        : "No payslip record available",
+      icon: BarChart3,
+    },
+  ];
+
+  const actions: DashboardAction[] = [
+    {
+      label: "Submit or track leave",
+      description: "Open leave requests, balances, and status updates.",
+      href: "/dashboard/leave",
+    },
+    {
+      label: "View my payslips",
+      description: "Check released payroll records and monthly slips.",
+      href: "/dashboard/my-payslips",
+    },
+    {
+      label: "Review performance",
+      description: "Open performance evaluation and participation tasks.",
+      href: "/dashboard/performance-evaluations",
+    },
+  ];
+
+  const tasks: DashboardTask[] = [];
+  if (pendingLeaves > 0) {
+    tasks.push({
+      label: "Pending leave follow-up",
+      detail: `${pendingLeaves} leave request${pendingLeaves === 1 ? "" : "s"} awaiting approval.`,
+      href: "/dashboard/leave",
+    });
+  }
+  if (latestPayslip && !latestPayslip.released) {
+    tasks.push({
+      label: "Payslip not yet released",
+      detail: `Latest cutoff ${toMonthLabel(latestPayslip.month, latestPayslip.year)} is pending release.`,
+      href: "/dashboard/my-payslips",
+    });
+  }
+
+  return { metrics, actions, tasks };
+}
+
+function buildHrDashboard(input: {
+  reviewQueue: LeaveRequestRecord[] | null;
+  pendingOvertimeCount: number;
+  usersCount: number;
+  unreleasedPayslipsCount: number;
+}): {
+  metrics: DashboardMetric[];
+  actions: DashboardAction[];
+  tasks: DashboardTask[];
+} {
+  const pendingLeaveApprovals = (input.reviewQueue ?? []).filter(
+    (request) => request.status === "PENDING",
+  ).length;
+
+  const metrics: DashboardMetric[] = [
+    {
+      title: "Leave Approvals Queue",
+      value: pendingLeaveApprovals.toString(),
+      detail: "Pending leave requests assigned for review",
+      icon: ClipboardList,
+    },
+    {
+      title: "Overtime Approvals",
+      value: input.pendingOvertimeCount.toString(),
+      detail: "Pending overtime responses",
+      icon: Activity,
+    },
+    {
+      title: "Unreleased Payslips",
+      value: input.unreleasedPayslipsCount.toString(),
+      detail: "Payroll records still pending release",
+      icon: Wallet,
+    },
+    {
+      title: "Active Employees",
+      value: input.usersCount.toString(),
+      detail: "Currently active user accounts",
+      icon: BarChart3,
+    },
+  ];
+
+  const actions: DashboardAction[] = [
+    {
+      label: "Review leave inbox",
+      description: "Prioritize pending leave requests and decisions.",
+      href: "/dashboard/leave/inbox",
+    },
+    {
+      label: "Process overtime approvals",
+      description: "Resolve overtime requests that need HR action.",
+      href: "/hr/overtime-management",
+    },
+    {
+      label: "Release payslips",
+      description: "Continue payroll processing and release workflow.",
+      href: "/hr/payslips",
+    },
+  ];
+
+  const tasks: DashboardTask[] = [];
+  if (pendingLeaveApprovals > 0) {
+    tasks.push({
+      label: "Leave approvals pending",
+      detail: `${pendingLeaveApprovals} leave request${pendingLeaveApprovals === 1 ? "" : "s"} need review.`,
+      href: "/dashboard/leave/inbox",
+    });
+  }
+  if (input.pendingOvertimeCount > 0) {
+    tasks.push({
+      label: "Overtime responses pending",
+      detail: `${input.pendingOvertimeCount} overtime request${input.pendingOvertimeCount === 1 ? "" : "s"} awaiting response.`,
+      href: "/hr/overtime-management",
+    });
+  }
+  if (input.unreleasedPayslipsCount > 0) {
+    tasks.push({
+      label: "Payslips to release",
+      detail: `${input.unreleasedPayslipsCount} payslip record${input.unreleasedPayslipsCount === 1 ? "" : "s"} are unreleased.`,
+      href: "/hr/payslips",
+    });
+  }
+
+  return { metrics, actions, tasks };
+}
+
+export default async function DashboardPage() {
+  const session = await getDashboardSession();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentDay = now.getDate();
+
+  const feed = await tryFetch<FeedItemRecord[]>(
+    session.token,
+    "/performance/feed",
+    "Unable to load updates feed.",
+  );
+
+  const employeeData = session.isHr
+    ? null
+    : await Promise.all([
+        tryFetch<LeaveCredit>(
+          session.token,
+          "/leave/credits/me",
+          "Unable to load leave credit.",
+        ),
+        tryFetch<LeaveRequestRecord[]>(
+          session.token,
+          `/leave/requests/me?year=${currentYear}`,
+          "Unable to load leave requests.",
+        ),
+        tryFetch<AttendanceSummary>(
+          session.token,
+          `/attendance/me/${currentYear}/${currentMonth}`,
+          "Unable to load attendance summary.",
+        ),
+        tryFetch<PayrollPayslip[]>(
+          session.token,
+          `/payroll/payslips?user_id=${session.user.id}&released=true`,
+          "Unable to load payslips.",
+        ),
+      ]);
+
+  const hrData = session.isHr
+    ? await Promise.all([
+        tryFetch<LeaveRequestRecord[]>(
+          session.token,
+          "/leave/requests/review?status=PENDING",
+          "Unable to load review queue.",
+        ),
+        tryFetch<Array<{ id: number }>>(
+          session.token,
+          "/attendance/overtime?scope=approvals&status=PEND",
+          "Unable to load overtime queue.",
+        ),
+        tryFetch<Array<{ id: number }>>(
+          session.token,
+          "/users?active_only=true",
+          "Unable to load active users.",
+        ),
+        tryFetch<Array<{ id: number }>>(
+          session.token,
+          "/payroll/payslips?released=false",
+          "Unable to load unreleased payslips.",
+        ),
+      ])
+    : null;
+
+  const dashboard = session.isHr
+    ? buildHrDashboard({
+        reviewQueue: hrData?.[0] ?? null,
+        pendingOvertimeCount: hrData?.[1]?.length ?? 0,
+        usersCount: hrData?.[2]?.length ?? 0,
+        unreleasedPayslipsCount: hrData?.[3]?.length ?? 0,
+      })
+    : buildEmployeeDashboard({
+        leaveCredit: employeeData?.[0] ?? null,
+        leaveRequests: employeeData?.[1] ?? null,
+        attendanceSummary: employeeData?.[2] ?? null,
+        payslips: employeeData?.[3] ?? null,
+        currentDay,
+      });
+
   return (
-    <DashboardPageFrame>
-      {() => (
-        <div className="flex w-full flex-col gap-8">
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {metrics.map((metric) => {
-              const Icon = metric.icon;
+    <DashboardShell
+      user={session.user}
+      displayName={session.displayName}
+      isHr={session.isHr}
+    >
+      <div className="flex w-full flex-col gap-8">
+        <section className="space-y-2">
+          <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">
+            {session.isHr ? "HR Workspace Overview" : "My Workspace Overview"}
+          </h1>
+          <p className="text-sm leading-6 text-muted-foreground">
+            {session.isHr
+              ? "Monitor approval queues, payroll progress, and team operations."
+              : "Track your leave, attendance, payslips, and required actions."}
+          </p>
+        </section>
 
-              return (
-                <Card
-                  key={metric.title}
-                  className="border-border/70 bg-card/85 shadow-lg shadow-black/5"
-                >
-                  <CardContent className="flex items-start justify-between gap-4 pt-4">
-                    <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
-                        {metric.title}
-                      </p>
-                      <div className="text-3xl font-semibold tracking-tight">
-                        {metric.value}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {metric.delta}
-                      </p>
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {dashboard.metrics.map((metric) => {
+            const Icon = metric.icon;
+            return (
+              <Card
+                key={metric.title}
+                className="border-border/70 bg-card/85 shadow-lg shadow-black/5"
+              >
+                <CardContent className="flex items-start justify-between gap-4 pt-4">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                      {metric.title}
+                    </p>
+                    <div className="text-3xl font-semibold tracking-tight">
+                      {metric.value}
                     </div>
-                    <div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-foreground">
-                      <Icon className="size-5" />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </section>
-
-          <section className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
-            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-              <CardHeader className="space-y-2">
-                <CardTitle>Recent activity</CardTitle>
-                <CardDescription>
-                  The latest approvals, deliveries, and alerts flowing through
-                  the system.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {activity.map((item, index) => (
-                  <div key={item.label}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-foreground">
-                            {item.label}
-                          </p>
-                          <Badge
-                            variant={index === 2 ? "destructive" : "secondary"}
-                          >
-                            {item.state}
-                          </Badge>
-                        </div>
-                        <p className="text-sm leading-6 text-muted-foreground">
-                          {item.detail}
-                        </p>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {item.time}
-                      </p>
-                    </div>
-                    {index < activity.length - 1 ? (
-                      <Separator className="mt-4" />
-                    ) : null}
+                    <p className="text-sm text-muted-foreground">
+                      {metric.detail}
+                    </p>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
+                  <div className="flex size-11 items-center justify-center rounded-2xl bg-muted text-foreground">
+                    <Icon className="size-5" />
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </section>
 
-            <div className="space-y-6">
-              <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-                <CardHeader className="space-y-2">
-                  <CardTitle>Quick actions</CardTitle>
-                  <CardDescription>
-                    Shortcuts for the most common operational tasks.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {shortcuts.map((item) => (
-                    <div
-                      key={item.label}
-                      className="rounded-2xl border border-border/70 bg-background/70 p-4"
+        <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+            <CardHeader className="space-y-2">
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>
+                {session.isHr
+                  ? "Top HR tasks for this cycle."
+                  : "Most common tasks for your account."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {dashboard.actions.map((action) => (
+                <Link
+                  key={action.label}
+                  href={action.href}
+                  className="block rounded-2xl border border-border/70 bg-background/70 p-4 transition-colors hover:bg-muted/50"
+                >
+                  <p className="font-medium text-foreground">{action.label}</p>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {action.description}
+                  </p>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+            <CardHeader className="space-y-2">
+              <CardTitle>Required Actions</CardTitle>
+              <CardDescription>
+                Items that likely need attention next.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {dashboard.tasks.length > 0 ? (
+                dashboard.tasks.map((task, index) => (
+                  <div key={task.label}>
+                    <Link
+                      href={task.href}
+                      className="block rounded-2xl border border-border/70 bg-background/70 p-4 transition-colors hover:bg-muted/50"
                     >
                       <p className="font-medium text-foreground">
-                        {item.label}
+                        {task.label}
                       </p>
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                        {item.description}
+                        {task.detail}
                       </p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-                <CardHeader className="space-y-2">
-                  <CardTitle>Facility snapshot</CardTitle>
-                  <CardDescription>
-                    At-a-glance view of where attention is needed next.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Critical alerts
-                      </p>
-                      <p className="text-2xl font-semibold">2 wards</p>
-                    </div>
-                    <Badge variant="destructive">Immediate review</Badge>
+                    </Link>
+                    {index < dashboard.tasks.length - 1 ? (
+                      <Separator className="mt-3" />
+                    ) : null}
                   </div>
-                  <Separator />
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Backordered items
+                ))
+              ) : (
+                <div className="rounded-2xl border border-border/70 bg-background/70 p-4 text-sm leading-6 text-muted-foreground">
+                  No urgent action is currently detected.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        <section>
+          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+            <CardHeader className="space-y-2">
+              <CardTitle>Recent Updates</CardTitle>
+              <CardDescription>
+                Latest announcements and polls from the workspace feed.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(feed ?? []).slice(0, 4).map((item, index) => {
+                const summary = buildFeedSummary(item);
+                return (
+                  <div key={`${item.item_type}-${index}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-foreground">
+                        {summary.label}
                       </p>
-                      <p className="text-2xl font-semibold">7 items</p>
+                      <Badge variant="secondary">{summary.badge}</Badge>
                     </div>
-                    <Badge variant="outline">Pending ETA</Badge>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                      {summary.detail}
+                    </p>
+                    {index < Math.min((feed ?? []).length, 4) - 1 ? (
+                      <Separator className="mt-3" />
+                    ) : null}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-
-          <section className="grid gap-4 lg:grid-cols-3">
-            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5 lg:col-span-2">
-              <CardHeader className="space-y-2">
-                <CardTitle>Operational notes</CardTitle>
-                <CardDescription>
-                  Use this area to keep the team aligned on current issues and
-                  priorities.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                  <Activity className="size-4 text-foreground" />
-                  <p className="mt-3 text-sm font-medium">Approvals queue</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Focus on expiring requests before end of day.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                  <PackageOpen className="size-4 text-foreground" />
-                  <p className="mt-3 text-sm font-medium">Receiving desk</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Match delivery slips with counted quantities.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                  <BarChart3 className="size-4 text-foreground" />
-                  <p className="mt-3 text-sm font-medium">Trend check</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Review weekly usage before replenishment planning.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-              <CardHeader className="space-y-2">
-                <CardTitle>Next checkpoint</CardTitle>
-                <CardDescription>
-                  Keep the team on one priority for the next shift.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-2xl bg-muted/60 p-4">
-                  <p className="text-sm text-muted-foreground">Focus area</p>
-                  <p className="mt-1 text-base font-medium">
-                    Emergency stock review
-                  </p>
-                </div>
+                );
+              })}
+              {(feed ?? []).length === 0 ? (
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Use the profile page for account details and the sidebar to
-                  navigate back to your dashboard.
+                  No recent feed updates available.
                 </p>
-              </CardContent>
-            </Card>
-          </section>
-        </div>
-      )}
-    </DashboardPageFrame>
+              ) : null}
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+    </DashboardShell>
   );
 }

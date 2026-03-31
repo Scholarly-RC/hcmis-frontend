@@ -58,3 +58,22 @@ export type AttendanceSummary = {
   month: number;
   days: AttendanceSummaryDay[];
 };
+
+export type OvertimeRequestStatus = "PEND" | "APP" | "REJ";
+
+export type OvertimeRequestScope = "mine" | "approvals" | "all";
+
+export type OvertimeRequestRecord = {
+  id: number;
+  user_id: number;
+  approver_id: number;
+  info: string | null;
+  date: string;
+  status: OvertimeRequestStatus;
+  user_name: string | null;
+  user_email: string | null;
+  user_department_name: string | null;
+  approver_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
