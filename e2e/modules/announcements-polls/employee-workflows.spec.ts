@@ -5,7 +5,7 @@ test("Employee announcements/polls workflow hides authoring controls", async ({
   page,
 }) => {
   await loginAs(page, "employee");
-  await page.goto("/dashboard/announcements-and-polls");
+  await page.goto("/announcements-and-polls");
   await expect(
     page.getByText("Announcements and Polls", { exact: true }).first(),
   ).toBeVisible();

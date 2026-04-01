@@ -172,17 +172,17 @@ function buildEmployeeDashboard(input: {
     {
       label: "Submit or track leave",
       description: "Open leave requests, balances, and status updates.",
-      href: "/dashboard/leave",
+      href: "/leave",
     },
     {
       label: "View my payslips",
       description: "Check released payroll records and monthly slips.",
-      href: "/dashboard/my-payslips",
+      href: "/my-payslips",
     },
     {
       label: "Review performance",
       description: "Open performance evaluation and participation tasks.",
-      href: "/dashboard/performance-evaluations",
+      href: "/performance-evaluations",
     },
   ];
 
@@ -191,14 +191,14 @@ function buildEmployeeDashboard(input: {
     tasks.push({
       label: "Pending leave follow-up",
       detail: `${pendingLeaves} leave request${pendingLeaves === 1 ? "" : "s"} awaiting approval.`,
-      href: "/dashboard/leave",
+      href: "/leave",
     });
   }
   if (latestPayslip && !latestPayslip.released) {
     tasks.push({
       label: "Payslip not yet released",
       detail: `Latest cutoff ${toMonthLabel(latestPayslip.month, latestPayslip.year)} is pending release.`,
-      href: "/dashboard/my-payslips",
+      href: "/my-payslips",
     });
   }
 
@@ -250,7 +250,7 @@ function buildHrDashboard(input: {
     {
       label: "Review leave inbox",
       description: "Prioritize pending leave requests and decisions.",
-      href: "/dashboard/leave/inbox",
+      href: "/leave/inbox",
     },
     {
       label: "Process overtime approvals",
@@ -269,7 +269,7 @@ function buildHrDashboard(input: {
     tasks.push({
       label: "Leave approvals pending",
       detail: `${pendingLeaveApprovals} leave request${pendingLeaveApprovals === 1 ? "" : "s"} need review.`,
-      href: "/dashboard/leave/inbox",
+      href: "/leave/inbox",
     });
   }
   if (input.pendingOvertimeCount > 0) {

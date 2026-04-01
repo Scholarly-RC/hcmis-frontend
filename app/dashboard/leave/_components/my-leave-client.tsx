@@ -262,7 +262,7 @@ export function MyLeaveClient() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/dashboard/leave/inbox">Open Review Inbox</Link>
+            <Link href="/leave/inbox">Open Review Inbox</Link>
           </Button>
         </div>
       </section>

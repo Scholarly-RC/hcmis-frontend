@@ -17,25 +17,25 @@ const hrWorkflowPages: Array<{ route: string; marker: string | RegExp }> = [
   { route: "/hr/app-logs", marker: "App Logs" },
   { route: "/hr/shared-resources", marker: "Shared Resources Management" },
   {
-    route: "/dashboard/performance-evaluations",
+    route: "/performance-evaluations",
     marker: "Performance Evaluations",
   },
   {
-    route: "/dashboard/announcements-and-polls",
+    route: "/announcements-and-polls",
     marker: "Announcements and Polls",
   },
 ];
 
 const employeeWorkflowPages: Array<{ route: string; marker: string | RegExp }> =
   [
-    { route: "/dashboard/leave", marker: "My Leave" },
-    { route: "/dashboard/my-payslips", marker: "My Payslips" },
+    { route: "/leave", marker: "My Leave" },
+    { route: "/my-payslips", marker: "My Payslips" },
     {
-      route: "/dashboard/performance-evaluations",
+      route: "/performance-evaluations",
       marker: "Performance Evaluations",
     },
     {
-      route: "/dashboard/announcements-and-polls",
+      route: "/announcements-and-polls",
       marker: "Announcements and Polls",
     },
     { route: "/profile", marker: "Profile details" },
@@ -98,13 +98,13 @@ test("performance evaluations shows staff cycle controls and hides them for empl
 }) => {
   await loginAs(page, "hr");
 
-  await page.goto("/dashboard/performance-evaluations");
+  await page.goto("/performance-evaluations");
   await expect(page.getByText("Performance Evaluations")).toBeVisible();
   await expect(page.getByText("Create Evaluation Cycle")).toBeVisible();
   await logout(page);
 
   await loginAs(page, "employee");
-  await page.goto("/dashboard/performance-evaluations");
+  await page.goto("/performance-evaluations");
   await expect(page.getByText("Performance Evaluations")).toBeVisible();
   await expect(page.getByText("Create Evaluation Cycle")).toHaveCount(0);
   await logout(page);
@@ -115,7 +115,7 @@ test("announcements and polls workflow supports creating drafts", async ({
 }) => {
   await loginAs(page, "hr");
 
-  await page.goto("/dashboard/announcements-and-polls");
+  await page.goto("/announcements-and-polls");
   await expect(
     page.getByText("Announcements and Polls", { exact: true }).first(),
   ).toBeVisible();
@@ -147,7 +147,7 @@ test("employee announcements and polls view has no staff authoring controls", as
 }) => {
   await loginAs(page, "employee");
 
-  await page.goto("/dashboard/announcements-and-polls");
+  await page.goto("/announcements-and-polls");
   await expect(
     page.getByText("Announcements and Polls", { exact: true }).first(),
   ).toBeVisible();

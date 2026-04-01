@@ -7,11 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   AnnouncementCreatePayload,
+  AnnouncementRecord,
   FeedItemRecord,
   PollCreatePayload,
   PollRecord,
@@ -76,6 +83,13 @@ function formatDate(value: string | null) {
   }).format(new Date(value));
 }
 
+function truncateText(value: string, maxLength: number) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
+}
+
 export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -93,7 +107,16 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
 
   const [submittingAnnouncement, setSubmittingAnnouncement] = useState(false);
   const [submittingPoll, setSubmittingPoll] = useState(false);
+  const [announcementModalOpen, setAnnouncementModalOpen] = useState(false);
+  const [pollModalOpen, setPollModalOpen] = useState(false);
+  const [archivedModalOpen, setArchivedModalOpen] = useState(false);
+  const [archivedLoading, setArchivedLoading] = useState(false);
+  const [archivedAnnouncements, setArchivedAnnouncements] = useState<
+    AnnouncementRecord[]
+  >([]);
+  const [archivedPolls, setArchivedPolls] = useState<PollRecord[]>([]);
   const [actionItemId, setActionItemId] = useState<number | null>(null);
+  const [previewItem, setPreviewItem] = useState<FeedItemRecord | null>(null);
   const [voteSelectionByPoll, setVoteSelectionByPoll] = useState<
     Record<number, number[]>
   >({});
@@ -170,6 +193,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
       setAnnouncementTitle("");
       setAnnouncementSummary("");
       setAnnouncementContent("");
+      setAnnouncementModalOpen(false);
       toast.success(
         shouldPublish
           ? "Announcement published."
@@ -229,6 +253,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
       setPollDescription("");
       setPollAllowMultiple(false);
       setPollChoices(["", ""]);
+      setPollModalOpen(false);
       toast.success(shouldPublish ? "Poll published." : "Poll draft created.");
       await loadFeed(filter, true);
     } catch (error) {
@@ -240,17 +265,61 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
     }
   }
 
+  const loadArchivedItems = useCallback(async () => {
+    setArchivedLoading(true);
+    try {
+      const archivedFeed = await requestJson<FeedItemRecord[]>(
+        "/api/performance/feed?include_archived=true",
+      );
+      setArchivedAnnouncements(
+        archivedFeed
+          .filter(
+            (
+              item,
+            ): item is FeedItemRecord & { announcement: AnnouncementRecord } =>
+              item.item_type === "announcement" && item.announcement !== null,
+          )
+          .map((item) => item.announcement),
+      );
+      setArchivedPolls(
+        archivedFeed
+          .filter(
+            (item): item is FeedItemRecord & { poll: PollRecord } =>
+              item.item_type === "poll" && item.poll !== null,
+          )
+          .map((item) => item.poll),
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to load archived items.",
+      );
+    } finally {
+      setArchivedLoading(false);
+    }
+  }, []);
+
   async function runAnnouncementAction(
     id: number,
-    action: "publish" | "archive",
+    action: "publish" | "archive" | "unarchive" | "draft",
   ) {
     setActionItemId(id);
     try {
       await requestJson(`/api/performance/announcements/${id}/${action}`, {
         method: "POST",
       });
-      toast.success(`Announcement ${action}d.`);
+      const messageByAction = {
+        publish: "Announcement published.",
+        archive: "Announcement archived.",
+        unarchive: "Announcement restored.",
+        draft: "Announcement moved back to draft.",
+      } as const;
+      toast.success(messageByAction[action]);
       await loadFeed(filter, true);
+      if (archivedModalOpen) {
+        await loadArchivedItems();
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Action failed.");
     } finally {
@@ -260,15 +329,24 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
 
   async function runPollAction(
     id: number,
-    action: "publish" | "close" | "archive",
+    action: "publish" | "close" | "archive" | "unarchive",
   ) {
     setActionItemId(id);
     try {
       await requestJson(`/api/performance/polls/${id}/${action}`, {
         method: "POST",
       });
-      toast.success(`Poll ${action}d.`);
+      const messageByAction = {
+        publish: "Poll published.",
+        close: "Poll closed.",
+        archive: "Poll archived.",
+        unarchive: "Poll restored.",
+      } as const;
+      toast.success(messageByAction[action]);
       await loadFeed(filter, true);
+      if (archivedModalOpen) {
+        await loadArchivedItems();
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Action failed.");
     } finally {
@@ -327,6 +405,19 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
     }
   }
 
+  const previewAnnouncement =
+    previewItem?.item_type === "announcement" ? previewItem.announcement : null;
+  const previewPoll =
+    previewItem?.item_type === "poll" ? previewItem.poll : null;
+  const showAnnouncementCreate = filter !== "poll";
+  const showPollCreate = filter !== "announcement";
+
+  useEffect(() => {
+    if (archivedModalOpen) {
+      void loadArchivedItems();
+    }
+  }, [archivedModalOpen, loadArchivedItems]);
+
   return (
     <div className="flex w-full flex-col gap-6">
       <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
@@ -371,131 +462,166 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
       </Card>
 
       {isStaff ? (
-        <section className="grid gap-4 lg:grid-cols-2">
-          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+        <section className="flex flex-wrap items-center gap-2">
+          {showAnnouncementCreate ? (
+            <Dialog
+              open={announcementModalOpen}
+              onOpenChange={setAnnouncementModalOpen}
+            >
+              <Button onClick={() => setAnnouncementModalOpen(true)}>
                 <Megaphone className="size-4" />
-                Create Announcement
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                value={announcementTitle}
-                onChange={(event) => setAnnouncementTitle(event.target.value)}
-                placeholder="Title"
-              />
-              <Input
-                value={announcementSummary}
-                onChange={(event) => setAnnouncementSummary(event.target.value)}
-                placeholder="Summary (optional)"
-              />
-              <Textarea
-                rows={5}
-                value={announcementContent}
-                onChange={(event) => setAnnouncementContent(event.target.value)}
-                placeholder="Announcement content"
-              />
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  disabled={submittingAnnouncement}
-                  onClick={() => void createAnnouncement(false)}
-                >
-                  {submittingAnnouncement ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : null}
-                  Save Draft
-                </Button>
-                <Button
-                  disabled={submittingAnnouncement}
-                  onClick={() => void createAnnouncement(true)}
-                >
-                  {submittingAnnouncement ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : null}
-                  Publish
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Vote className="size-4" />
-                Create Poll
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Input
-                value={pollQuestion}
-                onChange={(event) => setPollQuestion(event.target.value)}
-                placeholder="Poll question"
-              />
-              <Textarea
-                rows={3}
-                value={pollDescription}
-                onChange={(event) => setPollDescription(event.target.value)}
-                placeholder="Description (optional)"
-              />
-              <div className="space-y-2 rounded-lg border border-border/70 p-3">
-                {pollChoices.map((choice, index) => (
+                New Announcement
+              </Button>
+              <DialogContent className="max-h-[90vh] w-[min(96vw,44rem)] !max-w-2xl overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create Announcement</DialogTitle>
+                  <DialogDescription>
+                    Draft or publish an announcement for employees.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
                   <Input
-                    key={`${index + 1}`}
-                    value={choice}
-                    onChange={(event) => {
-                      const next = [...pollChoices];
-                      next[index] = event.target.value;
-                      setPollChoices(next);
-                    }}
-                    placeholder={`Choice ${index + 1}`}
+                    value={announcementTitle}
+                    onChange={(event) =>
+                      setAnnouncementTitle(event.target.value)
+                    }
+                    placeholder="Title"
                   />
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPollChoices((current) => [...current, ""])}
-                >
-                  Add Choice
-                </Button>
-              </div>
-              <label
-                htmlFor="allow-multiple-choices"
-                className="flex items-center gap-2 text-sm text-muted-foreground"
-              >
-                <Checkbox
-                  id="allow-multiple-choices"
-                  checked={pollAllowMultiple}
-                  onCheckedChange={(checked) =>
-                    setPollAllowMultiple(checked === true)
-                  }
-                />
-                Allow multiple choices
-              </label>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  disabled={submittingPoll}
-                  onClick={() => void createPoll(false)}
-                >
-                  {submittingPoll ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : null}
-                  Save Draft
-                </Button>
-                <Button
-                  disabled={submittingPoll}
-                  onClick={() => void createPoll(true)}
-                >
-                  {submittingPoll ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : null}
-                  Publish
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  <Input
+                    value={announcementSummary}
+                    onChange={(event) =>
+                      setAnnouncementSummary(event.target.value)
+                    }
+                    placeholder="Summary (optional)"
+                  />
+                  <Textarea
+                    rows={6}
+                    value={announcementContent}
+                    onChange={(event) =>
+                      setAnnouncementContent(event.target.value)
+                    }
+                    placeholder="Announcement content"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={submittingAnnouncement}
+                      onClick={() => void createAnnouncement(false)}
+                    >
+                      {submittingAnnouncement ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : null}
+                      Save Draft
+                    </Button>
+                    <Button
+                      disabled={submittingAnnouncement}
+                      onClick={() => void createAnnouncement(true)}
+                    >
+                      {submittingAnnouncement ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : null}
+                      Publish
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+
+          {showPollCreate ? (
+            <Dialog open={pollModalOpen} onOpenChange={setPollModalOpen}>
+              <Button variant="outline" onClick={() => setPollModalOpen(true)}>
+                <Vote className="size-4" />
+                New Poll
+              </Button>
+              <DialogContent className="max-h-[90vh] w-[min(96vw,44rem)] !max-w-2xl overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create Poll</DialogTitle>
+                  <DialogDescription>
+                    Create a poll, then publish when ready.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <Input
+                    value={pollQuestion}
+                    onChange={(event) => setPollQuestion(event.target.value)}
+                    placeholder="Poll question"
+                  />
+                  <Textarea
+                    rows={3}
+                    value={pollDescription}
+                    onChange={(event) => setPollDescription(event.target.value)}
+                    placeholder="Description (optional)"
+                  />
+                  <div className="space-y-2 rounded-lg border border-border/70 p-3">
+                    {pollChoices.map((choice, index) => (
+                      <Input
+                        key={`${index + 1}`}
+                        value={choice}
+                        onChange={(event) => {
+                          const next = [...pollChoices];
+                          next[index] = event.target.value;
+                          setPollChoices(next);
+                        }}
+                        placeholder={`Choice ${index + 1}`}
+                      />
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setPollChoices((current) => [...current, ""])
+                      }
+                    >
+                      Add Choice
+                    </Button>
+                  </div>
+                  <label
+                    htmlFor="allow-multiple-choices"
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                  >
+                    <Checkbox
+                      id="allow-multiple-choices"
+                      checked={pollAllowMultiple}
+                      onCheckedChange={(checked) =>
+                        setPollAllowMultiple(checked === true)
+                      }
+                    />
+                    Allow multiple choices
+                  </label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      disabled={submittingPoll}
+                      onClick={() => void createPoll(false)}
+                    >
+                      {submittingPoll ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : null}
+                      Save Draft
+                    </Button>
+                    <Button
+                      disabled={submittingPoll}
+                      onClick={() => void createPoll(true)}
+                    >
+                      {submittingPoll ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : null}
+                      Publish
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setArchivedModalOpen(true)}
+          >
+            Archived Items
+          </Button>
         </section>
       ) : null}
 
@@ -520,12 +646,17 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
         {feed.map((item) => {
           if (item.item_type === "announcement" && item.announcement) {
             const announcement = item.announcement;
+            const previewText = truncateText(
+              announcement.summary ?? announcement.content,
+              180,
+            );
+
             return (
               <Card
                 key={`announcement-${announcement.id}`}
                 className="border-border/70 bg-card/85 shadow-lg shadow-black/5"
               >
-                <CardHeader>
+                <CardHeader className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <CardTitle className="text-lg">
                       {announcement.title}
@@ -539,49 +670,53 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       ? `Published ${formatDate(announcement.published_at)}`
                       : `Created ${formatDate(announcement.created_at)}`}
                   </p>
-                  {announcement.summary ? (
-                    <p className="text-sm text-muted-foreground">
-                      {announcement.summary}
-                    </p>
-                  ) : null}
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-sm leading-6 whitespace-pre-wrap">
-                    {announcement.content}
-                  </p>
-                  {isStaff ? (
-                    <div className="flex gap-2">
-                      {announcement.status === "draft" ? (
-                        <Button
-                          size="sm"
-                          disabled={actionItemId === announcement.id}
-                          onClick={() =>
-                            void runAnnouncementAction(
-                              announcement.id,
-                              "publish",
-                            )
-                          }
-                        >
-                          Publish
-                        </Button>
-                      ) : null}
-                      {announcement.status !== "archived" ? (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={actionItemId === announcement.id}
-                          onClick={() =>
-                            void runAnnouncementAction(
-                              announcement.id,
-                              "archive",
-                            )
-                          }
-                        >
-                          Archive
-                        </Button>
-                      ) : null}
-                    </div>
-                  ) : null}
+                <CardContent className="space-y-3 pt-0">
+                  <p className="text-sm text-muted-foreground">{previewText}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPreviewItem(item)}
+                    >
+                      Preview
+                    </Button>
+                    {isStaff && announcement.status === "draft" ? (
+                      <Button
+                        size="sm"
+                        disabled={actionItemId === announcement.id}
+                        onClick={() =>
+                          void runAnnouncementAction(announcement.id, "publish")
+                        }
+                      >
+                        Publish
+                      </Button>
+                    ) : null}
+                    {isStaff && announcement.status === "published" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={actionItemId === announcement.id}
+                        onClick={() =>
+                          void runAnnouncementAction(announcement.id, "draft")
+                        }
+                      >
+                        Move to Draft
+                      </Button>
+                    ) : null}
+                    {isStaff && announcement.status !== "archived" ? (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={actionItemId === announcement.id}
+                        onClick={() =>
+                          void runAnnouncementAction(announcement.id, "archive")
+                        }
+                      >
+                        Archive
+                      </Button>
+                    ) : null}
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -589,8 +724,6 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
 
           if (item.item_type === "poll" && item.poll) {
             const poll = item.poll;
-            const selectedChoiceIds =
-              voteSelectionByPoll[poll.id] ?? poll.user_vote_choice_ids ?? [];
             const totalVotes = poll.choices.reduce(
               (sum, choice) => sum + choice.vote_count,
               0,
@@ -601,7 +734,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                 key={`poll-${poll.id}`}
                 className="border-border/70 bg-card/85 shadow-lg shadow-black/5"
               >
-                <CardHeader>
+                <CardHeader className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <CardTitle className="text-lg">{poll.question}</CardTitle>
                     <Badge variant={statusVariant(poll.status)}>
@@ -613,119 +746,56 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       ? `Published ${formatDate(poll.published_at)}`
                       : `Created ${formatDate(poll.created_at)}`}
                   </p>
-                  {poll.description ? (
-                    <p className="text-sm text-muted-foreground">
-                      {poll.description}
-                    </p>
-                  ) : null}
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    {poll.choices
-                      .slice()
-                      .sort((left, right) => left.position - right.position)
-                      .map((choice) => {
-                        const checked = selectedChoiceIds.includes(choice.id);
-                        const controlId = `poll-${poll.id}-choice-${choice.id}`;
-                        return (
-                          <div
-                            key={choice.id}
-                            className="rounded-lg border border-border/70 p-3"
-                          >
-                            <label
-                              htmlFor={controlId}
-                              className="flex cursor-pointer items-start justify-between gap-3"
-                            >
-                              <div className="flex items-start gap-2">
-                                {poll.allow_multiple_choices ? (
-                                  <Checkbox
-                                    id={controlId}
-                                    checked={checked}
-                                    disabled={poll.status !== "published"}
-                                    onCheckedChange={(value) =>
-                                      toggleMultiChoiceSelection(
-                                        poll.id,
-                                        choice.id,
-                                        value === true,
-                                      )
-                                    }
-                                  />
-                                ) : (
-                                  <input
-                                    id={controlId}
-                                    type="radio"
-                                    name={`poll-${poll.id}`}
-                                    checked={checked}
-                                    disabled={poll.status !== "published"}
-                                    onChange={() =>
-                                      setSingleChoiceSelection(
-                                        poll.id,
-                                        choice.id,
-                                      )
-                                    }
-                                  />
-                                )}
-                                <span className="text-sm">{choice.text}</span>
-                              </div>
-                              <span className="text-xs text-muted-foreground">
-                                {choice.vote_count} vote
-                                {choice.vote_count === 1 ? "" : "s"}
-                              </span>
-                            </label>
-                          </div>
-                        );
-                      })}
-                  </div>
-
-                  <Separator />
-
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">
-                      Total votes: {totalVotes}
-                    </p>
-                    <div className="flex gap-2">
-                      {poll.status === "published" ? (
-                        <Button
-                          size="sm"
-                          disabled={actionItemId === poll.id}
-                          onClick={() => void submitVote(poll)}
-                        >
-                          Submit vote
-                        </Button>
-                      ) : null}
-
-                      {isStaff && poll.status === "draft" ? (
-                        <Button
-                          size="sm"
-                          disabled={actionItemId === poll.id}
-                          onClick={() => void runPollAction(poll.id, "publish")}
-                        >
-                          Publish
-                        </Button>
-                      ) : null}
-
-                      {isStaff && poll.status === "published" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={actionItemId === poll.id}
-                          onClick={() => void runPollAction(poll.id, "close")}
-                        >
-                          Close
-                        </Button>
-                      ) : null}
-
-                      {isStaff && poll.status !== "archived" ? (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={actionItemId === poll.id}
-                          onClick={() => void runPollAction(poll.id, "archive")}
-                        >
-                          Archive
-                        </Button>
-                      ) : null}
-                    </div>
+                <CardContent className="space-y-3 pt-0">
+                  <p className="text-sm text-muted-foreground">
+                    {truncateText(
+                      poll.description ?? "No description provided.",
+                      160,
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {poll.choices.length} choice
+                    {poll.choices.length === 1 ? "" : "s"} | Total votes:{" "}
+                    {totalVotes}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPreviewItem(item)}
+                    >
+                      Preview
+                    </Button>
+                    {isStaff && poll.status === "draft" ? (
+                      <Button
+                        size="sm"
+                        disabled={actionItemId === poll.id}
+                        onClick={() => void runPollAction(poll.id, "publish")}
+                      >
+                        Publish
+                      </Button>
+                    ) : null}
+                    {isStaff && poll.status === "published" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={actionItemId === poll.id}
+                        onClick={() => void runPollAction(poll.id, "close")}
+                      >
+                        Close
+                      </Button>
+                    ) : null}
+                    {isStaff && poll.status !== "archived" ? (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        disabled={actionItemId === poll.id}
+                        onClick={() => void runPollAction(poll.id, "archive")}
+                      >
+                        Archive
+                      </Button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
@@ -735,6 +805,334 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
           return null;
         })}
       </section>
+
+      <Dialog open={archivedModalOpen} onOpenChange={setArchivedModalOpen}>
+        <DialogContent className="max-h-[90vh] w-[min(96vw,52rem)] !max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Archived Items</DialogTitle>
+            <DialogDescription>
+              Restore archived announcements and polls back into the feed.
+            </DialogDescription>
+          </DialogHeader>
+
+          {archivedLoading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Loading archived items...
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <section className="space-y-2">
+                <h3 className="text-sm font-medium">Announcements</h3>
+                {archivedAnnouncements.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No archived announcements.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {archivedAnnouncements.map((announcement) => (
+                      <div
+                        key={`archived-announcement-${announcement.id}`}
+                        className="rounded-lg border border-border/70 p-3"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">
+                              {announcement.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Archived {formatDate(announcement.archived_at)}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={actionItemId === announcement.id}
+                            onClick={() =>
+                              void runAnnouncementAction(
+                                announcement.id,
+                                "unarchive",
+                              )
+                            }
+                          >
+                            Unarchive
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="space-y-2">
+                <h3 className="text-sm font-medium">Polls</h3>
+                {archivedPolls.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No archived polls.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {archivedPolls.map((poll) => (
+                      <div
+                        key={`archived-poll-${poll.id}`}
+                        className="rounded-lg border border-border/70 p-3"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">
+                              {poll.question}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Archived {formatDate(poll.archived_at)}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            disabled={actionItemId === poll.id}
+                            onClick={() =>
+                              void runPollAction(poll.id, "unarchive")
+                            }
+                          >
+                            Unarchive
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={previewItem !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPreviewItem(null);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] w-[min(96vw,52rem)] !max-w-4xl overflow-y-auto">
+          {previewAnnouncement ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <DialogTitle>{previewAnnouncement.title}</DialogTitle>
+                  <Badge variant={statusVariant(previewAnnouncement.status)}>
+                    {previewAnnouncement.status}
+                  </Badge>
+                </div>
+                <DialogDescription>
+                  {previewAnnouncement.status === "published"
+                    ? `Published ${formatDate(previewAnnouncement.published_at)}`
+                    : `Created ${formatDate(previewAnnouncement.created_at)}`}
+                </DialogDescription>
+              </DialogHeader>
+              {previewAnnouncement.summary ? (
+                <p className="text-sm text-muted-foreground">
+                  {previewAnnouncement.summary}
+                </p>
+              ) : null}
+              <p className="text-sm leading-6 whitespace-pre-wrap">
+                {previewAnnouncement.content}
+              </p>
+              {isStaff ? (
+                <div className="flex flex-wrap gap-2">
+                  {previewAnnouncement.status === "draft" ? (
+                    <Button
+                      size="sm"
+                      disabled={actionItemId === previewAnnouncement.id}
+                      onClick={() =>
+                        void runAnnouncementAction(
+                          previewAnnouncement.id,
+                          "publish",
+                        )
+                      }
+                    >
+                      Publish
+                    </Button>
+                  ) : null}
+                  {previewAnnouncement.status === "published" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={actionItemId === previewAnnouncement.id}
+                      onClick={() =>
+                        void runAnnouncementAction(
+                          previewAnnouncement.id,
+                          "draft",
+                        )
+                      }
+                    >
+                      Move to Draft
+                    </Button>
+                  ) : null}
+                  {previewAnnouncement.status !== "archived" ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={actionItemId === previewAnnouncement.id}
+                      onClick={() =>
+                        void runAnnouncementAction(
+                          previewAnnouncement.id,
+                          "archive",
+                        )
+                      }
+                    >
+                      Archive
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          ) : null}
+
+          {previewPoll ? (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <DialogTitle>{previewPoll.question}</DialogTitle>
+                  <Badge variant={statusVariant(previewPoll.status)}>
+                    {previewPoll.status}
+                  </Badge>
+                </div>
+                <DialogDescription>
+                  {previewPoll.status === "published"
+                    ? `Published ${formatDate(previewPoll.published_at)}`
+                    : `Created ${formatDate(previewPoll.created_at)}`}
+                </DialogDescription>
+              </DialogHeader>
+
+              {previewPoll.description ? (
+                <p className="text-sm text-muted-foreground">
+                  {previewPoll.description}
+                </p>
+              ) : null}
+
+              <div className="space-y-2">
+                {previewPoll.choices
+                  .slice()
+                  .sort((left, right) => left.position - right.position)
+                  .map((choice) => {
+                    const selectedChoiceIds =
+                      voteSelectionByPoll[previewPoll.id] ??
+                      previewPoll.user_vote_choice_ids ??
+                      [];
+                    const checked = selectedChoiceIds.includes(choice.id);
+                    const controlId = `preview-poll-${previewPoll.id}-choice-${choice.id}`;
+                    return (
+                      <div
+                        key={choice.id}
+                        className="rounded-lg border border-border/70 p-3"
+                      >
+                        <label
+                          htmlFor={controlId}
+                          className="flex cursor-pointer items-start justify-between gap-3"
+                        >
+                          <div className="flex items-start gap-2">
+                            {previewPoll.allow_multiple_choices ? (
+                              <Checkbox
+                                id={controlId}
+                                checked={checked}
+                                disabled={previewPoll.status !== "published"}
+                                onCheckedChange={(value) =>
+                                  toggleMultiChoiceSelection(
+                                    previewPoll.id,
+                                    choice.id,
+                                    value === true,
+                                  )
+                                }
+                              />
+                            ) : (
+                              <input
+                                id={controlId}
+                                type="radio"
+                                name={`preview-poll-${previewPoll.id}`}
+                                checked={checked}
+                                disabled={previewPoll.status !== "published"}
+                                onChange={() =>
+                                  setSingleChoiceSelection(
+                                    previewPoll.id,
+                                    choice.id,
+                                  )
+                                }
+                              />
+                            )}
+                            <span className="text-sm">{choice.text}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {choice.vote_count} vote
+                            {choice.vote_count === 1 ? "" : "s"}
+                          </span>
+                        </label>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                <p className="text-xs text-muted-foreground">
+                  Total votes:{" "}
+                  {previewPoll.choices.reduce(
+                    (sum, choice) => sum + choice.vote_count,
+                    0,
+                  )}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {previewPoll.status === "published" ? (
+                    <Button
+                      size="sm"
+                      disabled={actionItemId === previewPoll.id}
+                      onClick={() => void submitVote(previewPoll)}
+                    >
+                      Submit vote
+                    </Button>
+                  ) : null}
+
+                  {isStaff && previewPoll.status === "draft" ? (
+                    <Button
+                      size="sm"
+                      disabled={actionItemId === previewPoll.id}
+                      onClick={() =>
+                        void runPollAction(previewPoll.id, "publish")
+                      }
+                    >
+                      Publish
+                    </Button>
+                  ) : null}
+
+                  {isStaff && previewPoll.status === "published" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={actionItemId === previewPoll.id}
+                      onClick={() =>
+                        void runPollAction(previewPoll.id, "close")
+                      }
+                    >
+                      Close
+                    </Button>
+                  ) : null}
+
+                  {isStaff && previewPoll.status !== "archived" ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={actionItemId === previewPoll.id}
+                      onClick={() =>
+                        void runPollAction(previewPoll.id, "archive")
+                      }
+                    >
+                      Archive
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

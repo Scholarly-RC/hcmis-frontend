@@ -216,7 +216,7 @@ export function LeaveInboxClient() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/dashboard/leave">Back to My Leave</Link>
+            <Link href="/leave">Back to My Leave</Link>
           </Button>
         </div>
       </section>

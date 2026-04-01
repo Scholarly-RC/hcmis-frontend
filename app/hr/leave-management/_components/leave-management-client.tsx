@@ -404,7 +404,7 @@ export function LeaveManagementClient() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/dashboard/leave">Open Employee Leave View</Link>
+            <Link href="/leave">Open Employee Leave View</Link>
           </Button>
         </div>
 
