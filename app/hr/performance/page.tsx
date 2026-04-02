@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { WorkspaceHub } from "@/components/workspace-hub";
+import { HR_WORKSPACES } from "@/lib/hr-workspaces";
 import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
@@ -9,6 +10,8 @@ export const metadata = {
 };
 
 export default function HrPerformanceHubPage() {
+  const workspace = HR_WORKSPACES.performance;
+
   return (
     <DashboardPageFrame>
       {(user) => {
@@ -19,31 +22,9 @@ export default function HrPerformanceHubPage() {
         return (
           <WorkspaceHub
             user={user}
-            title="Performance"
-            description="Handle evaluations, announcements, polls, and shared resources."
-            items={[
-              {
-                label: "Performance Evaluations",
-                description:
-                  "Manage HR evaluation cycles and peer/self evaluation workflows.",
-                href: "/performance-evaluations",
-                requiredCapabilities: ["access_hr_workspace"],
-              },
-              {
-                label: "Announcements and Polls",
-                description:
-                  "Publish announcements and run company participation polls.",
-                href: "/announcements-and-polls",
-                requiredCapabilities: ["manage_announcements_polls"],
-              },
-              {
-                label: "Shared Resources",
-                description:
-                  "Upload and manage shared resource documents for staff.",
-                href: "/hr/shared-resources",
-                requiredCapabilities: ["manage_shared_resources"],
-              },
-            ]}
+            title={workspace.title}
+            description={workspace.description}
+            items={workspace.items}
           />
         );
       }}

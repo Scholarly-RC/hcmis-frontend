@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { WorkspaceHub } from "@/components/workspace-hub";
+import { HR_WORKSPACES } from "@/lib/hr-workspaces";
 import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
@@ -9,6 +10,8 @@ export const metadata = {
 };
 
 export default function HrReportsHubPage() {
+  const workspace = HR_WORKSPACES.reports;
+
   return (
     <DashboardPageFrame>
       {(user) => {
@@ -19,23 +22,9 @@ export default function HrReportsHubPage() {
         return (
           <WorkspaceHub
             user={user}
-            title="Reports"
-            description="Generate analytics reports and review activity logs."
-            items={[
-              {
-                label: "Reports and Analytics",
-                description:
-                  "Generate HR and operational reports from backend data.",
-                href: "/hr/reports",
-                requiredCapabilities: ["view_reports"],
-              },
-              {
-                label: "App Logs",
-                description: "Inspect application logs by user and timeline.",
-                href: "/hr/app-logs",
-                requiredCapabilities: ["view_app_logs"],
-              },
-            ]}
+            title={workspace.title}
+            description={workspace.description}
+            items={workspace.items}
           />
         );
       }}

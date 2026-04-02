@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { WorkspaceHub } from "@/components/workspace-hub";
+import { HR_WORKSPACES } from "@/lib/hr-workspaces";
 import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
@@ -9,6 +10,8 @@ export const metadata = {
 };
 
 export default function HrAttendanceHubPage() {
+  const workspace = HR_WORKSPACES.attendance;
+
   return (
     <DashboardPageFrame>
       {(user) => {
@@ -19,30 +22,9 @@ export default function HrAttendanceHubPage() {
         return (
           <WorkspaceHub
             user={user}
-            title="Attendance"
-            description="Manage schedules, records, and overtime operations."
-            items={[
-              {
-                label: "Shift Management",
-                description:
-                  "Configure shift templates and department shift policies.",
-                href: "/hr/shift-management",
-                requiredCapabilities: ["manage_shift_templates"],
-              },
-              {
-                label: "User Attendance Management",
-                description:
-                  "Review and update employee attendance records and assignments.",
-                href: "/hr/user-attendance-management",
-                requiredCapabilities: ["manage_attendance_records"],
-              },
-              {
-                label: "Overtime Management",
-                description: "Review and resolve overtime requests.",
-                href: "/hr/overtime-management",
-                requiredCapabilities: ["manage_overtime_requests"],
-              },
-            ]}
+            title={workspace.title}
+            description={workspace.description}
+            items={workspace.items}
           />
         );
       }}

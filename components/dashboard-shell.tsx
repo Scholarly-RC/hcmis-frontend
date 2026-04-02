@@ -21,6 +21,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { HR_WORKSPACES, type HrWorkspaceKey } from "@/lib/hr-workspaces";
 import type { AuthUser } from "@/types/auth";
 import { can } from "@/utils/capabilities";
 import { cn } from "@/utils/cn";
@@ -150,6 +151,43 @@ function matchesSidebarChildItem(item: SidebarChildItem, query: string) {
   );
 }
 
+const hrWorkspaceSidebarIcons: Record<HrWorkspaceKey, LucideIcon> = {
+  attendance: NotebookTabs,
+  payroll: ReceiptText,
+  performance: User,
+  leave: BookOpenText,
+  reports: BookOpenText,
+};
+
+const hrWorkspaceSidebarOrder: HrWorkspaceKey[] = [
+  "attendance",
+  "payroll",
+  "performance",
+  "leave",
+  "reports",
+];
+
+const hrWorkspaceSidebarItems: SidebarItem[] = hrWorkspaceSidebarOrder.map(
+  (workspaceKey) => {
+    const workspace = HR_WORKSPACES[workspaceKey];
+    return {
+      label: workspace.sidebar.label,
+      icon: hrWorkspaceSidebarIcons[workspaceKey],
+      href: workspace.sidebar.href,
+      keywords: workspace.sidebar.keywords,
+      requiredCapabilities: workspace.sidebar.requiredCapabilities,
+      status: workspace.sidebar.status,
+      children: workspace.items.map((item) => ({
+        label: item.label,
+        href: item.href,
+        keywords: item.keywords,
+        requiredCapabilities: item.requiredCapabilities,
+        status: item.status,
+      })),
+    };
+  },
+);
+
 const sidebarItems: SidebarItem[] = [
   {
     label: "Dashboard",
@@ -205,66 +243,7 @@ const sidebarItems: SidebarItem[] = [
     requiredCapabilities: ["access_hr_workspace"],
     status: "active",
   },
-  {
-    label: "Attendance",
-    icon: NotebookTabs,
-    href: "/hr/attendance",
-    keywords: ["timekeeping", "clock in", "clock out", "presence"],
-    requiredCapabilities: ["access_hr_workspace"],
-    status: "active",
-  },
-  {
-    label: "Payroll",
-    icon: ReceiptText,
-    href: "/hr/payroll",
-    keywords: ["payslip", "payslips", "salary", "compensation", "pay"],
-    requiredCapabilities: ["access_hr_workspace"],
-    status: "active",
-    children: [
-      {
-        label: "Salary Structure",
-        href: "/hr/salary-structure",
-        keywords: ["jobs", "salary grade", "mapping"],
-        requiredCapabilities: ["manage_salary_structure"],
-      },
-      {
-        label: "Payslip Management",
-        href: "/hr/payslips",
-        keywords: ["payslip", "release", "payroll records"],
-        requiredCapabilities: ["manage_payslips"],
-      },
-      {
-        label: "Payroll Settings",
-        href: "/hr/payroll-settings",
-        keywords: ["deductions", "mp2", "rules"],
-        requiredCapabilities: ["manage_payroll_settings"],
-      },
-    ],
-  },
-  {
-    label: "Performance",
-    icon: User,
-    href: "/hr/performance",
-    keywords: ["evaluation", "kpi", "reviews", "appraisal"],
-    requiredCapabilities: ["access_hr_workspace"],
-    status: "active",
-  },
-  {
-    label: "Leave",
-    icon: BookOpenText,
-    href: "/hr/leave",
-    keywords: ["vacation", "time off", "absence"],
-    requiredCapabilities: ["access_hr_workspace"],
-    status: "active",
-  },
-  {
-    label: "Reports",
-    icon: BookOpenText,
-    href: "/hr/reports-hub",
-    keywords: ["analytics", "logs", "insights", "reporting"],
-    requiredCapabilities: ["view_app_logs"],
-    status: "active",
-  },
+  ...hrWorkspaceSidebarItems,
 ];
 
 export function DashboardShell({
