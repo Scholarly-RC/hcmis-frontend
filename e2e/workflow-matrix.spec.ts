@@ -100,13 +100,13 @@ test("performance evaluations shows staff cycle controls and hides them for empl
 
   await page.goto("/performance-evaluations");
   await expect(page.getByText("Performance Evaluations")).toBeVisible();
-  await expect(page.getByText("Create Evaluation Cycle")).toBeVisible();
+  await expect(page.getByRole("button", { name: "New Cycle" })).toBeVisible();
   await logout(page);
 
   await loginAs(page, "employee");
   await page.goto("/performance-evaluations");
   await expect(page.getByText("Performance Evaluations")).toBeVisible();
-  await expect(page.getByText("Create Evaluation Cycle")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "New Cycle" })).toHaveCount(0);
   await logout(page);
 });
 

@@ -7,6 +7,6 @@ test("Employee performance workflow hides staff-only controls", async ({
   await loginAs(page, "employee");
   await page.goto("/performance-evaluations");
   await expect(page.getByText("Performance Evaluations")).toBeVisible();
-  await expect(page.getByText("Create Evaluation Cycle")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "New Cycle" })).toHaveCount(0);
   await logout(page);
 });

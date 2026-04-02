@@ -11,6 +11,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -56,6 +65,7 @@ type CreateCycleFormState = {
 };
 
 type WorkspaceView = "self" | "peer" | "hr_cycle";
+type StaffPanel = "assignments" | "summary";
 
 type EvaluationProgress = {
   answered: number;
@@ -100,6 +110,17 @@ function formatCycle(cycle: UserEvaluationRecord) {
       ? `${cycle.evaluatee.first_name} ${cycle.evaluatee.last_name}`.trim()
       : `User #${cycle.evaluatee_id}`;
   return `${cycle.year} · ${quarter} · ${evaluateeName}`;
+}
+
+function compareCycleRecency(a: UserEvaluationRecord, b: UserEvaluationRecord) {
+  if (a.year !== b.year) {
+    return b.year - a.year;
+  }
+  const quarterRank: Record<UserEvaluationRecord["quarter"], number> = {
+    FQ: 1,
+    SQ: 2,
+  };
+  return quarterRank[b.quarter] - quarterRank[a.quarter];
 }
 
 function getDomainTitle(domain: EvaluationDomainRecord, index: number) {
@@ -267,11 +288,23 @@ export function PerformanceEvaluationsClient({
     quarter: "FQ",
     year: String(new Date().getFullYear()),
   });
+  const [selectedEvaluateeId, setSelectedEvaluateeId] = useState("");
+  const [staffPanel, setStaffPanel] = useState<StaffPanel>("assignments");
+  const [isCreateCycleDialogOpen, setIsCreateCycleDialogOpen] = useState(false);
 
   const selectedCycle = useMemo(
     () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
     [cycles, selectedCycleId],
   );
+  const filteredStaffCycles = useMemo(() => {
+    if (!selectedEvaluateeId) {
+      return [];
+    }
+    const evaluateeId = Number(selectedEvaluateeId);
+    return [...cycles]
+      .filter((cycle) => cycle.evaluatee_id === evaluateeId)
+      .sort(compareCycleRecency);
+  }, [cycles, selectedEvaluateeId]);
 
   const myEvaluations = useMemo(
     () =>
@@ -308,6 +341,40 @@ export function PerformanceEvaluationsClient({
   const evaluateeName = useMemo(
     () => getUserDisplayName(selectedCycle?.evaluatee ?? null),
     [selectedCycle?.evaluatee],
+  );
+  const staffSelfEvaluations = useMemo(
+    () =>
+      selectedCycle
+        ? evaluations.filter(
+            (evaluation) =>
+              evaluation.evaluator_id === selectedCycle.evaluatee_id,
+          )
+        : [],
+    [evaluations, selectedCycle],
+  );
+  const staffPeerEvaluations = useMemo(
+    () =>
+      selectedCycle
+        ? evaluations.filter(
+            (evaluation) =>
+              evaluation.evaluator_id !== selectedCycle.evaluatee_id,
+          )
+        : [],
+    [evaluations, selectedCycle],
+  );
+  const staffSelfSubmittedCount = useMemo(
+    () =>
+      staffSelfEvaluations.filter((evaluation) =>
+        Boolean(evaluation.date_submitted),
+      ).length,
+    [staffSelfEvaluations],
+  );
+  const staffPeerSubmittedCount = useMemo(
+    () =>
+      staffPeerEvaluations.filter((evaluation) =>
+        Boolean(evaluation.date_submitted),
+      ).length,
+    [staffPeerEvaluations],
   );
 
   const existingEvaluatorIds = useMemo(
@@ -417,7 +484,7 @@ export function PerformanceEvaluationsClient({
             selectedCycleId &&
             loadedCycles.some((cycle) => cycle.id === selectedCycleId)
               ? selectedCycleId
-              : (loadedCycles[0]?.id ?? null);
+              : null;
           setSelectedCycleId(nextSelectedCycleId);
 
           if (nextSelectedCycleId) {
@@ -523,6 +590,58 @@ export function PerformanceEvaluationsClient({
     }
     setWorkspaceView("self");
   }, [hasPeerForms, hasSelfForms, isStaff, workspaceView]);
+
+  useEffect(() => {
+    if (!isStaff) {
+      return;
+    }
+    if (users.length === 0) {
+      setSelectedEvaluateeId("");
+      return;
+    }
+    const exists = users.some(
+      (user) => String(user.id) === selectedEvaluateeId,
+    );
+    if (exists) {
+      return;
+    }
+    const preferredEvaluateeId = selectedCycle
+      ? String(selectedCycle.evaluatee_id)
+      : String(users[0].id);
+    setSelectedEvaluateeId(preferredEvaluateeId);
+  }, [isStaff, selectedCycle, selectedEvaluateeId, users]);
+
+  useEffect(() => {
+    if (!isStaff) {
+      return;
+    }
+    if (!selectedEvaluateeId) {
+      setSelectedCycleId(null);
+      return;
+    }
+    const selectedCycleMatchesEvaluatee =
+      selectedCycle &&
+      String(selectedCycle.evaluatee_id) === selectedEvaluateeId;
+    if (selectedCycleMatchesEvaluatee) {
+      return;
+    }
+    setSelectedCycleId(filteredStaffCycles[0]?.id ?? null);
+  }, [filteredStaffCycles, isStaff, selectedCycle, selectedEvaluateeId]);
+
+  useEffect(() => {
+    if (!isStaff || !selectedEvaluateeId) {
+      return;
+    }
+    setCreateCycleForm((current) => {
+      if (current.evaluateeId === selectedEvaluateeId) {
+        return current;
+      }
+      return {
+        ...current,
+        evaluateeId: selectedEvaluateeId,
+      };
+    });
+  }, [isStaff, selectedEvaluateeId]);
 
   useEffect(() => {
     if (!isStaff) {
@@ -699,6 +818,8 @@ export function PerformanceEvaluationsClient({
       toast.success("Evaluation cycle created.");
       await loadData(true);
       setSelectedCycleId(created.id);
+      setStaffPanel("assignments");
+      setIsCreateCycleDialogOpen(false);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to create cycle.",
@@ -1030,6 +1151,499 @@ export function PerformanceEvaluationsClient({
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (isStaff) {
+    return (
+      <div className="flex w-full flex-col gap-6">
+        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
+            <div>
+              <CardTitle>Performance Evaluations</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Focus on one cycle with assignments and summary in one place.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Dialog
+                open={isCreateCycleDialogOpen}
+                onOpenChange={setIsCreateCycleDialogOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button>New Cycle</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-xl">
+                  <DialogHeader>
+                    <DialogTitle>Create Evaluation Cycle</DialogTitle>
+                    <DialogDescription>
+                      Pick evaluatee, quarter, and year. Questionnaire is
+                      auto-selected.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="evaluatee">Evaluatee</Label>
+                      <Select
+                        value={createCycleForm.evaluateeId || "__none__"}
+                        onValueChange={(value) =>
+                          setCreateCycleForm((current) => ({
+                            ...current,
+                            evaluateeId: value === "__none__" ? "" : value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger id="evaluatee" className="h-10 w-full">
+                          <SelectValue placeholder="Select user" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Select user</SelectItem>
+                          {users.map((user) => (
+                            <SelectItem key={user.id} value={String(user.id)}>
+                              {[user.first_name, user.last_name]
+                                .filter(Boolean)
+                                .join(" ")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="questionnaire">Questionnaire</Label>
+                      <Select
+                        value={createCycleForm.questionnaireId || "__none__"}
+                        disabled
+                      >
+                        <SelectTrigger
+                          id="questionnaire"
+                          className="h-10 w-full"
+                        >
+                          <SelectValue placeholder="Select questionnaire" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">
+                            Select questionnaire
+                          </SelectItem>
+                          {questionnaires.map((questionnaire) => (
+                            <SelectItem
+                              key={questionnaire.id}
+                              value={String(questionnaire.id)}
+                            >
+                              {questionnaire.title}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quarter">Quarter</Label>
+                      <Select
+                        value={createCycleForm.quarter}
+                        onValueChange={(value: "FQ" | "SQ") =>
+                          setCreateCycleForm((current) => ({
+                            ...current,
+                            quarter: value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger id="quarter" className="h-10 w-full">
+                          <SelectValue placeholder="Select quarter" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="FQ">First Quarter</SelectItem>
+                          <SelectItem value="SQ">Second Quarter</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="year">Year</Label>
+                      <Input
+                        id="year"
+                        type="number"
+                        value={createCycleForm.year}
+                        onChange={(event) =>
+                          setCreateCycleForm((current) => ({
+                            ...current,
+                            year: event.target.value,
+                          }))
+                        }
+                        placeholder="2026"
+                        min={1900}
+                        step={1}
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsCreateCycleDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => void createCycle()}
+                      disabled={busyKey === "create-cycle"}
+                    >
+                      {busyKey === "create-cycle" ? (
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                      ) : null}
+                      Create Cycle
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <Button
+                variant="outline"
+                onClick={() => void loadData(true)}
+                disabled={refreshing}
+              >
+                {refreshing ? (
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 size-4" />
+                )}
+                Refresh
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="evaluatee-filter">Evaluatee</Label>
+              <Select
+                value={selectedEvaluateeId || "__none__"}
+                onValueChange={(value) =>
+                  setSelectedEvaluateeId(value === "__none__" ? "" : value)
+                }
+              >
+                <SelectTrigger
+                  id="evaluatee-filter"
+                  className="h-10 w-full max-w-2xl"
+                >
+                  <SelectValue placeholder="Select evaluatee" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select evaluatee</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {[user.first_name, user.last_name]
+                        .filter(Boolean)
+                        .join(" ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cycle-workspace">Cycle Workspace</Label>
+              <Select
+                value={selectedCycleId ? String(selectedCycleId) : "__none__"}
+                onValueChange={(value) =>
+                  setSelectedCycleId(
+                    value === "__none__" ? null : Number(value),
+                  )
+                }
+              >
+                <SelectTrigger
+                  id="cycle-workspace"
+                  className="h-10 w-full max-w-2xl"
+                >
+                  <SelectValue placeholder="Select cycle" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select cycle</SelectItem>
+                  {filteredStaffCycles.map((cycle) => (
+                    <SelectItem key={cycle.id} value={String(cycle.id)}>
+                      {formatCycle(cycle)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={staffPanel === "assignments" ? "default" : "outline"}
+                  onClick={() => setStaffPanel("assignments")}
+                  disabled={!selectedCycle}
+                >
+                  Assignments
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={staffPanel === "summary" ? "default" : "outline"}
+                  onClick={() => setStaffPanel("summary")}
+                  disabled={!selectedCycle}
+                >
+                  Summary
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedCycle ? (
+                  <Badge
+                    variant={
+                      selectedCycle.is_finalized ? "secondary" : "outline"
+                    }
+                  >
+                    {getCycleStatusLabel(selectedCycle.is_finalized)}
+                  </Badge>
+                ) : null}
+                {selectedCycle ? (
+                  <Button
+                    variant={
+                      selectedCycle.is_finalized ? "destructive" : "default"
+                    }
+                    onClick={() => void toggleFinalize()}
+                    disabled={busyKey === "toggle-finalize"}
+                  >
+                    {busyKey === "toggle-finalize" ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : null}
+                    {selectedCycle.is_finalized ? "Close Cycle" : "Open Cycle"}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {selectedCycle ? (
+          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+            <CardHeader>
+              <CardTitle className="text-base">
+                {staffPanel === "assignments"
+                  ? "Evaluator Assignments"
+                  : "Cycle Summary"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {staffPanel === "assignments" ? (
+                <>
+                  <div className="flex flex-col gap-2 md:flex-row">
+                    <Select
+                      value={assignmentUserId || "__none__"}
+                      onValueChange={(value) =>
+                        setAssignmentUserId(value === "__none__" ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="h-10 w-full">
+                        <SelectValue placeholder="Select evaluator" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">
+                          Select evaluator
+                        </SelectItem>
+                        {availableAssignmentUsers.map((user) => (
+                          <SelectItem key={user.id} value={String(user.id)}>
+                            {[user.first_name, user.last_name]
+                              .filter(Boolean)
+                              .join(" ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      onClick={() => void addAssignment()}
+                      disabled={
+                        !assignmentUserId || busyKey === "add-assignment"
+                      }
+                    >
+                      {busyKey === "add-assignment" ? (
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                      ) : null}
+                      Add Evaluator
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">
+                      Self {staffSelfSubmittedCount}/
+                      {staffSelfEvaluations.length}
+                    </Badge>
+                    <Badge variant="outline">
+                      Peer {staffPeerSubmittedCount}/
+                      {staffPeerEvaluations.length}
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-2">
+                    {evaluations.length > 0 ? (
+                      evaluations.map((evaluation) => {
+                        const evaluatorName =
+                          getUserDisplayName(evaluation.evaluator ?? null) ??
+                          userNameById.get(evaluation.evaluator_id);
+                        return (
+                          <div
+                            key={evaluation.id}
+                            className="flex items-center justify-between rounded-md border border-border/70 p-3"
+                          >
+                            <div className="text-sm">
+                              {evaluatorName
+                                ? `${evaluatorName} (#${evaluation.evaluator_id})`
+                                : `User #${evaluation.evaluator_id}`}
+                              {evaluation.evaluator_id ===
+                              selectedCycle.evaluatee_id
+                                ? " (Self)"
+                                : ""}
+                            </div>
+                            {evaluation.evaluator_id !==
+                            selectedCycle.evaluatee_id ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  void removeAssignment(evaluation.evaluator_id)
+                                }
+                                disabled={
+                                  busyKey ===
+                                  `remove-${evaluation.evaluator_id}`
+                                }
+                              >
+                                {busyKey ===
+                                `remove-${evaluation.evaluator_id}` ? (
+                                  <Loader2 className="mr-2 size-3 animate-spin" />
+                                ) : null}
+                                Remove
+                              </Button>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No evaluators assigned yet.
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="rounded-md border border-border/70 p-3">
+                      <div className="text-xs text-muted-foreground">
+                        Self forms
+                      </div>
+                      <div className="text-lg font-semibold">
+                        {staffSelfSubmittedCount}/{staffSelfEvaluations.length}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-border/70 p-3">
+                      <div className="text-xs text-muted-foreground">
+                        Peer forms
+                      </div>
+                      <div className="text-lg font-semibold">
+                        {staffPeerSubmittedCount}/{staffPeerEvaluations.length}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-border/70 p-3">
+                      <div className="text-xs text-muted-foreground">
+                        Status
+                      </div>
+                      <div className="text-lg font-semibold">
+                        {getCycleStatusLabel(selectedCycle.is_finalized)}
+                      </div>
+                    </div>
+                  </div>
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button type="button" variant="ghost" className="px-0">
+                        <ChevronDown className="mr-2 size-4" />
+                        Show details
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-4">
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        <div>
+                          Evaluatee:{" "}
+                          <span className="text-foreground">
+                            {evaluateeName
+                              ? `${evaluateeName} (#${selectedCycle.evaluatee_id})`
+                              : `User #${selectedCycle.evaluatee_id}`}
+                          </span>
+                        </div>
+                        <div>
+                          Questionnaire ID:{" "}
+                          <span className="text-foreground">
+                            {selectedCycle.questionnaire_id}
+                          </span>
+                        </div>
+                      </div>
+                      {aggregate ? (
+                        <>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="rounded-md border border-border/70 p-3">
+                              <div className="text-xs text-muted-foreground">
+                                Overall Self Mean
+                              </div>
+                              <div className="text-lg font-semibold">
+                                {aggregate.self_rating_overall_mean.toFixed(2)}
+                              </div>
+                            </div>
+                            <div className="rounded-md border border-border/70 p-3">
+                              <div className="text-xs text-muted-foreground">
+                                Overall Peer Mean
+                              </div>
+                              <div className="text-lg font-semibold">
+                                {aggregate.peer_rating_overall_mean.toFixed(2)}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="rounded-md border border-border/70">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Domain</TableHead>
+                                  <TableHead className="text-right">
+                                    Self
+                                  </TableHead>
+                                  <TableHead className="text-right">
+                                    Peer
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {aggregate.domains.map((domain) => (
+                                  <TableRow key={domain.domain_key}>
+                                    <TableCell>
+                                      {summaryDomainLabelByKey.get(
+                                        domain.domain_key,
+                                      ) ?? domain.domain_key}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {domain.self_rating_mean.toFixed(2)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {domain.peer_rating_mean.toFixed(2)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Summary metrics are not available yet.
+                        </div>
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+            <CardContent className="py-10 text-sm text-muted-foreground">
+              {selectedEvaluateeId
+                ? "No cycles available for the selected user. Create a new cycle."
+                : "Select an evaluatee to view cycles."}
+            </CardContent>
+          </Card>
+        )}
       </div>
     );
   }
