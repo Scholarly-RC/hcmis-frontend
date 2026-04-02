@@ -1,11 +1,11 @@
-export { AUTH_COOKIE_NAME } from "@/lib/auth";
+export { AUTH_COOKIE_NAME } from "@/constants/auth";
 
+import { buildBackendUrl, readBackendJson } from "@/lib/backend";
 import type {
   AuthLoginResponse,
   AuthUser,
   AuthUserProfileUpdate,
-} from "@/lib/auth";
-import { buildBackendUrl, readBackendJson } from "@/lib/backend";
+} from "@/types/auth";
 
 function getTokenExpiryDate(token: string) {
   const [, payload] = token.split(".");

@@ -1,13 +1,13 @@
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { ProfileEditModal } from "@/app/profile/_components/profile-edit-modal";
 import { ProfileHeader } from "@/app/profile/_components/profile-header";
-import type { AuthUser } from "@/lib/auth";
 import {
   CIVIL_STATUS_OPTIONS,
   EDUCATION_OPTIONS,
   GENDER_OPTIONS,
   RELIGION_OPTIONS,
 } from "@/lib/profile-options";
+import type { AuthUser } from "@/types/auth";
 
 export const metadata = {
   title: "My Profile",

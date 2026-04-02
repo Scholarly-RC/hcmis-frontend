@@ -13,7 +13,6 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { AuthUser } from "@/lib/auth";
 import {
   buildDeductionConfig,
   type DeductionConfigData,
@@ -24,6 +23,7 @@ import {
   requestJson,
 } from "@/lib/payroll";
 import { toast } from "@/lib/toast";
+import type { AuthUser } from "@/types/auth";
 
 type PayrollSettingsForm = {
   minimum_wage_amount: string;

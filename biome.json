@@ -18,6 +18,19 @@
     "enabled": true,
     "rules": {
       "recommended": true,
+      "style": {
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "@/lib/auth": "Use '@/types/auth' for types and '@/constants/auth' for AUTH_COOKIE_NAME.",
+              "@/lib/utils": "Use '@/utils/cn' instead.",
+              "@/lib/debounce": "Use '@/utils/debounce' instead.",
+              "@/lib/capabilities": "Use '@/utils/capabilities' instead."
+            }
+          }
+        }
+      },
       "suspicious": {
         "noUnknownAtRules": "off"
       }

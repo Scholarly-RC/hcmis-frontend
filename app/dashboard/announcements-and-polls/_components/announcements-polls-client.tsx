@@ -15,6 +15,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   AnnouncementCreatePayload,
@@ -576,7 +578,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       Add Choice
                     </Button>
                   </div>
-                  <label
+                  <Label
                     htmlFor="allow-multiple-choices"
                     className="flex items-center gap-2 text-sm text-muted-foreground"
                   >
@@ -588,7 +590,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       }
                     />
                     Allow multiple choices
-                  </label>
+                  </Label>
                   <div className="flex gap-2">
                     <Button
                       variant="outline"
@@ -1010,66 +1012,102 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                 </p>
               ) : null}
 
-              <div className="space-y-2">
-                {previewPoll.choices
+              {(() => {
+                const sortedChoices = previewPoll.choices
                   .slice()
-                  .sort((left, right) => left.position - right.position)
-                  .map((choice) => {
-                    const selectedChoiceIds =
-                      voteSelectionByPoll[previewPoll.id] ??
-                      previewPoll.user_vote_choice_ids ??
-                      [];
-                    const checked = selectedChoiceIds.includes(choice.id);
-                    const controlId = `preview-poll-${previewPoll.id}-choice-${choice.id}`;
-                    return (
-                      <div
-                        key={choice.id}
-                        className="rounded-lg border border-border/70 p-3"
-                      >
-                        <label
-                          htmlFor={controlId}
-                          className="flex cursor-pointer items-start justify-between gap-3"
-                        >
-                          <div className="flex items-start gap-2">
-                            {previewPoll.allow_multiple_choices ? (
-                              <Checkbox
-                                id={controlId}
-                                checked={checked}
-                                disabled={previewPoll.status !== "published"}
-                                onCheckedChange={(value) =>
-                                  toggleMultiChoiceSelection(
-                                    previewPoll.id,
-                                    choice.id,
-                                    value === true,
-                                  )
-                                }
-                              />
-                            ) : (
-                              <input
-                                id={controlId}
-                                type="radio"
-                                name={`preview-poll-${previewPoll.id}`}
-                                checked={checked}
-                                disabled={previewPoll.status !== "published"}
-                                onChange={() =>
-                                  setSingleChoiceSelection(
-                                    previewPoll.id,
-                                    choice.id,
-                                  )
-                                }
-                              />
-                            )}
-                            <span className="text-sm">{choice.text}</span>
+                  .sort((left, right) => left.position - right.position);
+                const selectedChoiceIds =
+                  voteSelectionByPoll[previewPoll.id] ??
+                  previewPoll.user_vote_choice_ids ??
+                  [];
+                const selectedChoiceId = selectedChoiceIds[0]
+                  ? String(selectedChoiceIds[0])
+                  : "";
+
+                if (previewPoll.allow_multiple_choices) {
+                  return (
+                    <div className="space-y-2">
+                      {sortedChoices.map((choice) => {
+                        const checked = selectedChoiceIds.includes(choice.id);
+                        const controlId = `preview-poll-${previewPoll.id}-choice-${choice.id}`;
+                        return (
+                          <div
+                            key={choice.id}
+                            className="rounded-lg border border-border/70 p-3"
+                          >
+                            <Label
+                              htmlFor={controlId}
+                              className="flex cursor-pointer items-start justify-between gap-3"
+                            >
+                              <div className="flex items-start gap-2">
+                                <Checkbox
+                                  id={controlId}
+                                  checked={checked}
+                                  disabled={previewPoll.status !== "published"}
+                                  onCheckedChange={(value) =>
+                                    toggleMultiChoiceSelection(
+                                      previewPoll.id,
+                                      choice.id,
+                                      value === true,
+                                    )
+                                  }
+                                />
+                                <span className="text-sm">{choice.text}</span>
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {choice.vote_count} vote
+                                {choice.vote_count === 1 ? "" : "s"}
+                              </span>
+                            </Label>
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {choice.vote_count} vote
-                            {choice.vote_count === 1 ? "" : "s"}
-                          </span>
-                        </label>
-                      </div>
-                    );
-                  })}
-              </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                return (
+                  <RadioGroup
+                    value={selectedChoiceId}
+                    disabled={previewPoll.status !== "published"}
+                    onValueChange={(value) => {
+                      const choiceId = Number(value);
+                      if (Number.isNaN(choiceId)) {
+                        return;
+                      }
+                      setSingleChoiceSelection(previewPoll.id, choiceId);
+                    }}
+                    className="space-y-2"
+                  >
+                    {sortedChoices.map((choice) => {
+                      const controlId = `preview-poll-${previewPoll.id}-choice-${choice.id}`;
+                      return (
+                        <div
+                          key={choice.id}
+                          className="rounded-lg border border-border/70 p-3"
+                        >
+                          <Label
+                            htmlFor={controlId}
+                            className="flex cursor-pointer items-start justify-between gap-3"
+                          >
+                            <div className="flex items-start gap-2">
+                              <RadioGroupItem
+                                id={controlId}
+                                value={String(choice.id)}
+                              />
+                              <span className="text-sm">{choice.text}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {choice.vote_count} vote
+                              {choice.vote_count === 1 ? "" : "s"}
+                            </span>
+                          </Label>
+                        </div>
+                      );
+                    })}
+                  </RadioGroup>
+                );
+              })()}
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                 <p className="text-xs text-muted-foreground">

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { WorkspaceHub } from "@/components/workspace-hub";
-import { isStaff } from "@/lib/capabilities";
+import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
   title: "Reports",

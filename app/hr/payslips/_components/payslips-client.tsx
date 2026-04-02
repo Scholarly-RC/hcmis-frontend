@@ -13,6 +13,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -20,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { AuthUser } from "@/lib/auth";
 import {
   openPayslipPrintWindow,
   type PayrollPayslip,
@@ -29,6 +35,7 @@ import {
   toNumber,
 } from "@/lib/payroll";
 import { toast } from "@/lib/toast";
+import type { AuthUser } from "@/types/auth";
 
 type PayslipFilters = {
   month: string;
@@ -284,31 +291,34 @@ export function PayslipsClient() {
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="filter_user">Employee</Label>
-          <select
-            id="filter_user"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-            value={filters.user_id}
-            onChange={(event) =>
+          <Select
+            value={filters.user_id || "__all__"}
+            onValueChange={(value) =>
               setFilters((current) => ({
                 ...current,
-                user_id: event.target.value,
+                user_id: value === "__all__" ? "" : value,
               }))
             }
           >
-            <option value="">All employees</option>
-            {users.map((user) => {
-              const label =
-                [user.first_name, user.last_name]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim() || user.email;
-              return (
-                <option key={user.id} value={user.id}>
-                  {label}
-                </option>
-              );
-            })}
-          </select>
+            <SelectTrigger id="filter_user" className="h-10 w-full">
+              <SelectValue placeholder="All employees" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All employees</SelectItem>
+              {users.map((user) => {
+                const label =
+                  [user.first_name, user.last_name]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim() || user.email;
+                return (
+                  <SelectItem key={user.id} value={String(user.id)}>
+                    {label}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-end">
           <Button className="w-full" onClick={() => void loadPayslips()}>
@@ -320,30 +330,33 @@ export function PayslipsClient() {
       <div className="grid gap-4 rounded-lg border bg-card p-4 md:grid-cols-5">
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="create_user">Employee</Label>
-          <select
-            id="create_user"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+          <Select
             value={createForm.user_id}
-            onChange={(event) =>
+            onValueChange={(value) =>
               setCreateForm((current) => ({
                 ...current,
-                user_id: event.target.value,
+                user_id: value,
               }))
             }
           >
-            {users.map((user) => {
-              const label =
-                [user.first_name, user.last_name]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim() || user.email;
-              return (
-                <option key={user.id} value={user.id}>
-                  {label}
-                </option>
-              );
-            })}
-          </select>
+            <SelectTrigger id="create_user" className="h-10 w-full">
+              <SelectValue placeholder="Select employee" />
+            </SelectTrigger>
+            <SelectContent>
+              {users.map((user) => {
+                const label =
+                  [user.first_name, user.last_name]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim() || user.email;
+                return (
+                  <SelectItem key={user.id} value={String(user.id)}>
+                    {label}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-2">
           <Label htmlFor="create_month">Month</Label>
@@ -378,20 +391,23 @@ export function PayslipsClient() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="create_period">Period</Label>
-          <select
-            id="create_period"
-            className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+          <Select
             value={createForm.period}
-            onChange={(event) =>
+            onValueChange={(value: "1ST" | "2ND") =>
               setCreateForm((current) => ({
                 ...current,
-                period: event.target.value as "1ST" | "2ND",
+                period: value,
               }))
             }
           >
-            <option value="1ST">1st</option>
-            <option value="2ND">2nd</option>
-          </select>
+            <SelectTrigger id="create_period" className="h-10 w-full">
+              <SelectValue placeholder="Select period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1ST">1st</SelectItem>
+              <SelectItem value="2ND">2nd</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-end md:col-span-5">
           <Button onClick={() => void createPayslip()}>

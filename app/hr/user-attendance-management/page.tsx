@@ -14,10 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MONTH_NAMES } from "@/constants/date";
 import type { AttendanceSummary } from "@/lib/attendance";
-import type { AuthUser } from "@/lib/auth";
 import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
-import { cn } from "@/lib/utils";
+import type { AuthUser } from "@/types/auth";
+import { cn } from "@/utils/cn";
 
 export const metadata = {
   title: "User Attendance Management",
@@ -27,21 +28,6 @@ export const metadata = {
 type SearchParams =
   | Record<string, string | string[] | undefined>
   | Promise<Record<string, string | string[] | undefined>>;
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 function firstValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {

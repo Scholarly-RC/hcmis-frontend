@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { DashboardShell } from "@/components/dashboard-shell";
-import type { AuthUser } from "@/lib/auth";
 import { AUTH_COOKIE_NAME, fetchCurrentUser } from "@/lib/auth-server";
-import { isStaff } from "@/lib/capabilities";
+import type { AuthUser } from "@/types/auth";
+import { isStaff } from "@/utils/capabilities";
 
 type DashboardPageFrameProps = {
   children: (user: AuthUser) => ReactNode;

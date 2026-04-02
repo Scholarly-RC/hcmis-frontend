@@ -22,8 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AttendanceSummary } from "@/lib/attendance";
-import type { AuthUser } from "@/lib/auth";
 import { toast } from "@/lib/toast";
+import type { AuthUser } from "@/types/auth";
 
 function pad(value: number) {
   return value.toString().padStart(2, "0");
@@ -203,7 +203,10 @@ function AssignmentRow({
             !departmentShiftPolicy || departmentShiftPolicy.shifts.length === 0
           }
         >
-          <SelectTrigger id={`assignment-template-${dayNumber}`}>
+          <SelectTrigger
+            id={`assignment-template-${dayNumber}`}
+            className="h-10 w-full"
+          >
             <SelectValue
               placeholder={
                 departmentShiftPolicy?.shifts.length
@@ -404,7 +407,7 @@ export function ShiftAssignmentManager({
               >
                 <SelectTrigger
                   id="month-template-select"
-                  className="h-10 min-w-52"
+                  className="h-10 w-full min-w-52"
                 >
                   <SelectValue
                     placeholder={

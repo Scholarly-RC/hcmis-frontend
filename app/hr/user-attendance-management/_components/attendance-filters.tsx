@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { debounce } from "@/lib/debounce";
+import { MONTH_NAMES } from "@/constants/date";
+import { debounce } from "@/utils/debounce";
 
 type EmployeeOption = {
   id: number;
@@ -57,21 +58,6 @@ const attendanceFiltersSchema = z.object({
   month: z.string(),
   tab: z.string(),
 });
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 function buildUrl(pathname: string, state: FilterState) {
   const searchParams = new URLSearchParams();

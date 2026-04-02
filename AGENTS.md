@@ -92,6 +92,7 @@ Follow these rules before making changes.
 - Add components with the shadcn CLI/MCP flow; avoid hand-copying registry code.
 - Keep generated primitives in `components/ui/` and compose them in feature code.
 - Default to shadcn primitives for interactive UI and form controls instead of raw HTML when a matching primitive exists, including dialogs, menus, tables, textareas, collapsibles, popovers, sheets, and similar building blocks.
+- For any UI element with an available shadcn primitive (for example buttons, inputs, selects, textareas, dialogs, tables, popovers, sheets, menus, tooltips), use the shadcn component and do not introduce raw HTML primitives in feature code.
 - If the needed primitive is missing, add it through the shadcn CLI/MCP flow before building a custom alternative.
 - If a shadcn component requires provider wiring (for example `TooltipProvider`), ensure it is added in `app/layout.tsx` or the appropriate shared layout.
 
@@ -105,8 +106,9 @@ Follow these rules before making changes.
 ## State, Data, And Side Effects
 
 - Keep pages presentational unless the task needs data wiring.
-- For forms, use React Hook Form + Zod for non-trivial or validated forms; keep very small forms simple only when there is no meaningful validation/state complexity.
-- Prefer a consistent form pattern over ad hoc `useState` validation when a form has multiple fields, derived state, or server error handling.
+- For forms, default to React Hook Form + Zod (via `zodResolver`) as the standard implementation pattern.
+- Do not implement field validation with ad hoc `useState` error state when React Hook Form + Zod can be used.
+- Allow a simple non-RHF form only for truly trivial UI (for example, a single input with no validation rules and no server-side error mapping).
 - Isolate async/data-fetch logic so rendering remains easy to follow.
 - Handle empty/loading/error states for non-trivial data views.
 

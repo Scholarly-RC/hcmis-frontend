@@ -6,6 +6,7 @@ import { HrModulePageScaffold } from "@/components/hr/module-scaffold";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -188,7 +189,7 @@ export function SharedResourcesClient() {
           <h2 className="text-lg font-semibold tracking-tight">
             Upload Resource
           </h2>
-          <label htmlFor="shared-resource-name" className="space-y-1 text-sm">
+          <Label htmlFor="shared-resource-name" className="space-y-1 text-sm">
             <span className="text-muted-foreground">
               Resource name (optional)
             </span>
@@ -197,8 +198,8 @@ export function SharedResourcesClient() {
               value={resourceName}
               onChange={(event) => setResourceName(event.target.value)}
             />
-          </label>
-          <label
+          </Label>
+          <Label
             htmlFor="shared-resource-description"
             className="space-y-1 text-sm"
           >
@@ -210,16 +211,16 @@ export function SharedResourcesClient() {
               value={description}
               onChange={(event) => setDescription(event.target.value)}
             />
-          </label>
-          <label htmlFor="shared-resource-file" className="space-y-1 text-sm">
+          </Label>
+          <Label htmlFor="shared-resource-file" className="space-y-1 text-sm">
             <span className="text-muted-foreground">File</span>
             <Input
               id="shared-resource-file"
               type="file"
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
-          </label>
-          <label
+          </Label>
+          <Label
             htmlFor="shared-resource-confidential"
             className="flex items-center gap-2 text-sm"
           >
@@ -229,7 +230,7 @@ export function SharedResourcesClient() {
               onCheckedChange={(next) => setIsConfidential(Boolean(next))}
             />
             <span>Mark as confidential</span>
-          </label>
+          </Label>
           <Button
             type="button"
             onClick={() => void uploadResource()}

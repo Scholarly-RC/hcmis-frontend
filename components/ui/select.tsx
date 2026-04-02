@@ -4,7 +4,7 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { Select as SelectPrimitive } from "radix-ui";
 import type * as React from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 
 function Select({
   ...props
@@ -60,7 +60,8 @@ function SelectTrigger({
 function SelectContent({
   className,
   children,
-  position = "item-aligned",
+  position = "popper",
+  side = "bottom",
   align = "center",
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Content>) {
@@ -76,6 +77,7 @@ function SelectContent({
           className,
         )}
         position={position}
+        side={side}
         align={align}
         {...props}
       >

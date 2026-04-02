@@ -27,7 +27,7 @@ import {
   leaveTypeLabel,
 } from "@/lib/leave";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 
 type RequestError = {
   detail?: string;

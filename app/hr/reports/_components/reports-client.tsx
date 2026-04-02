@@ -6,6 +6,7 @@ import { HrModulePageScaffold } from "@/components/hr/module-scaffold";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { ReportCatalogEntry } from "@/lib/reports";
 import { toast } from "@/lib/toast";
 
@@ -124,7 +125,7 @@ export function ReportsClient() {
             <CardTitle>Report Controls</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <label
+            <Label
               htmlFor="reports-selected-year"
               className="space-y-1 text-sm"
             >
@@ -134,8 +135,8 @@ export function ReportsClient() {
                 value={selectedYear}
                 onChange={(event) => setSelectedYear(event.target.value)}
               />
-            </label>
-            <label
+            </Label>
+            <Label
               htmlFor="reports-selected-date"
               className="space-y-1 text-sm"
             >
@@ -146,8 +147,8 @@ export function ReportsClient() {
                 value={selectedDate}
                 onChange={(event) => setSelectedDate(event.target.value)}
               />
-            </label>
-            <label htmlFor="reports-from-date" className="space-y-1 text-sm">
+            </Label>
+            <Label htmlFor="reports-from-date" className="space-y-1 text-sm">
               <span className="text-muted-foreground">From date</span>
               <Input
                 id="reports-from-date"
@@ -155,8 +156,8 @@ export function ReportsClient() {
                 value={fromDate}
                 onChange={(event) => setFromDate(event.target.value)}
               />
-            </label>
-            <label htmlFor="reports-to-date" className="space-y-1 text-sm">
+            </Label>
+            <Label htmlFor="reports-to-date" className="space-y-1 text-sm">
               <span className="text-muted-foreground">To date</span>
               <Input
                 id="reports-to-date"
@@ -164,7 +165,7 @@ export function ReportsClient() {
                 value={toDate}
                 onChange={(event) => setToDate(event.target.value)}
               />
-            </label>
+            </Label>
 
             <div className="grid gap-2 pt-2">
               {actions.map((action) => (

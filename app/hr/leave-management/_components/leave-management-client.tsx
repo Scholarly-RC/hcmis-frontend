@@ -2,6 +2,7 @@
 
 import { Loader2, RotateCcw } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SelectField } from "@/components/form-select-field";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +23,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { AuthDepartment, AuthUser } from "@/lib/auth";
 import type {
   LeaveApprover,
   LeaveApproverUpsertPayload,
@@ -32,7 +32,8 @@ import type {
 } from "@/lib/leave";
 import { leaveStatusClass, leaveTypeLabel } from "@/lib/leave";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import type { AuthDepartment, AuthUser } from "@/types/auth";
+import { cn } from "@/utils/cn";
 
 type RequestError = {
   detail?: string;
@@ -116,8 +117,17 @@ function roleLabel(role: string | null | undefined) {
   return normalized;
 }
 
-export function LeaveManagementClient() {
-  const [tab, setTab] = useState<ManagementTab>("requests");
+type LeaveManagementClientProps = {
+  initialTab?: ManagementTab;
+};
+
+export function LeaveManagementClient({
+  initialTab = "requests",
+}: LeaveManagementClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<ManagementTab>(initialTab);
   const [loading, setLoading] = useState(true);
 
   const [departments, setDepartments] = useState<AuthDepartment[]>([]);
@@ -390,6 +400,37 @@ export function LeaveManagementClient() {
       .sort((a, b) => displayUser(a).localeCompare(displayUser(b)));
   }, [users]);
 
+  const setTabWithUrl = useCallback(
+    (nextTab: ManagementTab) => {
+      setTab(nextTab);
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("tab", nextTab);
+      const queryString = nextParams.toString();
+      router.replace(
+        queryString.length > 0 ? `${pathname}?${queryString}` : pathname,
+      );
+    },
+    [pathname, router, searchParams],
+  );
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (
+      tabParam === "requests" ||
+      tabParam === "approvers" ||
+      tabParam === "credits"
+    ) {
+      if (tab !== tabParam) {
+        setTab(tabParam);
+      }
+      return;
+    }
+
+    if (tab !== "requests") {
+      setTab("requests");
+    }
+  }, [searchParams, tab]);
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-lg shadow-black/5 sm:p-5">
@@ -412,21 +453,21 @@ export function LeaveManagementClient() {
           <Button
             type="button"
             variant={tab === "requests" ? "default" : "outline"}
-            onClick={() => setTab("requests")}
+            onClick={() => setTabWithUrl("requests")}
           >
             Request Monitor
           </Button>
           <Button
             type="button"
             variant={tab === "approvers" ? "default" : "outline"}
-            onClick={() => setTab("approvers")}
+            onClick={() => setTabWithUrl("approvers")}
           >
             Approver Settings
           </Button>
           <Button
             type="button"
             variant={tab === "credits" ? "default" : "outline"}
-            onClick={() => setTab("credits")}
+            onClick={() => setTabWithUrl("credits")}
           >
             Leave Credits
           </Button>

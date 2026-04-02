@@ -1,4 +1,4 @@
-import type { AuthDepartment, AuthUser } from "@/lib/auth";
+import type { AuthDepartment, AuthUser } from "@/types/auth";
 
 export type LeaveTypeOption = {
   value: "PA" | "UN" | "WR";

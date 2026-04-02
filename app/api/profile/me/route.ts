@@ -1,7 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
-
-import type { AuthUserProfileUpdate } from "@/lib/auth";
 import { AUTH_COOKIE_NAME, updateCurrentUserProfile } from "@/lib/auth-server";
+import type { AuthUserProfileUpdate } from "@/types/auth";
 
 type ProfileUpdateRequestBody = {
   first_name?: unknown;

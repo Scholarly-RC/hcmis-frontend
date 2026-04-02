@@ -6,7 +6,7 @@ import { useState } from "react";
 import { ProfileEditForm } from "@/app/profile/_components/profile-edit-form";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import type { AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/types/auth";
 
 type ProfileEditModalProps = {
   user: AuthUser;

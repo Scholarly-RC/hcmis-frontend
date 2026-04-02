@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { HrModulePageScaffold } from "@/components/hr/module-scaffold";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -100,7 +101,7 @@ export function AppLogsClient() {
       }
     >
       <div className="grid gap-3 rounded-2xl border border-border/70 bg-card/85 p-4 shadow-lg shadow-black/5 sm:grid-cols-2 lg:grid-cols-3">
-        <label htmlFor="app-logs-date" className="space-y-1 text-sm">
+        <Label htmlFor="app-logs-date" className="space-y-1 text-sm">
           <span className="text-muted-foreground">Selected date</span>
           <Input
             id="app-logs-date"
@@ -108,8 +109,8 @@ export function AppLogsClient() {
             value={selectedDate}
             onChange={(event) => setSelectedDate(event.target.value)}
           />
-        </label>
-        <label htmlFor="app-logs-user-id" className="space-y-1 text-sm">
+        </Label>
+        <Label htmlFor="app-logs-user-id" className="space-y-1 text-sm">
           <span className="text-muted-foreground">User ID (optional)</span>
           <Input
             id="app-logs-user-id"
@@ -117,7 +118,7 @@ export function AppLogsClient() {
             onChange={(event) => setUserId(event.target.value)}
             placeholder="e.g. 12"
           />
-        </label>
+        </Label>
         <div className="flex items-end">
           <Button
             type="button"

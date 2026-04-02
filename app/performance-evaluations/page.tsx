@@ -1,6 +1,6 @@
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { PerformanceEvaluationsClient } from "@/app/dashboard/performance-evaluations/_components/performance-evaluations-client";
-import { isStaff } from "@/lib/capabilities";
+import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
   title: "Performance Evaluations",

@@ -1,6 +1,5 @@
-import type { AuthUser } from "@/lib/auth";
-
-export const CAP_ACCESS_HR_WORKSPACE = "access_hr_workspace";
+import { CAP_ACCESS_HR_WORKSPACE } from "@/constants/capabilities";
+import type { AuthUser } from "@/types/auth";
 
 export function can(
   user: Pick<AuthUser, "capabilities"> | null | undefined,

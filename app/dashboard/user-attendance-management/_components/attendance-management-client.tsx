@@ -53,9 +53,9 @@ import type {
   AttendanceSummary,
   AttendanceSummaryDay,
 } from "@/lib/attendance";
-import type { AuthUser } from "@/lib/auth";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import type { AuthUser } from "@/types/auth";
+import { cn } from "@/utils/cn";
 
 type DraftState =
   | {
@@ -426,7 +426,7 @@ function AttendanceDraftForm({
               <div className="space-y-2">
                 <Label>Punch type</Label>
                 <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="h-10 w-full">
                     <SelectValue placeholder="Select punch type" />
                   </SelectTrigger>
                   <SelectContent>

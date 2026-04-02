@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { useTheme } from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 
 type ThemeToggleProps = {
   className?: string;

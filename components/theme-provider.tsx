@@ -10,6 +10,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { THEME_STORAGE_KEY } from "@/constants/theme";
 
 type Theme = "light" | "dark" | "system";
 type ResolvedTheme = "light" | "dark";
@@ -35,8 +36,6 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
-
-const STORAGE_KEY = "theme";
 
 function getSystemTheme(): ResolvedTheme {
   if (typeof window === "undefined") {
@@ -110,7 +109,7 @@ export function ThemeProvider({
   enableSystem = true,
   disableTransitionOnChange = false,
   forcedTheme,
-  storageKey = STORAGE_KEY,
+  storageKey = THEME_STORAGE_KEY,
   value,
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {

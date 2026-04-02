@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { PayslipsClient } from "@/app/hr/payslips/_components/payslips-client";
-import { isStaff } from "@/lib/capabilities";
+import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
   title: "Payslip Management",

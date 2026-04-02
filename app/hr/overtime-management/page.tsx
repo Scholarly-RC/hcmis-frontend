@@ -7,8 +7,8 @@ import type {
   OvertimeRequestRecord,
   OvertimeRequestScope,
 } from "@/lib/attendance";
-import type { AuthUser } from "@/lib/auth";
 import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
+import type { AuthUser } from "@/types/auth";
 
 export const metadata = {
   title: "Overtime Management",

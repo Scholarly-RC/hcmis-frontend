@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { AuthUser } from "@/lib/auth";
 import {
   CIVIL_STATUS_OPTIONS,
   EDUCATION_OPTIONS,
@@ -26,6 +25,7 @@ import {
   type ProfileOption,
   RELIGION_OPTIONS,
 } from "@/lib/profile-options";
+import type { AuthUser } from "@/types/auth";
 
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required."),

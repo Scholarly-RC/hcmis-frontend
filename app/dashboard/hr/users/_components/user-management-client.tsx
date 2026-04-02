@@ -29,9 +29,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { AuthDepartment, AuthUser } from "@/lib/auth";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import type { AuthDepartment, AuthUser } from "@/types/auth";
+import { cn } from "@/utils/cn";
 
 type UsersResponse = AuthUser[];
 type DepartmentsResponse = AuthDepartment[];
@@ -863,7 +863,7 @@ export function UserManagementClient({
               onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 setSearch(event.target.value)
               }
-              className="pl-9"
+              className="h-10 pl-9"
               placeholder="Search users"
             />
           </div>

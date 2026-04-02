@@ -18,7 +18,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { AuthUser } from "@/lib/auth";
 import {
   openPayslipPrintWindow,
   type PayrollPayslip,
@@ -27,6 +26,7 @@ import {
   toNumber,
 } from "@/lib/payroll";
 import { toast } from "@/lib/toast";
+import type { AuthUser } from "@/types/auth";
 
 type MyPayslipsClientProps = {
   user: AuthUser;

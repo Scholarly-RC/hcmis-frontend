@@ -1,4 +1,4 @@
-import type { AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/types/auth";
 
 export type AttendanceRecord = {
   id: number;

@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -26,9 +27,9 @@ import type {
   OvertimeRequestScope,
   OvertimeRequestStatus,
 } from "@/lib/attendance";
-import { debounce } from "@/lib/debounce";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
+import { debounce } from "@/utils/debounce";
 
 type OvertimeFilterState = {
   scope: OvertimeRequestScope;
@@ -313,9 +314,9 @@ export function OvertimeManagementClient({
         <CardContent className="space-y-4">
           <div className="grid gap-4 lg:grid-cols-4">
             <div className="space-y-2 lg:col-span-2">
-              <label htmlFor="q" className="text-sm font-medium">
+              <Label htmlFor="q" className="text-sm font-medium">
                 Search
-              </label>
+              </Label>
               <Input
                 id="q"
                 value={formState.query}

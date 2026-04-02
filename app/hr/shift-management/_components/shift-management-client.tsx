@@ -43,8 +43,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { WORKWEEK_DAYS } from "@/constants/date";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 
 export type ShiftTemplateRecord = {
   id: number;
@@ -175,7 +176,7 @@ function ShiftCheckboxField({
       control={control}
       name={name}
       render={({ field, fieldState }) => (
-        <label
+        <Label
           htmlFor={String(name)}
           className="flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3"
         >
@@ -197,7 +198,7 @@ function ShiftCheckboxField({
               </span>
             ) : null}
           </span>
-        </label>
+        </Label>
       )}
     />
   );
@@ -218,16 +219,6 @@ type ShiftManagementClientProps = {
   initialDepartmentId: string;
   initialDepartmentShiftPolicy: DepartmentShiftPolicy | null;
 };
-
-const WORKWEEK_DAYS = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-] as const;
 
 class ApiError extends Error {
   status: number;
@@ -587,7 +578,7 @@ function DepartmentWorkweekToggle({
   const id = `workweek-${day.toLowerCase()}`;
 
   return (
-    <label
+    <Label
       htmlFor={id}
       className={cn(
         "flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition-colors",
@@ -602,7 +593,7 @@ function DepartmentWorkweekToggle({
         onCheckedChange={(next) => onCheckedChange(next === true)}
       />
       <span className="text-sm font-medium text-foreground">{day}</span>
-    </label>
+    </Label>
   );
 }
 
@@ -1024,7 +1015,7 @@ export function ShiftManagementClient({
                             );
 
                             return (
-                              <label
+                              <Label
                                 htmlFor={`shift-${shift.id}`}
                                 key={shift.id}
                                 className={cn(
@@ -1049,7 +1040,7 @@ export function ShiftManagementClient({
                                     {buildShiftSummary(shift)}
                                   </span>
                                 </span>
-                              </label>
+                              </Label>
                             );
                           })}
                         </div>

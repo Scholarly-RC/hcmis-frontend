@@ -21,9 +21,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { AuthDepartment } from "@/lib/auth";
 import { type PayrollJob, requestJson } from "@/lib/payroll";
 import { toast } from "@/lib/toast";
+import type { AuthDepartment } from "@/types/auth";
 
 type JobForm = {
   title: string;

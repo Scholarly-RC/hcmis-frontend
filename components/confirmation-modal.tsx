@@ -62,14 +62,16 @@ export function ConfirmationModal({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent showCloseButton={false}>
-        <DialogHeader>
+      <DialogContent showCloseButton={false} className="gap-0 p-0">
+        <DialogHeader className="gap-2 border-b px-4 py-3">
           <DialogTitle>{title}</DialogTitle>
-          {description ? (
-            <DialogDescription>{description}</DialogDescription>
-          ) : null}
         </DialogHeader>
-        <DialogFooter>
+        {description ? (
+          <div className="border-b px-4 py-3">
+            <DialogDescription>{description}</DialogDescription>
+          </div>
+        ) : null}
+        <DialogFooter className="mx-0 mb-0 rounded-b-xl border-t-0 bg-muted/30 px-4 py-3">
           <Button
             type="button"
             variant="outline"

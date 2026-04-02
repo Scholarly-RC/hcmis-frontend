@@ -8,9 +8,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import type { AuthUser } from "@/lib/auth";
+import {
+  ADMINISTRATOR_QUESTIONNAIRE_CODE,
+  EMPLOYEE_QUESTIONNAIRE_CODE,
+} from "@/constants/performance";
 import type {
   EvaluationDomainRecord,
   EvaluationRecord,
@@ -19,6 +37,7 @@ import type {
   UserEvaluationRecord,
 } from "@/lib/performance-updates";
 import { toast } from "@/lib/toast";
+import type { AuthUser } from "@/types/auth";
 
 type RequestError = {
   detail?: string;
@@ -81,6 +100,39 @@ function getDomainTitle(domain: EvaluationDomainRecord, index: number) {
   return `Domain ${index + 1}`;
 }
 
+function getDomainKey(domain: EvaluationDomainRecord, index: number) {
+  if (domain.domain_number) {
+    return String(domain.domain_number);
+  }
+  if (domain.domain_name && domain.domain_name.trim().length > 0) {
+    return domain.domain_name;
+  }
+  return `domain_${index + 1}`;
+}
+
+function getDomainSummaryLabel(domain: EvaluationDomainRecord, index: number) {
+  const domainNumber = domain.domain_number
+    ? String(domain.domain_number).trim()
+    : "";
+  const domainName =
+    domain.domain_name && domain.domain_name.trim().length > 0
+      ? domain.domain_name.trim()
+      : domain.name && domain.name.trim().length > 0
+        ? domain.name.trim()
+        : "";
+
+  if (domainNumber && domainName) {
+    return `Domain ${domainNumber} - ${domainName}`;
+  }
+  if (domainNumber) {
+    return `Domain ${domainNumber}`;
+  }
+  if (domainName) {
+    return domainName;
+  }
+  return `Domain ${index + 1}`;
+}
+
 function cloneContentData(contentData: EvaluationDomainRecord[]) {
   return contentData.map((domain) => ({
     ...domain,
@@ -106,6 +158,11 @@ function getUserDisplayName(
     .join(" ")
     .trim();
   return value.length > 0 ? value : null;
+}
+
+function isEmployeeRole(role: string | null) {
+  const normalized = (role ?? "EMP").trim().toUpperCase();
+  return normalized === "" || normalized === "EMP";
 }
 
 export function PerformanceEvaluationsClient({
@@ -207,6 +264,45 @@ export function PerformanceEvaluationsClient({
     }
     return mapping;
   }, [users]);
+
+  const summaryDomainLabelByKey = useMemo(() => {
+    const mapping = new Map<string, string>();
+    for (const evaluation of evaluations) {
+      for (const [index, domain] of evaluation.content_data.entries()) {
+        const domainKey = getDomainKey(domain, index);
+        if (mapping.has(domainKey)) {
+          continue;
+        }
+        mapping.set(domainKey, getDomainSummaryLabel(domain, index));
+      }
+    }
+    return mapping;
+  }, [evaluations]);
+
+  const questionnaireIdByCode = useMemo(() => {
+    const mapping = new Map<string, string>();
+    for (const questionnaire of questionnaires) {
+      mapping.set(questionnaire.code.toUpperCase(), String(questionnaire.id));
+    }
+    return mapping;
+  }, [questionnaires]);
+
+  const selectedCreateCycleUser = useMemo(
+    () =>
+      users.find((user) => String(user.id) === createCycleForm.evaluateeId) ??
+      null,
+    [createCycleForm.evaluateeId, users],
+  );
+
+  const autoQuestionnaireIdForSelectedUser = useMemo(() => {
+    if (!selectedCreateCycleUser) {
+      return "";
+    }
+    const expectedCode = isEmployeeRole(selectedCreateCycleUser.role)
+      ? EMPLOYEE_QUESTIONNAIRE_CODE
+      : ADMINISTRATOR_QUESTIONNAIRE_CODE;
+    return questionnaireIdByCode.get(expectedCode) ?? "";
+  }, [questionnaireIdByCode, selectedCreateCycleUser]);
 
   const loadCycleDetails = useCallback(async (cycleId: number) => {
     const [cycleEvaluations, aggregateSummary] = await Promise.all([
@@ -356,6 +452,21 @@ export function PerformanceEvaluationsClient({
     }
     setWorkspaceView("self");
   }, [hasPeerForms, hasSelfForms, isStaff, workspaceView]);
+
+  useEffect(() => {
+    if (!isStaff) {
+      return;
+    }
+    setCreateCycleForm((current) => {
+      if (current.questionnaireId === autoQuestionnaireIdForSelectedUser) {
+        return current;
+      }
+      return {
+        ...current,
+        questionnaireId: autoQuestionnaireIdForSelectedUser,
+      };
+    });
+  }, [autoQuestionnaireIdForSelectedUser, isStaff]);
 
   function updateEvaluationQuestionRating(
     evaluationId: number,
@@ -621,26 +732,32 @@ export function PerformanceEvaluationsClient({
                     </span>{" "}
                     {question.indicator ?? ""}
                   </div>
-                  <select
-                    value={String(question.rating ?? "")}
+                  <Select
+                    value={
+                      question.rating ? String(question.rating) : "__none__"
+                    }
                     disabled={!canEdit}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       updateEvaluationQuestionRating(
                         evaluation.id,
                         domainIndex,
                         questionIndex,
-                        event.target.value,
+                        value === "__none__" ? "" : value,
                       )
                     }
-                    className="h-9 rounded-md border border-input bg-background px-2 text-sm"
                   >
-                    <option value="">-</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                    <option value="3">3</option>
-                    <option value="4">4</option>
-                    <option value="5">5</option>
-                  </select>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="-" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">-</SelectItem>
+                      <SelectItem value="1">1</SelectItem>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                      <SelectItem value="4">4</SelectItem>
+                      <SelectItem value="5">5</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               ))}
             </div>
@@ -749,72 +866,77 @@ export function PerformanceEvaluationsClient({
           <CardContent className="grid gap-3 md:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="evaluatee">Evaluatee</Label>
-              <select
-                id="evaluatee"
-                value={createCycleForm.evaluateeId}
-                onChange={(event) =>
+              <Select
+                value={createCycleForm.evaluateeId || "__none__"}
+                onValueChange={(value) =>
                   setCreateCycleForm((current) => ({
                     ...current,
-                    evaluateeId: event.target.value,
+                    evaluateeId: value === "__none__" ? "" : value,
                   }))
                 }
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
-                <option value="">Select user</option>
-                {users.map((user) => (
-                  <option key={user.id} value={String(user.id)}>
-                    {[user.first_name, user.last_name]
-                      .filter(Boolean)
-                      .join(" ")}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="evaluatee" className="h-10 w-full">
+                  <SelectValue placeholder="Select user" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select user</SelectItem>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {[user.first_name, user.last_name]
+                        .filter(Boolean)
+                        .join(" ")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="questionnaire">Questionnaire</Label>
-              <select
-                id="questionnaire"
-                value={createCycleForm.questionnaireId}
-                onChange={(event) =>
-                  setCreateCycleForm((current) => ({
-                    ...current,
-                    questionnaireId: event.target.value,
-                  }))
-                }
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              <Select
+                value={createCycleForm.questionnaireId || "__none__"}
+                disabled
               >
-                <option value="">Select questionnaire</option>
-                {questionnaires.map((questionnaire) => (
-                  <option
-                    key={questionnaire.id}
-                    value={String(questionnaire.id)}
-                  >
-                    {questionnaire.title}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger id="questionnaire" className="h-10 w-full">
+                  <SelectValue placeholder="Select questionnaire" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Select questionnaire</SelectItem>
+                  {questionnaires.map((questionnaire) => (
+                    <SelectItem
+                      key={questionnaire.id}
+                      value={String(questionnaire.id)}
+                    >
+                      {questionnaire.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="quarter">Quarter</Label>
-              <select
-                id="quarter"
+              <Select
                 value={createCycleForm.quarter}
-                onChange={(event) =>
+                onValueChange={(value: "FQ" | "SQ") =>
                   setCreateCycleForm((current) => ({
                     ...current,
-                    quarter: event.target.value as "FQ" | "SQ",
+                    quarter: value,
                   }))
                 }
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
-                <option value="FQ">First Quarter</option>
-                <option value="SQ">Second Quarter</option>
-              </select>
+                <SelectTrigger id="quarter" className="h-10 w-full">
+                  <SelectValue placeholder="Select quarter" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="FQ">First Quarter</SelectItem>
+                  <SelectItem value="SQ">Second Quarter</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="year">Year</Label>
               <Input
                 id="year"
+                type="number"
                 value={createCycleForm.year}
                 onChange={(event) =>
                   setCreateCycleForm((current) => ({
@@ -823,6 +945,9 @@ export function PerformanceEvaluationsClient({
                   }))
                 }
                 placeholder="2026"
+                min={1900}
+                step={1}
+                className="h-10"
               />
             </div>
             <div className="md:col-span-4">
@@ -843,21 +968,24 @@ export function PerformanceEvaluationsClient({
       <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
         <CardHeader className="space-y-2">
           <CardTitle className="text-base">Cycle Workspace</CardTitle>
-          <select
-            value={selectedCycleId ? String(selectedCycleId) : ""}
-            onChange={(event) => {
-              const value = event.target.value;
-              setSelectedCycleId(value ? Number(value) : null);
-            }}
-            className="h-10 w-full max-w-2xl rounded-md border border-input bg-background px-3 text-sm"
+          <Select
+            value={selectedCycleId ? String(selectedCycleId) : "__none__"}
+            onValueChange={(value) =>
+              setSelectedCycleId(value === "__none__" ? null : Number(value))
+            }
           >
-            <option value="">Select cycle</option>
-            {cycles.map((cycle) => (
-              <option key={cycle.id} value={String(cycle.id)}>
-                {formatCycle(cycle)}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="h-10 w-full max-w-2xl">
+              <SelectValue placeholder="Select cycle" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Select cycle</SelectItem>
+              {cycles.map((cycle) => (
+                <SelectItem key={cycle.id} value={String(cycle.id)}>
+                  {formatCycle(cycle)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
       </Card>
 
@@ -950,22 +1078,26 @@ export function PerformanceEvaluationsClient({
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-col gap-2 md:flex-row">
-                  <select
-                    value={assignmentUserId}
-                    onChange={(event) =>
-                      setAssignmentUserId(event.target.value)
+                  <Select
+                    value={assignmentUserId || "__none__"}
+                    onValueChange={(value) =>
+                      setAssignmentUserId(value === "__none__" ? "" : value)
                     }
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                   >
-                    <option value="">Select evaluator</option>
-                    {availableAssignmentUsers.map((user) => (
-                      <option key={user.id} value={String(user.id)}>
-                        {[user.first_name, user.last_name]
-                          .filter(Boolean)
-                          .join(" ")}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue placeholder="Select evaluator" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Select evaluator</SelectItem>
+                      {availableAssignmentUsers.map((user) => (
+                        <SelectItem key={user.id} value={String(user.id)}>
+                          {[user.first_name, user.last_name]
+                            .filter(Boolean)
+                            .join(" ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     onClick={() => void addAssignment()}
                     disabled={!assignmentUserId || busyKey === "add-assignment"}
@@ -1084,21 +1216,32 @@ export function PerformanceEvaluationsClient({
                     </div>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  {aggregate.domains.map((domain) => (
-                    <div
-                      key={domain.domain_key}
-                      className="grid grid-cols-3 gap-2 rounded-md border border-border/70 p-3 text-sm"
-                    >
-                      <div>{domain.domain_key}</div>
-                      <div className="text-center">
-                        Self: {domain.self_rating_mean.toFixed(2)}
-                      </div>
-                      <div className="text-right">
-                        Peer: {domain.peer_rating_mean.toFixed(2)}
-                      </div>
-                    </div>
-                  ))}
+                <div className="rounded-md border border-border/70">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Domain</TableHead>
+                        <TableHead className="text-right">Self</TableHead>
+                        <TableHead className="text-right">Peer</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {aggregate.domains.map((domain) => (
+                        <TableRow key={domain.domain_key}>
+                          <TableCell>
+                            {summaryDomainLabelByKey.get(domain.domain_key) ??
+                              domain.domain_key}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {domain.self_rating_mean.toFixed(2)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {domain.peer_rating_mean.toFixed(2)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">

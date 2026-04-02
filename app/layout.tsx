@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,8 +39,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Toaster position="top-right" />
-          {children}
+          <TooltipProvider>
+            <Toaster position="top-right" />
+            {children}
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

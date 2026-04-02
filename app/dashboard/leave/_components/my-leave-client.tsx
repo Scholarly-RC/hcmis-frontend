@@ -1,8 +1,11 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { SelectField } from "@/components/form-select-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +16,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,6 +35,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type {
   LeaveCredit,
   LeaveRequestCreatePayload,
@@ -32,7 +48,7 @@ import type {
 } from "@/lib/leave";
 import { leaveStatusClass, leaveTypeLabel } from "@/lib/leave";
 import { toast } from "@/lib/toast";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils/cn";
 
 type RequestError = {
   detail?: string;
@@ -43,6 +59,14 @@ type FilterState = {
   month: string;
   status: string;
 };
+
+const createLeaveRequestSchema = z.object({
+  leave_date: z.string().min(1, "Date is required."),
+  leave_type: z.string().min(1, "Type is required."),
+  info: z.string().trim().min(1, "Info is required."),
+});
+
+type CreateLeaveRequestFormValues = z.infer<typeof createLeaveRequestSchema>;
 
 async function requestJson<T>(
   pathname: string,
@@ -121,17 +145,27 @@ export function MyLeaveClient() {
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeOption[]>([]);
   const [credit, setCredit] = useState<LeaveCredit | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     year: "all",
     month: "all",
     status: "all",
   });
-  const [createForm, setCreateForm] = useState<LeaveRequestCreatePayload>({
-    leave_date: "",
-    leave_type: "PA",
-    info: null,
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors, isSubmitting },
+  } = useForm<CreateLeaveRequestFormValues>({
+    resolver: zodResolver(createLeaveRequestSchema),
+    defaultValues: {
+      leave_date: "",
+      leave_type: "PA",
+      info: "",
+    },
   });
 
   useEffect(() => {
@@ -189,18 +223,26 @@ export function MyLeaveClient() {
 
   const canCreatePaidLeave = (credit?.remaining_credits ?? 0) > 0;
 
-  async function handleCreateRequest() {
-    if (!createForm.leave_date) {
-      toast.error("Leave date is required.");
+  const selectedLeaveType = watch("leave_type");
+  const selectedLeaveDate = watch("leave_date");
+  const leaveInfoValue = watch("info");
+  const isPaidLeaveWithoutCredits =
+    selectedLeaveType === "PA" && !canCreatePaidLeave;
+  const isCreateFormIncomplete =
+    !selectedLeaveDate || !leaveInfoValue || !leaveInfoValue.trim();
+
+  async function handleCreateRequest(values: CreateLeaveRequestFormValues) {
+    if (values.leave_type === "PA" && !canCreatePaidLeave) {
+      toast.error("Paid leave is disabled when remaining credits are zero.");
       return;
     }
 
-    setSubmitting(true);
     try {
       const payload: LeaveRequestCreatePayload = {
-        leave_date: createForm.leave_date,
-        leave_type: createForm.leave_type,
-        info: createForm.info?.trim() || null,
+        leave_date: values.leave_date,
+        leave_type:
+          values.leave_type as LeaveRequestCreatePayload["leave_type"],
+        info: values.info.trim(),
       };
 
       const created = await requestJson<LeaveRequestRecord>(
@@ -212,7 +254,8 @@ export function MyLeaveClient() {
       );
 
       setRequests((prev) => [created, ...prev]);
-      setCreateForm({ leave_date: "", leave_type: "PA", info: null });
+      reset({ leave_date: "", leave_type: "PA", info: "" });
+      setIsCreateDialogOpen(false);
       toast.success("Leave request submitted.");
     } catch (error) {
       toast.error(
@@ -220,8 +263,6 @@ export function MyLeaveClient() {
           ? error.message
           : "Unable to submit leave request.",
       );
-    } finally {
-      setSubmitting(false);
     }
   }
 
@@ -267,7 +308,7 @@ export function MyLeaveClient() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      <section>
         <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
           <CardHeader>
             <CardTitle>Leave Credits</CardTitle>
@@ -292,90 +333,123 @@ export function MyLeaveClient() {
             </div>
           </CardContent>
         </Card>
-
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardHeader>
-            <CardTitle>Create Leave Request</CardTitle>
-            <CardDescription>
-              Paid leave is disabled when remaining credits are zero.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="leave_date">Date</Label>
-                <Input
-                  id="leave_date"
-                  type="date"
-                  value={createForm.leave_date}
-                  onChange={(event) =>
-                    setCreateForm((prev) => ({
-                      ...prev,
-                      leave_date: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-              <SelectField
-                id="leave_type"
-                label="Type"
-                value={createForm.leave_type}
-                onChange={(_, value) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    leave_type:
-                      value as LeaveRequestCreatePayload["leave_type"],
-                  }))
-                }
-                options={leaveTypes.map((item) => ({
-                  value: item.value,
-                  label:
-                    item.value === "PA" && !canCreatePaidLeave
-                      ? `${item.label} (No credits)`
-                      : item.label,
-                }))}
-                placeholder="Select type"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="leave_info">Info</Label>
-              <Textarea
-                id="leave_info"
-                value={createForm.info ?? ""}
-                onChange={(event) =>
-                  setCreateForm((prev) => ({
-                    ...prev,
-                    info: event.target.value,
-                  }))
-                }
-                placeholder="Reason or details"
-              />
-            </div>
-            <Button
-              type="button"
-              onClick={handleCreateRequest}
-              disabled={
-                submitting ||
-                (createForm.leave_type === "PA" && !canCreatePaidLeave)
-              }
-            >
-              {submitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="mr-2 h-4 w-4" />
-              )}
-              Submit Request
-            </Button>
-          </CardContent>
-        </Card>
       </section>
 
       <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
         <CardHeader>
-          <CardTitle>My Requests</CardTitle>
-          <CardDescription>
-            Filter and review your leave submissions.
-          </CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle>My Requests</CardTitle>
+              <CardDescription>
+                Filter and review your leave submissions.
+              </CardDescription>
+            </div>
+            <Dialog
+              open={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+            >
+              <DialogTrigger asChild>
+                <Button type="button">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Leave Request
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create Leave Request</DialogTitle>
+                  <DialogDescription>
+                    Paid leave is disabled when remaining credits are zero.
+                  </DialogDescription>
+                </DialogHeader>
+                <form
+                  className="space-y-4"
+                  onSubmit={handleSubmit(handleCreateRequest)}
+                >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="leave_date">Date</Label>
+                      <Input
+                        id="leave_date"
+                        type="date"
+                        className="h-10"
+                        aria-invalid={errors.leave_date ? "true" : "false"}
+                        disabled={isSubmitting}
+                        {...register("leave_date")}
+                      />
+                      {errors.leave_date ? (
+                        <p className="text-xs text-destructive">
+                          {errors.leave_date.message}
+                        </p>
+                      ) : null}
+                    </div>
+                    <SelectField
+                      id="leave_type"
+                      label="Type"
+                      value={selectedLeaveType}
+                      onChange={(_, value) =>
+                        setValue("leave_type", value, {
+                          shouldDirty: true,
+                          shouldValidate: true,
+                        })
+                      }
+                      options={leaveTypes.map((item) => ({
+                        value: item.value,
+                        label:
+                          item.value === "PA" && !canCreatePaidLeave
+                            ? `${item.label} (No credits)`
+                            : item.label,
+                      }))}
+                      placeholder="Select type"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="leave_info">Info</Label>
+                    <Textarea
+                      id="leave_info"
+                      aria-invalid={errors.info ? "true" : "false"}
+                      disabled={isSubmitting}
+                      placeholder="Reason or details"
+                      {...register("info")}
+                    />
+                    {errors.info ? (
+                      <p className="text-xs text-destructive">
+                        {errors.info.message}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="flex justify-end">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex">
+                          <Button
+                            type="submit"
+                            disabled={
+                              isSubmitting ||
+                              isPaidLeaveWithoutCredits ||
+                              isCreateFormIncomplete
+                            }
+                          >
+                            {isSubmitting ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <Plus className="mr-2 h-4 w-4" />
+                            )}
+                            Submit Request
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {isPaidLeaveWithoutCredits ? (
+                        <TooltipContent side="top">
+                          Paid leave cannot be submitted when remaining credits
+                          are zero.
+                        </TooltipContent>
+                      ) : null}
+                    </Tooltip>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">

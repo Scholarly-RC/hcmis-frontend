@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { SalaryStructureClient } from "@/app/hr/salary-structure/_components/salary-structure-client";
-import { isStaff } from "@/lib/capabilities";
+import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
   title: "Salary Structure",

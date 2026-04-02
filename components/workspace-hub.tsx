@@ -8,8 +8,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { AuthUser } from "@/lib/auth";
-import { can } from "@/lib/capabilities";
+import type { AuthUser } from "@/types/auth";
+import { can } from "@/utils/capabilities";
 
 type WorkspaceHubItem = {
   label: string;

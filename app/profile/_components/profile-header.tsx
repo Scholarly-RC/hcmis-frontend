@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { AuthUser } from "@/lib/auth";
+import type { AuthUser } from "@/types/auth";
 
 type ProfileHeaderProps = {
   user: AuthUser;
