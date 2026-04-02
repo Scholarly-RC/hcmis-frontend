@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { loginAs, logout } from "./helpers/auth";
 
-test("coming-soon account modules are disabled and non-clickable", async ({
+test("attendance module is available from account modules", async ({
   page,
 }) => {
   await loginAs(page, "employee");
@@ -11,12 +11,13 @@ test("coming-soon account modules are disabled and non-clickable", async ({
   });
   await accountModulesTrigger.click();
 
-  const attendanceSoonItem = page.locator('div[aria-disabled="true"]', {
-    hasText: "Attendance",
-  });
-  await expect(attendanceSoonItem).toBeVisible();
-  await expect(attendanceSoonItem.getByText("Soon")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Attendance" })).toHaveCount(0);
+  const attendanceLink = page.getByRole("link", { name: "My Attendance" });
+  await expect(attendanceLink).toBeVisible();
+  await attendanceLink.click();
+  await expect(page).toHaveURL(/\/attendance/);
+  await expect(
+    page.getByRole("heading", { name: "My Attendance" }),
+  ).toBeVisible();
 
   await logout(page);
 });

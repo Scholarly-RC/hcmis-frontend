@@ -183,9 +183,9 @@ const sidebarItems: SidebarItem[] = [
       },
       {
         label: "My Attendance",
+        href: "/attendance",
         keywords: ["attendance", "timeline", "summary"],
         requiredCapabilities: ["view_attendance_self"],
-        status: "coming_soon",
       },
     ],
   },

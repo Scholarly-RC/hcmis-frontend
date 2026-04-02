@@ -36,8 +36,8 @@ export default function MyWorkflowsPage() {
             {
               label: "Attendance",
               description: "Personal attendance timeline and summary view.",
+              href: "/attendance",
               requiredCapabilities: ["view_attendance_self"],
-              status: "coming_soon",
             },
           ]}
         />

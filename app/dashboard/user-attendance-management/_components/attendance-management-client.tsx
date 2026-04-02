@@ -89,6 +89,7 @@ type AttendanceManagementClientProps = {
   monthLabel: string;
   mode: "today" | "history";
   focusDay: number | null;
+  readOnly?: boolean;
   referenceDate: {
     year: number;
     month: number;
@@ -506,6 +507,7 @@ export function AttendanceManagementClient({
   monthLabel,
   mode,
   focusDay,
+  readOnly = false,
   referenceDate,
 }: AttendanceManagementClientProps) {
   const router = useRouter();
@@ -540,6 +542,9 @@ export function AttendanceManagementClient({
   }
 
   function startCreate(day: AttendanceSummaryDay) {
+    if (readOnly) {
+      return;
+    }
     setDraft({
       mode: "create",
       day,
@@ -549,6 +554,9 @@ export function AttendanceManagementClient({
   }
 
   function startEdit(day: AttendanceSummaryDay, record: AttendanceRecord) {
+    if (readOnly) {
+      return;
+    }
     setDraft({
       mode: "edit",
       day,
@@ -559,6 +567,9 @@ export function AttendanceManagementClient({
   }
 
   async function deleteRecord(recordId: number) {
+    if (readOnly) {
+      return;
+    }
     if (isSaving) {
       return;
     }
@@ -798,14 +809,16 @@ export function AttendanceManagementClient({
                         {selectedDay.attendance_records.length} records
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => startCreate(selectedDay)}
-                    >
-                      <Plus className="size-4" />
-                      Add punch
-                    </Button>
+                    {!readOnly ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => startCreate(selectedDay)}
+                      >
+                        <Plus className="size-4" />
+                        Add punch
+                      </Button>
+                    ) : null}
                   </div>
 
                   <div className="mt-4 space-y-3">
@@ -824,34 +837,36 @@ export function AttendanceManagementClient({
                                 {formatTimeLabel(record.timestamp)}
                               </p>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={() => startEdit(selectedDay, record)}
-                              >
-                                <PencilLine className="size-4" />
-                                Edit
-                              </Button>
-                              <ConfirmationModal
-                                trigger={
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="destructive"
-                                    disabled={isSaving}
-                                  >
-                                    <Trash2 className="size-4" />
-                                    Delete
-                                  </Button>
-                                }
-                                title={`Delete ${record.punch} punch?`}
-                                description={`This will remove the ${record.punch.toLowerCase()} record at ${formatTimeLabel(record.timestamp)}.`}
-                                confirmLabel="Delete"
-                                onConfirm={() => deleteRecord(record.id)}
-                              />
-                            </div>
+                            {!readOnly ? (
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => startEdit(selectedDay, record)}
+                                >
+                                  <PencilLine className="size-4" />
+                                  Edit
+                                </Button>
+                                <ConfirmationModal
+                                  trigger={
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="destructive"
+                                      disabled={isSaving}
+                                    >
+                                      <Trash2 className="size-4" />
+                                      Delete
+                                    </Button>
+                                  }
+                                  title={`Delete ${record.punch} punch?`}
+                                  description={`This will remove the ${record.punch.toLowerCase()} record at ${formatTimeLabel(record.timestamp)}.`}
+                                  confirmLabel="Delete"
+                                  onConfirm={() => deleteRecord(record.id)}
+                                />
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       ))
@@ -873,7 +888,7 @@ export function AttendanceManagementClient({
       </section>
 
       <Dialog
-        open={draft !== null}
+        open={!readOnly && draft !== null}
         onOpenChange={(open) => {
           if (!open) {
             setDraft(null);
