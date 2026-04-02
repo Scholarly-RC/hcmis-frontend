@@ -1,11 +1,16 @@
 "use client";
 
-import { Loader2, RefreshCw } from "lucide-react";
+import { ChevronDown, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -51,6 +56,16 @@ type CreateCycleFormState = {
 };
 
 type WorkspaceView = "self" | "peer" | "hr_cycle";
+
+type EvaluationProgress = {
+  answered: number;
+  total: number;
+};
+
+type UnansweredQuestion = {
+  domainIndex: number;
+  questionIndex: number;
+};
 
 async function requestJson<T>(pathname: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
@@ -165,6 +180,59 @@ function isEmployeeRole(role: string | null) {
   return normalized === "" || normalized === "EMP";
 }
 
+function normalizeRating(rating: string | number | null) {
+  if (rating === null || rating === undefined) {
+    return "";
+  }
+  return String(rating).trim();
+}
+
+function getEvaluationProgress(
+  evaluation: EvaluationRecord,
+): EvaluationProgress {
+  return evaluation.content_data.reduce<EvaluationProgress>(
+    (progress, domain) => {
+      for (const question of domain.questions) {
+        progress.total += 1;
+        if (normalizeRating(question.rating).length > 0) {
+          progress.answered += 1;
+        }
+      }
+      return progress;
+    },
+    { answered: 0, total: 0 },
+  );
+}
+
+function getDomainProgress(domain: EvaluationDomainRecord) {
+  const total = domain.questions.length;
+  const answered = domain.questions.filter(
+    (question) => normalizeRating(question.rating).length > 0,
+  ).length;
+  return { answered, total };
+}
+
+function findFirstUnansweredQuestion(
+  evaluation: EvaluationRecord,
+): UnansweredQuestion | null {
+  for (const [domainIndex, domain] of evaluation.content_data.entries()) {
+    for (const [questionIndex, question] of domain.questions.entries()) {
+      if (normalizeRating(question.rating).length === 0) {
+        return { domainIndex, questionIndex };
+      }
+    }
+  }
+  return null;
+}
+
+function getQuestionRowId(
+  evaluationId: number,
+  domainIndex: number,
+  questionIndex: number,
+) {
+  return `evaluation-${evaluationId}-question-${domainIndex}-${questionIndex}`;
+}
+
 export function PerformanceEvaluationsClient({
   currentUser,
   isStaff,
@@ -187,6 +255,9 @@ export function PerformanceEvaluationsClient({
   );
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [assignmentUserId, setAssignmentUserId] = useState("");
+  const [openDomainByEvaluation, setOpenDomainByEvaluation] = useState<
+    Record<number, string>
+  >({});
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>(
     isStaff ? "hr_cycle" : "self",
   );
@@ -542,6 +613,33 @@ export function PerformanceEvaluationsClient({
   }
 
   async function submitEvaluation(evaluation: EvaluationRecord) {
+    const firstUnanswered = findFirstUnansweredQuestion(evaluation);
+    if (firstUnanswered) {
+      const targetDomainKey = getDomainKey(
+        evaluation.content_data[firstUnanswered.domainIndex] ?? {
+          questions: [],
+        },
+        firstUnanswered.domainIndex,
+      );
+      setOpenDomainByEvaluation((current) => ({
+        ...current,
+        [evaluation.id]: targetDomainKey,
+      }));
+      requestAnimationFrame(() => {
+        document
+          .getElementById(
+            getQuestionRowId(
+              evaluation.id,
+              firstUnanswered.domainIndex,
+              firstUnanswered.questionIndex,
+            ),
+          )
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      toast.error("Please answer all questions before submitting.");
+      return;
+    }
+
     setBusyKey(`submit-${evaluation.id}`);
     try {
       await requestJson<EvaluationRecord>(
@@ -697,126 +795,229 @@ export function PerformanceEvaluationsClient({
       const canEdit = !isSubmitted && Boolean(selectedCycle?.is_finalized);
       const requiresComments = kind === "peer";
       const evaluatorName = getUserDisplayName(evaluation.evaluator ?? null);
+      const progress = getEvaluationProgress(evaluation);
+      const unresolvedCount = progress.total - progress.answered;
+      const completionPercent =
+        progress.total > 0
+          ? Math.round((progress.answered / progress.total) * 100)
+          : 0;
+      const activeDomainKey = openDomainByEvaluation[evaluation.id] ?? "";
       return (
         <div key={evaluation.id} className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">
-              {kind === "peer" && evaluatorName
-                ? `${evaluatorName} · Evaluation #${evaluation.id}`
-                : `Evaluation #${evaluation.id}`}
-            </h4>
-            <Badge variant={isSubmitted ? "secondary" : "outline"}>
-              {isSubmitted
-                ? "Submitted"
-                : selectedCycle?.is_finalized
-                  ? "Open"
-                  : "Draft"}
-            </Badge>
-          </div>
-          {evaluation.content_data.map((domain, domainIndex) => (
-            <div
-              key={`${evaluation.id}-domain-${domainIndex}`}
-              className="space-y-2 rounded-md border border-border/70 p-3"
-            >
-              <div className="text-sm font-medium">
-                {getDomainTitle(domain, domainIndex)}
+          <div className="sticky top-2 z-10 rounded-lg border border-border/80 bg-background/90 p-3 shadow-sm backdrop-blur-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-semibold">
+                    {kind === "peer" && evaluatorName
+                      ? `${evaluatorName} · Evaluation #${evaluation.id}`
+                      : `Evaluation #${evaluation.id}`}
+                  </h4>
+                  <Badge variant={isSubmitted ? "secondary" : "outline"}>
+                    {isSubmitted
+                      ? "Submitted"
+                      : selectedCycle?.is_finalized
+                        ? "Open"
+                        : "Draft"}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {progress.answered}/{progress.total} answered (
+                  {completionPercent}%)
+                  {unresolvedCount > 0
+                    ? ` · ${unresolvedCount} unanswered`
+                    : ""}
+                </p>
               </div>
-              {domain.questions.map((question, questionIndex) => (
-                <div
-                  key={`${evaluation.id}-question-${domainIndex}-${questionIndex}`}
-                  className="grid gap-2 md:grid-cols-[1fr_120px]"
-                >
-                  <div className="text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">
-                      {question.indicator_number}
-                    </span>{" "}
-                    {question.indicator ?? ""}
-                  </div>
-                  <Select
-                    value={
-                      question.rating ? String(question.rating) : "__none__"
-                    }
-                    disabled={!canEdit}
-                    onValueChange={(value) =>
-                      updateEvaluationQuestionRating(
-                        evaluation.id,
-                        domainIndex,
-                        questionIndex,
-                        value === "__none__" ? "" : value,
-                      )
+              {canEdit ? (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => void saveEvaluation(evaluation)}
+                    disabled={busyKey === `save-${evaluation.id}`}
+                  >
+                    {busyKey === `save-${evaluation.id}` ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : null}
+                    Save Draft
+                  </Button>
+                  <Button
+                    onClick={() => void submitEvaluation(evaluation)}
+                    disabled={
+                      busyKey === `submit-${evaluation.id}` ||
+                      unresolvedCount > 0
                     }
                   >
-                    <SelectTrigger className="h-9 w-full">
-                      <SelectValue placeholder="-" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">-</SelectItem>
-                      <SelectItem value="1">1</SelectItem>
-                      <SelectItem value="2">2</SelectItem>
-                      <SelectItem value="3">3</SelectItem>
-                      <SelectItem value="4">4</SelectItem>
-                      <SelectItem value="5">5</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    {busyKey === `submit-${evaluation.id}` ? (
+                      <Loader2 className="mr-2 size-4 animate-spin" />
+                    ) : null}
+                    Submit
+                  </Button>
                 </div>
-              ))}
+              ) : null}
             </div>
-          ))}
+          </div>
+          {evaluation.content_data.map((domain, domainIndex) => {
+            const domainProgress = getDomainProgress(domain);
+            return (
+              <Collapsible
+                key={`${evaluation.id}-domain-${domainIndex}`}
+                open={activeDomainKey === getDomainKey(domain, domainIndex)}
+                onOpenChange={(nextOpen) => {
+                  setOpenDomainByEvaluation((current) => ({
+                    ...current,
+                    [evaluation.id]: nextOpen
+                      ? getDomainKey(domain, domainIndex)
+                      : "",
+                  }));
+                }}
+              >
+                <div className="overflow-hidden rounded-lg border border-border/70">
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="flex h-auto w-full items-center justify-between rounded-none px-3 py-3 hover:bg-muted/40"
+                    >
+                      <div className="text-left">
+                        <div className="text-sm font-medium">
+                          {getDomainTitle(domain, domainIndex)}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {domainProgress.answered}/{domainProgress.total}{" "}
+                          answered
+                        </p>
+                      </div>
+                      <ChevronDown
+                        className={`size-4 transition-transform ${
+                          activeDomainKey === getDomainKey(domain, domainIndex)
+                            ? "rotate-180"
+                            : ""
+                        }`}
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="border-t border-border/70">
+                    <div className="space-y-2 p-3">
+                      {domain.questions.map((question, questionIndex) => {
+                        const normalizedRating = normalizeRating(
+                          question.rating,
+                        );
+                        const hasRating = normalizedRating.length > 0;
+                        return (
+                          <div
+                            id={getQuestionRowId(
+                              evaluation.id,
+                              domainIndex,
+                              questionIndex,
+                            )}
+                            key={`${evaluation.id}-question-${domainIndex}-${questionIndex}`}
+                            className={`rounded-md border p-2 md:grid md:grid-cols-[1fr_auto] md:items-center md:gap-3 ${
+                              !hasRating && canEdit
+                                ? "border-amber-300/70 bg-amber-50/40"
+                                : "border-border/70"
+                            }`}
+                          >
+                            <div className="text-sm text-muted-foreground">
+                              <span className="font-medium text-foreground">
+                                {question.indicator_number}
+                              </span>{" "}
+                              {question.indicator ?? ""}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-1 md:mt-0 md:justify-end">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={
+                                  normalizedRating === ""
+                                    ? "default"
+                                    : "outline"
+                                }
+                                className="h-8 min-w-8 px-2"
+                                disabled={!canEdit}
+                                onClick={() =>
+                                  updateEvaluationQuestionRating(
+                                    evaluation.id,
+                                    domainIndex,
+                                    questionIndex,
+                                    "",
+                                  )
+                                }
+                              >
+                                -
+                              </Button>
+                              {["1", "2", "3", "4", "5"].map((value) => (
+                                <Button
+                                  key={`${evaluation.id}-${domainIndex}-${questionIndex}-${value}`}
+                                  type="button"
+                                  size="sm"
+                                  variant={
+                                    normalizedRating === value
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  className="h-8 min-w-8 px-2"
+                                  disabled={!canEdit}
+                                  onClick={() =>
+                                    updateEvaluationQuestionRating(
+                                      evaluation.id,
+                                      domainIndex,
+                                      questionIndex,
+                                      value,
+                                    )
+                                  }
+                                >
+                                  {value}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CollapsibleContent>
+                </div>
+              </Collapsible>
+            );
+          })}
           {requiresComments ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Positive feedback</Label>
-                <Textarea
-                  rows={4}
-                  disabled={!canEdit}
-                  value={evaluation.positive_feedback ?? ""}
-                  onChange={(event) =>
-                    updateEvaluationText(
-                      evaluation.id,
-                      "positive_feedback",
-                      event.target.value,
-                    )
-                  }
-                />
+            <div className="space-y-2 rounded-lg border border-border/70 p-3">
+              <div className="text-sm font-medium">Peer Comments</div>
+              <p className="text-xs text-muted-foreground">
+                Summarize strengths and concrete improvement areas.
+              </p>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Positive feedback</Label>
+                  <Textarea
+                    rows={4}
+                    disabled={!canEdit}
+                    value={evaluation.positive_feedback ?? ""}
+                    onChange={(event) =>
+                      updateEvaluationText(
+                        evaluation.id,
+                        "positive_feedback",
+                        event.target.value,
+                      )
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Improvement suggestion</Label>
+                  <Textarea
+                    rows={4}
+                    disabled={!canEdit}
+                    value={evaluation.improvement_suggestion ?? ""}
+                    onChange={(event) =>
+                      updateEvaluationText(
+                        evaluation.id,
+                        "improvement_suggestion",
+                        event.target.value,
+                      )
+                    }
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Improvement suggestion</Label>
-                <Textarea
-                  rows={4}
-                  disabled={!canEdit}
-                  value={evaluation.improvement_suggestion ?? ""}
-                  onChange={(event) =>
-                    updateEvaluationText(
-                      evaluation.id,
-                      "improvement_suggestion",
-                      event.target.value,
-                    )
-                  }
-                />
-              </div>
-            </div>
-          ) : null}
-          {canEdit ? (
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => void saveEvaluation(evaluation)}
-                disabled={busyKey === `save-${evaluation.id}`}
-              >
-                {busyKey === `save-${evaluation.id}` ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                ) : null}
-                Save Draft
-              </Button>
-              <Button
-                onClick={() => void submitEvaluation(evaluation)}
-                disabled={busyKey === `submit-${evaluation.id}`}
-              >
-                {busyKey === `submit-${evaluation.id}` ? (
-                  <Loader2 className="mr-2 size-4 animate-spin" />
-                ) : null}
-                Submit
-              </Button>
             </div>
           ) : null}
           <Separator />
