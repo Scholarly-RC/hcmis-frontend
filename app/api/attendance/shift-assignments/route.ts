@@ -3,7 +3,12 @@ import type { NextRequest } from "next/server";
 import { proxyJson } from "@/app/api/_proxy";
 
 export async function GET(request: NextRequest) {
-  return proxyJson(request, "/attendance/shift-assignments");
+  const query = request.nextUrl.searchParams.toString();
+  const pathname =
+    query.length > 0
+      ? `/attendance/shift-assignments?${query}`
+      : "/attendance/shift-assignments";
+  return proxyJson(request, pathname);
 }
 
 export async function POST(request: NextRequest) {

@@ -98,61 +98,65 @@ export function AttendancePeriodControls({
         </div>
 
         <form
-          className="flex flex-wrap items-center gap-2"
+          className="flex w-full flex-col items-start gap-2 lg:w-auto lg:items-end"
           onSubmit={(event) => {
             event.preventDefault();
             applyPeriod();
           }}
         >
-          <Button asChild variant="outline" className="h-10">
-            <Link href={buildHref(previousMonth.year, previousMonth.month)}>
-              <ChevronLeft className="size-4" />
-              Previous
-            </Link>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={monthInput} onValueChange={setMonthInput}>
+              <SelectTrigger
+                id="attendance-month"
+                aria-label="Select month"
+                className="h-10 w-[10rem]"
+              >
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_NAMES.map((label, index) => (
+                  <SelectItem key={label} value={(index + 1).toString()}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-          <Button asChild variant="outline" className="h-10">
-            <Link href={buildHref(nextMonth.year, nextMonth.month)}>
-              Next
-              <ChevronRight className="size-4" />
-            </Link>
-          </Button>
+            <Input
+              id="attendance-year"
+              aria-label="Select year"
+              type="number"
+              min={2000}
+              max={2100}
+              value={yearInput}
+              onChange={(event) => setYearInput(event.target.value)}
+              className="h-10 w-[7rem]"
+            />
 
-          <Select value={monthInput} onValueChange={setMonthInput}>
-            <SelectTrigger
-              id="attendance-month"
-              aria-label="Select month"
-              className="h-10 w-[10rem]"
-            >
-              <SelectValue placeholder="Select month" />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTH_NAMES.map((label, index) => (
-                <SelectItem key={label} value={(index + 1).toString()}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Button type="submit" className="h-10">
+              Apply
+            </Button>
+          </div>
 
-          <Input
-            id="attendance-year"
-            aria-label="Select year"
-            type="number"
-            min={2000}
-            max={2100}
-            value={yearInput}
-            onChange={(event) => setYearInput(event.target.value)}
-            className="h-10 w-[7rem]"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Button asChild variant="outline" className="h-10">
+              <Link href={buildHref(previousMonth.year, previousMonth.month)}>
+                <ChevronLeft className="size-4" />
+                Previous
+              </Link>
+            </Button>
 
-          <Button type="submit" className="h-10">
-            Apply
-          </Button>
+            <Button asChild variant="outline" className="h-10">
+              <Link href={buildHref(nextMonth.year, nextMonth.month)}>
+                Next
+                <ChevronRight className="size-4" />
+              </Link>
+            </Button>
 
-          <Button asChild variant="outline" className="h-10">
-            <Link href={buildHref(todayYear, todayMonth)}>Current month</Link>
-          </Button>
+            <Button asChild variant="outline" className="h-10">
+              <Link href={buildHref(todayYear, todayMonth)}>Current month</Link>
+            </Button>
+          </div>
         </form>
       </div>
     </div>

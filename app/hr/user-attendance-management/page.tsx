@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-frame";
 import { AttendanceManagementClient } from "@/app/dashboard/user-attendance-management/_components/attendance-management-client";
 import type { DepartmentShiftPolicy } from "@/app/hr/shift-management/_components/shift-management-client";
+import { AssignmentCalendarModal } from "@/app/hr/user-attendance-management/_components/assignment-calendar-modal";
 import { AttendanceFilters } from "@/app/hr/user-attendance-management/_components/attendance-filters";
 import { ShiftAssignmentManager } from "@/app/hr/user-attendance-management/_components/shift-assignment-manager";
 import { DashboardShell } from "@/components/dashboard-shell";
@@ -200,6 +201,10 @@ export default async function UserAttendanceManagementPage({
                   attendance workflows with fewer on-screen actions.
                 </p>
               </div>
+              <AssignmentCalendarModal
+                initialYear={year}
+                initialMonth={month}
+              />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {availableTabs.map((tab) => (

@@ -33,6 +33,17 @@ export type DailyShiftSchedule = {
   updated_at: string;
 };
 
+export type EmployeeShiftAssignmentRecord = {
+  id: number;
+  date: string;
+  user_id: number;
+  shift_id: number;
+  user: AuthUser | null;
+  shift: AttendanceShift | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AttendanceHoliday = {
   id: number;
   name: string;
