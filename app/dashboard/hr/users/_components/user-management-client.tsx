@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Pencil, Plus, Search, UserCircle2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type ReactNode, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -37,7 +38,7 @@ type UsersResponse = AuthUser[];
 type DepartmentsResponse = AuthDepartment[];
 
 type UserStatusFilter = "all" | "active" | "inactive";
-type UserEditorMode = "create" | "edit";
+export type UserEditorMode = "create" | "edit";
 
 type UserFormState = {
   email: string;
@@ -126,7 +127,7 @@ function buildUserEditorSchema(mode: UserEditorMode) {
     });
 }
 
-type UserEditorPayload = {
+export type UserEditorPayload = {
   email: string;
   password?: string;
   first_name: string;
@@ -142,6 +143,10 @@ type UserEditorPayload = {
   date_of_hiring: string | null;
   can_modify_shift: boolean;
 };
+
+export type UserEditorInitialValues = Partial<
+  Pick<UserFormState, "first_name" | "last_name" | "biometric_uid">
+>;
 
 const ROLE_OPTIONS = [
   { value: "EMP", label: "Employee" },
@@ -246,27 +251,37 @@ function normalizeUserRole(
     : "EMP";
 }
 
-function buildFormState(user: AuthUser | null): UserFormState {
-  if (!user) {
-    return emptyFormState();
+function buildFormState(
+  user: AuthUser | null,
+  initialValues?: UserEditorInitialValues,
+): UserFormState {
+  const baseState = !user
+    ? emptyFormState()
+    : {
+        email: user.email,
+        password: "",
+        confirmPassword: "",
+        first_name: user.first_name,
+        middle_name: user.middle_name ?? "",
+        last_name: user.last_name,
+        employee_number: user.employee_number ?? "",
+        biometric_uid: user.biometric_uid?.toString() ?? "",
+        role: normalizeUserRole(user.role),
+        department_id: user.department_id?.toString() ?? "none",
+        rank: user.rank ?? "",
+        phone_number: user.phone_number ?? "",
+        date_of_birth: formatDateInput(user.date_of_birth),
+        date_of_hiring: formatDateInput(user.date_of_hiring),
+        can_modify_shift: user.can_modify_shift,
+      };
+
+  if (!initialValues) {
+    return baseState;
   }
 
   return {
-    email: user.email,
-    password: "",
-    confirmPassword: "",
-    first_name: user.first_name,
-    middle_name: user.middle_name ?? "",
-    last_name: user.last_name,
-    employee_number: user.employee_number ?? "",
-    biometric_uid: user.biometric_uid?.toString() ?? "",
-    role: normalizeUserRole(user.role),
-    department_id: user.department_id?.toString() ?? "none",
-    rank: user.rank ?? "",
-    phone_number: user.phone_number ?? "",
-    date_of_birth: formatDateInput(user.date_of_birth),
-    date_of_hiring: formatDateInput(user.date_of_hiring),
-    can_modify_shift: user.can_modify_shift,
+    ...baseState,
+    ...initialValues,
   };
 }
 
@@ -304,10 +319,11 @@ function FormField({
   );
 }
 
-function UserEditorDialog({
+export function UserEditorDialog({
   open,
   mode,
   user,
+  initialValues,
   departments,
   onOpenChange,
   onSubmit,
@@ -315,6 +331,7 @@ function UserEditorDialog({
   open: boolean;
   mode: UserEditorMode;
   user: AuthUser | null;
+  initialValues?: UserEditorInitialValues;
   departments: AuthDepartment[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: UserEditorPayload) => Promise<void>;
@@ -327,7 +344,7 @@ function UserEditorDialog({
     formState: { errors, isDirty, isSubmitting },
   } = useForm<UserFormState>({
     resolver: zodResolver(buildUserEditorSchema(mode)),
-    defaultValues: buildFormState(user),
+    defaultValues: buildFormState(user, initialValues),
     mode: "onSubmit",
   });
   const departmentOptions = [
@@ -846,10 +863,15 @@ export function UserManagementClient({
           </p>
         </div>
 
-        <Button onClick={openCreateDialog} className="self-start">
-          <Plus className="size-4" />
-          Add user
-        </Button>
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          <Button asChild type="button" variant="outline">
+            <Link href="/hr/users/biometric-sync">Open biometric sync</Link>
+          </Button>
+          <Button onClick={openCreateDialog} type="button" variant="secondary">
+            <Plus className="size-4" />
+            Add user
+          </Button>
+        </div>
       </section>
 
       <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_220px_180px] lg:items-end">
