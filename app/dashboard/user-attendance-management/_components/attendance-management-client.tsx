@@ -155,6 +155,28 @@ function getShiftRangeLabel(shift: AttendanceSummaryDay["shift"]) {
     : shift.shift.description;
 }
 
+function getPunchSummary(records: AttendanceRecord[]) {
+  const sorted = [...records].sort((a, b) =>
+    a.timestamp.localeCompare(b.timestamp),
+  );
+  const firstClockIn = sorted.find((record) => record.punch === "IN") ?? null;
+  const lastClockOut =
+    [...sorted].reverse().find((record) => record.punch === "OUT") ?? null;
+  const highlightedIds = new Set<number>();
+  if (firstClockIn) {
+    highlightedIds.add(firstClockIn.id);
+  }
+  if (lastClockOut) {
+    highlightedIds.add(lastClockOut.id);
+  }
+
+  return {
+    firstClockIn,
+    lastClockOut,
+    additionalCount: Math.max(sorted.length - highlightedIds.size, 0),
+  };
+}
+
 function getSummaryStats(summary: AttendanceSummary) {
   let daysWithShifts = 0;
   let daysWithPunches = 0;
@@ -518,6 +540,7 @@ export function AttendanceManagementClient({
   const [isSaving, setIsSaving] = useState(false);
   const stats = getSummaryStats(summary);
   const filteredDays = getDaysForMode(summary, mode, focusDay);
+  const showActionsColumn = mode !== "today";
   const selectedDay =
     selectedDayNumber === null
       ? null
@@ -659,9 +682,11 @@ export function AttendanceManagementClient({
                       <TableHead className="px-4 py-3">Shift</TableHead>
                       <TableHead className="px-4 py-3">Punches</TableHead>
                       <TableHead className="px-4 py-3">Status</TableHead>
-                      <TableHead className="px-4 py-3 text-right">
-                        Actions
-                      </TableHead>
+                      {showActionsColumn ? (
+                        <TableHead className="px-4 py-3 text-right">
+                          Actions
+                        </TableHead>
+                      ) : null}
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-border/70 bg-background">
@@ -671,6 +696,9 @@ export function AttendanceManagementClient({
                           summary,
                           day,
                           referenceDate,
+                        );
+                        const punchSummary = getPunchSummary(
+                          day.attendance_records,
                         );
                         return (
                           <TableRow
@@ -703,24 +731,38 @@ export function AttendanceManagementClient({
                               </p>
                             </TableCell>
                             <TableCell className="px-4 py-4 align-top">
-                              <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
                                 {day.attendance_records.length > 0 ? (
-                                  day.attendance_records.map((record) => (
-                                    <div
-                                      key={record.id}
-                                      className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm"
-                                    >
-                                      <span className="font-medium">
-                                        {record.punch}
+                                  <>
+                                    {punchSummary.firstClockIn ? (
+                                      <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm">
+                                        <span className="font-medium">IN</span>
+                                        <span className="text-muted-foreground">
+                                          {formatTimeLabel(
+                                            punchSummary.firstClockIn.timestamp,
+                                          )}
+                                        </span>
                                       </span>
-                                      <span className="text-muted-foreground">
-                                        {formatTimeLabel(record.timestamp)}
+                                    ) : null}
+                                    {punchSummary.lastClockOut ? (
+                                      <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm">
+                                        <span className="font-medium">OUT</span>
+                                        <span className="text-muted-foreground">
+                                          {formatTimeLabel(
+                                            punchSummary.lastClockOut.timestamp,
+                                          )}
+                                        </span>
                                       </span>
-                                    </div>
-                                  ))
+                                    ) : null}
+                                    {punchSummary.additionalCount > 0 ? (
+                                      <span className="text-xs text-muted-foreground">
+                                        +{punchSummary.additionalCount} more
+                                      </span>
+                                    ) : null}
+                                  </>
                                 ) : (
                                   <p className="text-sm text-muted-foreground">
-                                    No punch records
+                                    No punches
                                   </p>
                                 )}
                               </div>
@@ -730,26 +772,28 @@ export function AttendanceManagementClient({
                                 {status.label}
                               </MiniBadge>
                             </TableCell>
-                            <TableCell className="px-4 py-4 align-top text-right">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  openDay(day);
-                                }}
-                              >
-                                View details
-                              </Button>
-                            </TableCell>
+                            {showActionsColumn ? (
+                              <TableCell className="px-4 py-4 align-top text-right">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openDay(day);
+                                  }}
+                                >
+                                  View details
+                                </Button>
+                              </TableCell>
+                            ) : null}
                           </TableRow>
                         );
                       })
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={showActionsColumn ? 5 : 4}
                           className="px-4 py-8 text-center text-sm text-muted-foreground"
                         >
                           No rows for this view.

@@ -16,7 +16,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -319,6 +318,30 @@ function FormField({
   );
 }
 
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5">
+      <div className="space-y-1">
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        {description ? (
+          <p className="text-sm leading-5 text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">{children}</div>
+    </section>
+  );
+}
+
 export function UserEditorDialog({
   open,
   mode,
@@ -337,6 +360,7 @@ export function UserEditorDialog({
   onSubmit: (payload: UserEditorPayload) => Promise<void>;
 }) {
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const controlHeightClass = "h-10";
   const {
     control,
     register,
@@ -395,8 +419,8 @@ export function UserEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-6xl w-[min(96vw,72rem)] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="!max-w-5xl flex w-[min(96vw,64rem)] max-h-[90vh] flex-col gap-1 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b bg-background px-6 py-4">
           <DialogTitle>
             {mode === "create" ? "Add user" : "Edit user"}
           </DialogTitle>
@@ -407,213 +431,247 @@ export function UserEditorDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={handleSubmit(handleFormSubmit)}>
-          {submitError ? (
-            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              {submitError}
+        <form
+          className="flex min-h-0 flex-1 flex-col gap-1"
+          onSubmit={handleSubmit(handleFormSubmit)}
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-0 pb-6">
+            <div className="space-y-5">
+              {submitError ? (
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                  {submitError}
+                </div>
+              ) : null}
+
+              <FormSection
+                title="Account and Access"
+                description="Login identity and organization access."
+              >
+                <FormField
+                  label="Email"
+                  htmlFor="user-email"
+                  error={errors.email?.message}
+                >
+                  <Input
+                    id="user-email"
+                    type="email"
+                    autoComplete="email"
+                    className={controlHeightClass}
+                    aria-invalid={errors.email ? "true" : "false"}
+                    {...register("email")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Employee number"
+                  htmlFor="user-employee-number"
+                  error={errors.employee_number?.message}
+                >
+                  <Input
+                    id="user-employee-number"
+                    placeholder="EMP-001"
+                    className={controlHeightClass}
+                    aria-invalid={errors.employee_number ? "true" : "false"}
+                    {...register("employee_number")}
+                  />
+                </FormField>
+
+                <Controller
+                  control={control}
+                  name="role"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-role"
+                      label="Role"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={ROLE_OPTIONS}
+                      placeholder="Select a role"
+                      triggerClassName={controlHeightClass}
+                      error={errors.role?.message}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="department_id"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-department"
+                      label="Department"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={departmentOptions}
+                      placeholder="Select a department"
+                      triggerClassName={controlHeightClass}
+                      error={errors.department_id?.message}
+                    />
+                  )}
+                />
+
+                {mode === "create" ? (
+                  <>
+                    <FormField
+                      label="Password"
+                      htmlFor="user-password"
+                      error={errors.password?.message}
+                    >
+                      <Input
+                        id="user-password"
+                        type="password"
+                        autoComplete="new-password"
+                        className={controlHeightClass}
+                        aria-invalid={errors.password ? "true" : "false"}
+                        {...register("password")}
+                      />
+                    </FormField>
+
+                    <FormField
+                      label="Confirm password"
+                      htmlFor="user-confirm-password"
+                      error={errors.confirmPassword?.message}
+                    >
+                      <Input
+                        id="user-confirm-password"
+                        type="password"
+                        autoComplete="new-password"
+                        className={controlHeightClass}
+                        aria-invalid={errors.confirmPassword ? "true" : "false"}
+                        {...register("confirmPassword")}
+                      />
+                    </FormField>
+                  </>
+                ) : null}
+              </FormSection>
+
+              <FormSection
+                title="Personal Information"
+                description="Employee identity and contact details."
+              >
+                <FormField
+                  label="First name"
+                  htmlFor="user-first-name"
+                  error={errors.first_name?.message}
+                >
+                  <Input
+                    id="user-first-name"
+                    autoComplete="given-name"
+                    className={controlHeightClass}
+                    aria-invalid={errors.first_name ? "true" : "false"}
+                    {...register("first_name")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Middle name"
+                  htmlFor="user-middle-name"
+                  error={errors.middle_name?.message}
+                >
+                  <Input
+                    id="user-middle-name"
+                    autoComplete="additional-name"
+                    className={controlHeightClass}
+                    aria-invalid={errors.middle_name ? "true" : "false"}
+                    {...register("middle_name")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Last name"
+                  htmlFor="user-last-name"
+                  error={errors.last_name?.message}
+                >
+                  <Input
+                    id="user-last-name"
+                    autoComplete="family-name"
+                    className={controlHeightClass}
+                    aria-invalid={errors.last_name ? "true" : "false"}
+                    {...register("last_name")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Phone number"
+                  htmlFor="user-phone"
+                  error={errors.phone_number?.message}
+                >
+                  <Input
+                    id="user-phone"
+                    autoComplete="tel"
+                    className={controlHeightClass}
+                    aria-invalid={errors.phone_number ? "true" : "false"}
+                    {...register("phone_number")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Date of birth"
+                  htmlFor="user-dob"
+                  error={errors.date_of_birth?.message}
+                >
+                  <Input
+                    id="user-dob"
+                    type="date"
+                    className={controlHeightClass}
+                    aria-invalid={errors.date_of_birth ? "true" : "false"}
+                    {...register("date_of_birth")}
+                  />
+                </FormField>
+              </FormSection>
+
+              <FormSection
+                title="Employment Details"
+                description="Organization records and employment dates."
+              >
+                <FormField
+                  label="Biometric UID"
+                  htmlFor="user-biometric-uid"
+                  error={errors.biometric_uid?.message}
+                >
+                  <Input
+                    id="user-biometric-uid"
+                    type="number"
+                    min="0"
+                    placeholder="Optional"
+                    className={controlHeightClass}
+                    aria-invalid={errors.biometric_uid ? "true" : "false"}
+                    {...register("biometric_uid")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Rank"
+                  htmlFor="user-rank"
+                  error={errors.rank?.message}
+                >
+                  <Input
+                    id="user-rank"
+                    placeholder="Optional"
+                    className={controlHeightClass}
+                    aria-invalid={errors.rank ? "true" : "false"}
+                    {...register("rank")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Date of hiring"
+                  htmlFor="user-doh"
+                  error={errors.date_of_hiring?.message}
+                >
+                  <Input
+                    id="user-doh"
+                    type="date"
+                    className={controlHeightClass}
+                    aria-invalid={errors.date_of_hiring ? "true" : "false"}
+                    {...register("date_of_hiring")}
+                  />
+                </FormField>
+              </FormSection>
             </div>
-          ) : null}
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <FormField
-              label="Email"
-              htmlFor="user-email"
-              error={errors.email?.message}
-            >
-              <Input
-                id="user-email"
-                type="email"
-                autoComplete="email"
-                aria-invalid={errors.email ? "true" : "false"}
-                {...register("email")}
-              />
-            </FormField>
-
-            <FormField
-              label="Employee number"
-              htmlFor="user-employee-number"
-              error={errors.employee_number?.message}
-            >
-              <Input
-                id="user-employee-number"
-                placeholder="EMP-001"
-                aria-invalid={errors.employee_number ? "true" : "false"}
-                {...register("employee_number")}
-              />
-            </FormField>
-
-            <FormField
-              label="First name"
-              htmlFor="user-first-name"
-              error={errors.first_name?.message}
-            >
-              <Input
-                id="user-first-name"
-                autoComplete="given-name"
-                aria-invalid={errors.first_name ? "true" : "false"}
-                {...register("first_name")}
-              />
-            </FormField>
-
-            <FormField
-              label="Middle name"
-              htmlFor="user-middle-name"
-              error={errors.middle_name?.message}
-            >
-              <Input
-                id="user-middle-name"
-                autoComplete="additional-name"
-                aria-invalid={errors.middle_name ? "true" : "false"}
-                {...register("middle_name")}
-              />
-            </FormField>
-
-            <FormField
-              label="Last name"
-              htmlFor="user-last-name"
-              error={errors.last_name?.message}
-            >
-              <Input
-                id="user-last-name"
-                autoComplete="family-name"
-                aria-invalid={errors.last_name ? "true" : "false"}
-                {...register("last_name")}
-              />
-            </FormField>
-
-            <FormField
-              label="Biometric UID"
-              htmlFor="user-biometric-uid"
-              error={errors.biometric_uid?.message}
-            >
-              <Input
-                id="user-biometric-uid"
-                type="number"
-                min="0"
-                placeholder="Optional"
-                aria-invalid={errors.biometric_uid ? "true" : "false"}
-                {...register("biometric_uid")}
-              />
-            </FormField>
-
-            <Controller
-              control={control}
-              name="department_id"
-              render={({ field }) => (
-                <SelectField
-                  id="user-department"
-                  label="Department"
-                  value={field.value}
-                  onChange={(_, value) => field.onChange(value)}
-                  options={departmentOptions}
-                  placeholder="Select a department"
-                  error={errors.department_id?.message}
-                />
-              )}
-            />
-
-            <Controller
-              control={control}
-              name="role"
-              render={({ field }) => (
-                <SelectField
-                  id="user-role"
-                  label="Role"
-                  value={field.value}
-                  onChange={(_, value) => field.onChange(value)}
-                  options={ROLE_OPTIONS}
-                  placeholder="Select a role"
-                  error={errors.role?.message}
-                />
-              )}
-            />
-
-            <FormField
-              label="Rank"
-              htmlFor="user-rank"
-              error={errors.rank?.message}
-            >
-              <Input
-                id="user-rank"
-                placeholder="Optional"
-                aria-invalid={errors.rank ? "true" : "false"}
-                {...register("rank")}
-              />
-            </FormField>
-
-            <FormField
-              label="Phone number"
-              htmlFor="user-phone"
-              error={errors.phone_number?.message}
-            >
-              <Input
-                id="user-phone"
-                autoComplete="tel"
-                aria-invalid={errors.phone_number ? "true" : "false"}
-                {...register("phone_number")}
-              />
-            </FormField>
-
-            <FormField
-              label="Date of birth"
-              htmlFor="user-dob"
-              error={errors.date_of_birth?.message}
-            >
-              <Input
-                id="user-dob"
-                type="date"
-                aria-invalid={errors.date_of_birth ? "true" : "false"}
-                {...register("date_of_birth")}
-              />
-            </FormField>
-
-            <FormField
-              label="Date of hiring"
-              htmlFor="user-doh"
-              error={errors.date_of_hiring?.message}
-            >
-              <Input
-                id="user-doh"
-                type="date"
-                aria-invalid={errors.date_of_hiring ? "true" : "false"}
-                {...register("date_of_hiring")}
-              />
-            </FormField>
-
-            {mode === "create" ? (
-              <>
-                <FormField
-                  label="Password"
-                  htmlFor="user-password"
-                  error={errors.password?.message}
-                >
-                  <Input
-                    id="user-password"
-                    type="password"
-                    autoComplete="new-password"
-                    aria-invalid={errors.password ? "true" : "false"}
-                    {...register("password")}
-                  />
-                </FormField>
-
-                <FormField
-                  label="Confirm password"
-                  htmlFor="user-confirm-password"
-                  error={errors.confirmPassword?.message}
-                >
-                  <Input
-                    id="user-confirm-password"
-                    type="password"
-                    autoComplete="new-password"
-                    aria-invalid={errors.confirmPassword ? "true" : "false"}
-                    {...register("confirmPassword")}
-                  />
-                </FormField>
-              </>
-            ) : null}
           </div>
 
-          <DialogFooter className="!mx-0 !mb-0">
+          <div className="shrink-0 flex items-center justify-end gap-2 border-t bg-background px-6 py-3">
             <Button
               type="button"
               variant="outline"
@@ -629,7 +687,7 @@ export function UserEditorDialog({
                   ? "Create user"
                   : "Save changes"}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -865,7 +923,7 @@ export function UserManagementClient({
 
         <div className="flex flex-wrap items-center gap-2 self-start">
           <Button asChild type="button" variant="outline">
-            <Link href="/hr/users/biometric-sync">Open biometric sync</Link>
+            <Link href="/hr/users/biometric-sync">Biometric Sync</Link>
           </Button>
           <Button onClick={openCreateDialog} type="button" variant="secondary">
             <Plus className="size-4" />
