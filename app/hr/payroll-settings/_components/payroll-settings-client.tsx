@@ -37,7 +37,7 @@ type FixedCompensationForm = {
   id: number | null;
   name: string;
   amount: string;
-  user_ids: number[];
+  user_ids: string[];
 };
 
 function currentMonth() {
@@ -77,7 +77,7 @@ export function PayrollSettingsClient() {
     useState<DeductionConfigData | null>(null);
   const [mp2Amount, setMp2Amount] = useState("0");
   const [users, setUsers] = useState<AuthUser[]>([]);
-  const [selectedMp2Users, setSelectedMp2Users] = useState<number[]>([]);
+  const [selectedMp2Users, setSelectedMp2Users] = useState<string[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(String(currentMonth()));
   const [selectedYear, setSelectedYear] = useState(String(currentYear()));
   const [fixedCompensations, setFixedCompensations] = useState<
@@ -134,7 +134,7 @@ export function PayrollSettingsClient() {
     void load();
   }, []);
 
-  function toggleMp2User(userId: number, checked: boolean) {
+  function toggleMp2User(userId: string, checked: boolean) {
     setSelectedMp2Users((current) => {
       if (checked) {
         return [...current, userId];
@@ -143,7 +143,7 @@ export function PayrollSettingsClient() {
     });
   }
 
-  function toggleCompensationUser(userId: number, checked: boolean) {
+  function toggleCompensationUser(userId: string, checked: boolean) {
     setCompensationForm((current) => {
       if (checked) {
         return {

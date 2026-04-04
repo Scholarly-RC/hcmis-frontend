@@ -1,6 +1,7 @@
 "use client";
 
 import { Camera, Check, X } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -24,6 +25,10 @@ export function ProfileHeader({
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [imageFailed, setImageFailed] = useState(false);
+  const normalizedProfilePictureUrl = user.profile_picture_url?.trim() || null;
+  const profileImageSrc = normalizedProfilePictureUrl ?? "";
+  const showProfileImage = Boolean(normalizedProfilePictureUrl) && !imageFailed;
 
   function resetEditor() {
     setSelectedPhoto(null);
@@ -63,6 +68,7 @@ export function ProfileHeader({
 
       setFeedback("Profile picture updated.");
       setIsEditingPhoto(false);
+      setImageFailed(false);
       router.refresh();
     } catch {
       setFeedback("Unable to reach the profile service.");
@@ -74,13 +80,15 @@ export function ProfileHeader({
   return (
     <section className="rounded-3xl border border-border/70 bg-card/90 p-6 shadow-lg shadow-black/5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="relative size-20 shrink-0 overflow-hidden rounded-3xl border border-border/70 bg-muted/70 shadow-sm shadow-black/10 sm:size-24">
-          {user.profile_picture_url ? (
-            // biome-ignore lint/performance/noImgElement: backend profile URLs are already normalized and may be remote
-            <img
-              src={`/api/profile/me/photo?v=${encodeURIComponent(user.updated_at)}`}
+        <div className="relative size-20 shrink-0 overflow-hidden rounded-full border border-border/70 bg-muted/70 shadow-sm shadow-black/10 sm:size-24">
+          {showProfileImage ? (
+            <Image
+              src={profileImageSrc}
               alt={displayName}
-              className="h-full w-full object-cover"
+              fill
+              sizes="96px"
+              className="object-cover"
+              onError={() => setImageFailed(true)}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-foreground/80 text-2xl font-semibold text-primary-foreground">

@@ -99,7 +99,7 @@ export default async function UserAttendanceManagementPage({
 
   const query = firstValue(params.q).trim();
   const requestedUserIdParam = firstValue(params.user);
-  const requestedUserId = Number.parseInt(firstValue(params.user), 10);
+  const requestedUserId = firstValue(params.user);
   const year = parsePositiveInteger(firstValue(params.year), currentYear);
   const month = parseMonth(firstValue(params.month), currentMonth);
   const activeTab = parseTab(firstValue(params.tab));
@@ -174,7 +174,7 @@ export default async function UserAttendanceManagementPage({
       search.set("q", query);
     }
     if (selectedUser?.id) {
-      search.set("user", selectedUser.id.toString());
+      search.set("user", selectedUser.id);
     }
     search.set("year", year.toString());
     search.set("month", month.toString());
@@ -227,7 +227,7 @@ export default async function UserAttendanceManagementPage({
           <AttendanceFilters
             key={`${query}|${requestedUserIdParam}|${year}|${month}`}
             query={query}
-            userId={selectedUser?.id?.toString() ?? ""}
+            userId={selectedUser?.id ?? ""}
             year={year}
             month={month}
             tab={activeTab}

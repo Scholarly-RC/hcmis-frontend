@@ -55,7 +55,7 @@ type DepartmentOption = {
 };
 
 type ApproverOption = {
-  id: number;
+  id: string;
   name: string;
 };
 
@@ -63,7 +63,7 @@ type OvertimeManagementClientProps = {
   initialRequests: OvertimeRequestRecord[];
   departments: DepartmentOption[];
   approvers: ApproverOption[];
-  currentUserId: number;
+  currentUserId: string;
   isStaff: boolean;
   filters: OvertimeFilterState;
   yearOptions: number[];

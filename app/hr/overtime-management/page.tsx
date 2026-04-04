@@ -76,7 +76,7 @@ export default async function OvertimeManagementPage({
   const month = parseMonth(firstValue(params.month));
   const year = parsePositiveInteger(firstValue(params.year));
   const departmentId = parsePositiveInteger(firstValue(params.department_id));
-  const approverId = parsePositiveInteger(firstValue(params.approver_id));
+  const approverId = firstValue(params.approver_id).trim();
 
   const overtimeSearch = new URLSearchParams({
     scope,
@@ -97,13 +97,13 @@ export default async function OvertimeManagementPage({
   if (departmentId !== null) {
     overtimeSearch.set("department_id", departmentId.toString());
   }
-  if (approverId !== null) {
-    overtimeSearch.set("approver_id", approverId.toString());
+  if (approverId.length > 0) {
+    overtimeSearch.set("approver_id", approverId);
   }
 
   let overtimeRequests: OvertimeRequestRecord[] = [];
   let departments: DepartmentOption[] = [];
-  let approvers: { id: number; name: string }[] = [];
+  let approvers: { id: string; name: string }[] = [];
   let loadError: string | null = null;
 
   try {
@@ -186,7 +186,7 @@ export default async function OvertimeManagementPage({
               year: year !== null ? year.toString() : "all",
               departmentId:
                 departmentId !== null ? departmentId.toString() : "all",
-              approverId: approverId !== null ? approverId.toString() : "all",
+              approverId: approverId || "all",
             }}
             yearOptions={yearOptions}
           />

@@ -499,6 +499,7 @@ export function DashboardShell({
               <SidebarAccountMenu
                 displayName={displayName}
                 email={user.email}
+                profilePictureUrl={user.profile_picture_url}
               />
             </div>
           </div>

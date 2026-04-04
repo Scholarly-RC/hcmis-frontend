@@ -5,7 +5,6 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
-  Eye,
   PencilLine,
   Plus,
   Save,
@@ -332,7 +331,7 @@ function AttendanceDraftForm({
 }: {
   draft: DraftState;
   summary: AttendanceSummary;
-  userId: number;
+  userId: string;
   onClose: () => void;
   setIsSaving: (value: boolean) => void;
 }) {
@@ -543,7 +542,6 @@ export function AttendanceManagementClient({
   const [isSaving, setIsSaving] = useState(false);
   const stats = getSummaryStats(summary);
   const filteredDays = getDaysForMode(summary, mode, focusDay);
-  const showActionsColumn = mode !== "today";
   const selectedDay =
     selectedDayNumber === null
       ? null
@@ -685,11 +683,6 @@ export function AttendanceManagementClient({
                       <TableHead className="px-4 py-3">Shift</TableHead>
                       <TableHead className="px-4 py-3">Punches</TableHead>
                       <TableHead className="px-4 py-3">Status</TableHead>
-                      {showActionsColumn ? (
-                        <TableHead className="px-4 py-3 text-right">
-                          Actions
-                        </TableHead>
-                      ) : null}
                     </TableRow>
                   </TableHeader>
                   <TableBody className="divide-y divide-border/70 bg-background">
@@ -775,29 +768,13 @@ export function AttendanceManagementClient({
                                 {status.label}
                               </MiniBadge>
                             </TableCell>
-                            {showActionsColumn ? (
-                              <TableCell className="px-4 py-4 align-top text-right">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    openDay(day);
-                                  }}
-                                >
-                                  <Eye className="size-4" />
-                                  View Details
-                                </Button>
-                              </TableCell>
-                            ) : null}
                           </TableRow>
                         );
                       })
                     ) : (
                       <TableRow>
                         <TableCell
-                          colSpan={showActionsColumn ? 5 : 4}
+                          colSpan={4}
                           className="px-4 py-8 text-center text-sm text-muted-foreground"
                         >
                           No rows for this view.

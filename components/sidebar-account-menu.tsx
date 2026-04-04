@@ -1,9 +1,11 @@
 "use client";
 
 import { ChevronDown, LogOut, UserCircle2 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -17,14 +19,20 @@ import { cn } from "@/utils/cn";
 type SidebarAccountMenuProps = {
   displayName: string;
   email: string;
+  profilePictureUrl?: string | null;
 };
 
 export function SidebarAccountMenu({
   displayName,
   email,
+  profilePictureUrl,
 }: SidebarAccountMenuProps) {
   const [open, setOpen] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const primaryText = displayName || email;
+  const normalizedProfilePictureUrl = profilePictureUrl?.trim() || undefined;
+  const profileImageSrc = normalizedProfilePictureUrl ?? "";
+  const showProfileImage = Boolean(normalizedProfilePictureUrl) && !imageFailed;
   const initials = primaryText
     .split(" ")
     .filter(Boolean)
@@ -41,9 +49,22 @@ export function SidebarAccountMenu({
           className="h-auto w-full justify-start rounded-2xl border-border/70 bg-background/80 px-3 py-3 text-left shadow-sm transition-colors hover:bg-muted/50"
         >
           <div className="flex w-full items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-semibold text-foreground">
-              {initials || "U"}
-            </div>
+            <Avatar className="size-10 shrink-0 rounded-full">
+              {showProfileImage ? (
+                <Image
+                  src={profileImageSrc}
+                  alt={`${primaryText} profile picture`}
+                  width={40}
+                  height={40}
+                  className="h-full w-full rounded-full object-cover"
+                  onError={() => setImageFailed(true)}
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center rounded-full bg-muted text-sm font-semibold text-foreground">
+                  {initials || "U"}
+                </div>
+              )}
+            </Avatar>
             <div className="min-w-0 flex-1">
               <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">
                 Signed in as

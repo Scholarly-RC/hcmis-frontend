@@ -55,7 +55,7 @@ type FilterState = {
 };
 
 type MyOvertimeClientProps = {
-  currentUserId: number;
+  currentUserId: string;
   currentUserDepartmentId: number | null;
   currentUserRole: string | null;
   canManageOvertime: boolean;
@@ -63,12 +63,7 @@ type MyOvertimeClientProps = {
 
 const createOvertimeRequestSchema = z.object({
   date: z.string().min(1, "Date is required."),
-  approver_id: z
-    .string()
-    .min(1, "Approver is required.")
-    .refine((value) => Number.isFinite(Number.parseInt(value, 10)), {
-      message: "Approver is required.",
-    }),
+  approver_id: z.string().min(1, "Approver is required."),
   info: z.string().trim().min(1, "Info is required."),
 });
 
@@ -77,8 +72,8 @@ type CreateOvertimeRequestFormValues = z.infer<
 >;
 
 type OvertimeCreatePayload = {
-  user_id: number;
-  approver_id: number;
+  user_id: string;
+  approver_id: string;
   date: string;
   info: string;
 };
@@ -222,7 +217,7 @@ export function MyOvertimeClient({
   const searchParams = useSearchParams();
   const [requests, setRequests] = useState<OvertimeRequestRecord[]>([]);
   const [approvers, setApprovers] = useState<
-    Array<{ id: number; name: string }>
+    Array<{ id: string; name: string }>
   >([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -411,8 +406,8 @@ export function MyOvertimeClient({
 
   async function handleCreateRequest(values: CreateOvertimeRequestFormValues) {
     try {
-      const approverId = Number.parseInt(values.approver_id, 10);
-      if (!Number.isFinite(approverId) || approverId <= 0) {
+      const approverId = values.approver_id.trim();
+      if (!approverId) {
         toast.error("Approver is required.");
         return;
       }

@@ -31,7 +31,7 @@ type BridgeCommandsResponse = {
 type BridgeReconcileRow = {
   key: string;
   biometric_uid: number | null;
-  app_user_id: number | null;
+  app_user_id: string | null;
   app_name: string | null;
   biometric_name: string | null;
   present_in_app: boolean;

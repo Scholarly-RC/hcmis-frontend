@@ -315,9 +315,8 @@ export function PerformanceEvaluationsClient({
     if (!selectedEvaluateeId) {
       return [];
     }
-    const evaluateeId = Number(selectedEvaluateeId);
     return [...cycles]
-      .filter((cycle) => cycle.evaluatee_id === evaluateeId)
+      .filter((cycle) => cycle.evaluatee_id === selectedEvaluateeId)
       .sort(compareCycleRecency);
   }, [cycles, selectedEvaluateeId]);
 
@@ -408,7 +407,7 @@ export function PerformanceEvaluationsClient({
     );
   }, [users, existingEvaluatorIds, selectedCycle]);
   const userNameById = useMemo(() => {
-    const mapping = new Map<number, string>();
+    const mapping = new Map<string, string>();
     for (const user of users) {
       const value = getUserDisplayName(user);
       if (value) {
@@ -886,7 +885,7 @@ export function PerformanceEvaluationsClient({
         `/api/performance/user-evaluations/${selectedCycleId}/assignments`,
         {
           method: "POST",
-          body: JSON.stringify({ evaluator_id: Number(assignmentUserId) }),
+          body: JSON.stringify({ evaluator_id: assignmentUserId }),
         },
       );
       setAssignmentUserId("");
@@ -901,7 +900,7 @@ export function PerformanceEvaluationsClient({
     }
   }
 
-  async function removeAssignment(evaluatorId: number) {
+  async function removeAssignment(evaluatorId: string) {
     if (!selectedCycleId) {
       return;
     }

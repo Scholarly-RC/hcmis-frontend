@@ -155,7 +155,7 @@ export function PayslipsClient() {
 
   async function createPayslip() {
     try {
-      const userId = Number(createForm.user_id);
+      const userId = createForm.user_id.trim();
       const month = Number(createForm.month);
       const year = Number(createForm.year);
       if (!userId || month < 1 || month > 12 || year < 2000) {

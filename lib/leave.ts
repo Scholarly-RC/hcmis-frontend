@@ -9,10 +9,10 @@ export type LeaveApprover = {
   id: number;
   department_id: number;
   department: AuthDepartment | null;
-  department_approver_id: number | null;
-  director_approver_id: number | null;
-  president_approver_id: number | null;
-  hr_approver_id: number | null;
+  department_approver_id: string | null;
+  director_approver_id: string | null;
+  president_approver_id: string | null;
+  hr_approver_id: string | null;
   department_approver: AuthUser | null;
   director_approver: AuthUser | null;
   president_approver: AuthUser | null;
@@ -22,7 +22,7 @@ export type LeaveApprover = {
 };
 
 export type LeaveCredit = {
-  user_id: number;
+  user_id: string;
   credits: number;
   used_credits: number;
   remaining_credits: number;
@@ -35,14 +35,14 @@ export type LeaveRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type LeaveRequestRecord = {
   id: number;
-  user_id: number;
+  user_id: string;
   leave_date: string;
   leave_type: "PA" | "UN" | "WR";
   info: string | null;
-  first_approver_id: number | null;
+  first_approver_id: string | null;
   first_approver_status: LeaveRequestStatus;
   first_approver_at: string | null;
-  second_approver_id: number | null;
+  second_approver_id: string | null;
   second_approver_status: LeaveRequestStatus | null;
   second_approver_at: string | null;
   status: LeaveRequestStatus;
@@ -64,10 +64,10 @@ export type LeaveReviewPayload = {
 };
 
 export type LeaveApproverUpsertPayload = {
-  department_approver_id: number | null;
-  director_approver_id: number | null;
-  president_approver_id: number | null;
-  hr_approver_id: number | null;
+  department_approver_id: string | null;
+  director_approver_id: string | null;
+  president_approver_id: string | null;
+  hr_approver_id: string | null;
 };
 
 export type LeaveCreditUpsertPayload = {

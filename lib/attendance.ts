@@ -2,7 +2,7 @@ import type { AuthUser } from "@/types/auth";
 
 export type AttendanceRecord = {
   id: number;
-  user_id: number;
+  user_id: string;
   device_user_id: number | null;
   timestamp: string;
   punch: "IN" | "OUT";
@@ -25,7 +25,7 @@ export type AttendanceShift = {
 export type DailyShiftSchedule = {
   id: number;
   date: string;
-  user_id: number;
+  user_id: string;
   shift_id: number;
   user: AuthUser | null;
   shift: AttendanceShift | null;
@@ -36,7 +36,7 @@ export type DailyShiftSchedule = {
 export type EmployeeShiftAssignmentRecord = {
   id: number;
   date: string;
-  user_id: number;
+  user_id: string;
   shift_id: number;
   user: AuthUser | null;
   shift: AttendanceShift | null;
@@ -76,8 +76,8 @@ export type OvertimeRequestScope = "mine" | "approvals" | "all";
 
 export type OvertimeRequestRecord = {
   id: number;
-  user_id: number;
-  approver_id: number;
+  user_id: string;
+  approver_id: string;
   info: string | null;
   date: string;
   status: OvertimeRequestStatus;

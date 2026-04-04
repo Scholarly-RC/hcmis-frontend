@@ -26,7 +26,7 @@ import { MONTH_NAMES } from "@/constants/date";
 import { debounce } from "@/utils/debounce";
 
 type EmployeeOption = {
-  id: number;
+  id: string;
   label: string;
 };
 

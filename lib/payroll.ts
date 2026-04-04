@@ -59,7 +59,7 @@ export type PayrollJob = {
 
 export type PayrollPayslip = {
   id: number;
-  user_id: number;
+  user_id: string;
   rank: string | null;
   salary: string | null;
   period: "1ST" | "2ND" | null;

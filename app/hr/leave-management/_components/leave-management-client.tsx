@@ -88,7 +88,7 @@ function formatDate(value: string) {
 
 function displayUser(
   user: AuthUser | null | undefined,
-  fallbackId?: number | null,
+  fallbackId?: string | null,
 ) {
   if (!user) {
     return fallbackId ? `User #${fallbackId}` : "-";
@@ -148,11 +148,11 @@ export function LeaveManagementClient({
   const [approverSavingDepartmentId, setApproverSavingDepartmentId] = useState<
     number | null
   >(null);
-  const [creditSavingUserId, setCreditSavingUserId] = useState<number | null>(
+  const [creditSavingUserId, setCreditSavingUserId] = useState<string | null>(
     null,
   );
   const [creditResettingUserId, setCreditResettingUserId] = useState<
-    number | null
+    string | null
   >(null);
 
   useEffect(() => {
@@ -209,7 +209,7 @@ export function LeaveManagementClient({
   }, []);
 
   const usersById = useMemo(() => {
-    const map = new Map<number, AuthUser>();
+    const map = new Map<string, AuthUser>();
     for (const user of users) {
       map.set(user.id, user);
     }
@@ -220,7 +220,7 @@ export function LeaveManagementClient({
     return requests.filter((item) => {
       if (
         requestFilters.userId !== "all" &&
-        item.user_id !== Number(requestFilters.userId)
+        item.user_id !== requestFilters.userId
       ) {
         return false;
       }
@@ -339,7 +339,7 @@ export function LeaveManagementClient({
     }
   }
 
-  async function saveCredit(userId: number, creditsValue: number) {
+  async function saveCredit(userId: string, creditsValue: number) {
     if (!Number.isFinite(creditsValue) || creditsValue < 0) {
       toast.error("Credits must be zero or greater.");
       return;
@@ -360,7 +360,9 @@ export function LeaveManagementClient({
 
       setCredits((prev) => {
         const next = prev.filter((item) => item.user_id !== userId);
-        return [...next, updated].sort((a, b) => a.user_id - b.user_id);
+        return [...next, updated].sort((a, b) =>
+          a.user_id.localeCompare(b.user_id),
+        );
       });
       toast.success("Leave credit updated.");
     } catch (error) {
@@ -372,7 +374,7 @@ export function LeaveManagementClient({
     }
   }
 
-  async function resetCredit(userId: number) {
+  async function resetCredit(userId: string) {
     setCreditResettingUserId(userId);
     try {
       const updated = await requestJson<LeaveCredit>(

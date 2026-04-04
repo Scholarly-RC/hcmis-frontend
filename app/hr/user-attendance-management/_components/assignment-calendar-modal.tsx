@@ -345,14 +345,8 @@ export function AssignmentCalendarModal({
     if (selectedUserId === "all") {
       return assignments;
     }
-
-    const targetUserId = Number.parseInt(selectedUserId, 10);
-    if (!Number.isFinite(targetUserId)) {
-      return assignments;
-    }
-
     return assignments.filter(
-      (assignment) => assignment.user_id === targetUserId,
+      (assignment) => assignment.user_id === selectedUserId,
     );
   }, [assignments, selectedUserId]);
 

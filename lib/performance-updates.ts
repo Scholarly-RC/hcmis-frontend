@@ -4,7 +4,7 @@ export type PollStatus = "draft" | "published" | "closed" | "archived";
 
 export type AnnouncementRecord = {
   id: number;
-  author_id: number;
+  author_id: string;
   title: string;
   summary: string | null;
   content: string;
@@ -25,7 +25,7 @@ export type PollChoiceRecord = {
 
 export type PollRecord = {
   id: number;
-  author_id: number;
+  author_id: string;
   question: string;
   description: string | null;
   allow_multiple_choices: boolean;
@@ -60,13 +60,13 @@ export type QuestionnaireRecord = {
 
 export type UserEvaluationRecord = {
   id: number;
-  evaluatee_id: number;
+  evaluatee_id: string;
   questionnaire_id: number;
   quarter: "FQ" | "SQ";
   year: number;
   is_finalized: boolean;
   evaluatee?: {
-    id: number;
+    id: string;
     first_name: string;
     last_name: string;
   } | null;
@@ -94,7 +94,7 @@ export type EvaluationDomainRecord = {
 
 export type EvaluationRecord = {
   id: number;
-  evaluator_id: number;
+  evaluator_id: string;
   user_evaluation_id: number;
   questionnaire_id: number;
   positive_feedback: string | null;
@@ -102,7 +102,7 @@ export type EvaluationRecord = {
   content_data: EvaluationDomainRecord[];
   date_submitted: string | null;
   evaluator?: {
-    id: number;
+    id: string;
     first_name: string;
     last_name: string;
   } | null;
@@ -118,7 +118,7 @@ export type UserEvaluationAggregateDomainRecord = {
 
 export type UserEvaluationAggregateRecord = {
   user_evaluation_id: number;
-  evaluatee_id: number;
+  evaluatee_id: string;
   questionnaire_id: number;
   quarter: "FQ" | "SQ";
   year: number;
