@@ -871,7 +871,7 @@ export function ShiftManagementClient({
               </div>
               <Button type="button" onClick={openCreateShift}>
                 <Plus className="size-4" />
-                Add shift
+                Add Shift
               </Button>
             </div>
           </CardHeader>
@@ -1064,7 +1064,7 @@ export function ShiftManagementClient({
                         disabled={isSavingSchedule || !selectedPolicy}
                       >
                         <Save className="size-4" />
-                        {isSavingSchedule ? "Saving..." : "Save shift policy"}
+                        {isSavingSchedule ? "Saving..." : "Save Shift Policy"}
                       </Button>
                     </div>
                   </div>

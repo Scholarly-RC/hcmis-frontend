@@ -31,6 +31,9 @@ export async function getDashboardSession(): Promise<DashboardSession> {
   if (!user) {
     redirect("/login");
   }
+  if (user.must_change_password) {
+    redirect("/change-password");
+  }
 
   const displayName = [user.first_name, user.last_name]
     .filter(Boolean)

@@ -406,7 +406,7 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
         <div className="flex justify-end">
           <Button type="submit" disabled={isSubmitting || !isDirty}>
             <Save className="size-4" />
-            {isSubmitting ? "Saving..." : "Save changes"}
+            {isSubmitting ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>

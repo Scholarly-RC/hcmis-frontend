@@ -27,6 +27,8 @@ export type AuthUser = {
   resignation_date: string | null;
   profile_picture_url: string | null;
   can_modify_shift: boolean;
+  must_change_password: boolean;
+  temporary_password_expires_at: string | null;
   capabilities?: string[];
   is_active: boolean;
   is_superuser: boolean;
@@ -54,4 +56,9 @@ export type AuthUserProfileUpdate = {
   date_of_birth?: string | null;
   date_of_hiring?: string | null;
   profile_picture_url?: string | null;
+};
+
+export type AuthUserChangePassword = {
+  current_password?: string;
+  new_password: string;
 };

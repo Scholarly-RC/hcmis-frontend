@@ -2,6 +2,7 @@
 
 import { Check, Loader2, X } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { SelectField } from "@/components/form-select-field";
 import { Badge } from "@/components/ui/badge";
@@ -84,7 +85,16 @@ function parseNumeric(value: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function parsePositiveInt(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function LeaveInboxClient() {
+  const searchParams = useSearchParams();
   const [requests, setRequests] = useState<LeaveRequestRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterState>({
@@ -95,6 +105,20 @@ export function LeaveInboxClient() {
   const [actionState, setActionState] = useState<
     Record<number, "approve" | "reject" | undefined>
   >({});
+  const [highlightedLeaveId, setHighlightedLeaveId] = useState<number | null>(
+    null,
+  );
+  const deepLinkedLeaveId = parsePositiveInt(searchParams.get("leave_id"));
+
+  useEffect(() => {
+    if (!deepLinkedLeaveId) {
+      return;
+    }
+    setFilters((current) => ({
+      ...current,
+      status: "all",
+    }));
+  }, [deepLinkedLeaveId]);
 
   useEffect(() => {
     let mounted = true;
@@ -168,6 +192,30 @@ export function LeaveInboxClient() {
       return true;
     });
   }, [requests, filters]);
+
+  useEffect(() => {
+    if (!deepLinkedLeaveId) {
+      return;
+    }
+    const exists = filteredRows.some((item) => item.id === deepLinkedLeaveId);
+    if (!exists) {
+      return;
+    }
+    setHighlightedLeaveId(deepLinkedLeaveId);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`leave-inbox-row-${deepLinkedLeaveId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedLeaveId((current) =>
+        current === deepLinkedLeaveId ? null : current,
+      );
+    }, 4000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [deepLinkedLeaveId, filteredRows]);
 
   async function respond(leaveId: number, response: "APPROVE" | "REJECT") {
     setActionState((prev) => ({
@@ -325,7 +373,14 @@ export function LeaveInboxClient() {
                       const canRespond = item.status === "PENDING";
 
                       return (
-                        <TableRow key={item.id}>
+                        <TableRow
+                          id={`leave-inbox-row-${item.id}`}
+                          key={item.id}
+                          className={cn(
+                            highlightedLeaveId === item.id &&
+                              "bg-primary/5 ring-1 ring-primary/40",
+                          )}
+                        >
                           <TableCell>
                             {item.user
                               ? `${item.user.first_name} ${item.user.last_name}`

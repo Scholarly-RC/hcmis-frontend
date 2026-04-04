@@ -5,8 +5,10 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Eye,
   PencilLine,
   Plus,
+  Save,
   Trash2,
   Users,
 } from "lucide-react";
@@ -468,7 +470,8 @@ function AttendanceDraftForm({
 
           <div className="flex flex-wrap gap-2">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Save changes"}
+              <Save className="size-4" />
+              {isSubmitting ? "Saving..." : "Save Changes"}
             </Button>
             <Button
               type="button"
@@ -783,7 +786,8 @@ export function AttendanceManagementClient({
                                     openDay(day);
                                   }}
                                 >
-                                  View details
+                                  <Eye className="size-4" />
+                                  View Details
                                 </Button>
                               </TableCell>
                             ) : null}
@@ -860,7 +864,7 @@ export function AttendanceManagementClient({
                         onClick={() => startCreate(selectedDay)}
                       >
                         <Plus className="size-4" />
-                        Add punch
+                        Add Punch
                       </Button>
                     ) : null}
                   </div>

@@ -59,6 +59,7 @@ export function LoginForm() {
 
       const payload = (await response.json().catch(() => null)) as {
         detail?: string;
+        must_change_password?: boolean;
       } | null;
 
       if (!response.ok) {
@@ -66,7 +67,9 @@ export function LoginForm() {
         return;
       }
 
-      router.replace("/dashboard");
+      router.replace(
+        payload?.must_change_password ? "/change-password" : "/dashboard",
+      );
       router.refresh();
     } catch {
       setError("Unable to reach the authentication service.");
@@ -76,7 +79,7 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md border-border/70 bg-card/95 shadow-2xl shadow-black/10 backdrop-blur-xl">
       <CardHeader className="space-y-2">
-        <CardTitle className="text-2xl">Sign in</CardTitle>
+        <CardTitle className="text-2xl">Sign In</CardTitle>
         <CardDescription className="text-sm">
           Use your HCMIS account to continue.
         </CardDescription>
@@ -151,7 +154,7 @@ export function LoginForm() {
             type="submit"
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Signing in..." : "Sign in"}
+            {isSubmitting ? "Signing In..." : "Sign In"}
             <ArrowRight className="ml-2 size-4" />
           </Button>
         </form>

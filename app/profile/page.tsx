@@ -1,6 +1,7 @@
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { ProfileEditModal } from "@/app/profile/_components/profile-edit-modal";
 import { ProfileHeader } from "@/app/profile/_components/profile-header";
+import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import {
   CIVIL_STATUS_OPTIONS,
   EDUCATION_OPTIONS,
@@ -262,6 +263,18 @@ export default function ProfilePage() {
                   items={employmentItems}
                 />
               </div>
+            </section>
+
+            <section className="space-y-3">
+              <div>
+                <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                  Security
+                </h2>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Change your password anytime from your account.
+                </p>
+              </div>
+              <ChangePasswordForm redirectToDashboard={false} />
             </section>
           </div>
         );

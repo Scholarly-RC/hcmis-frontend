@@ -175,6 +175,11 @@ function buildEmployeeDashboard(input: {
       href: "/leave",
     },
     {
+      label: "Submit overtime request",
+      description: "Create overtime requests and track approval decisions.",
+      href: "/overtime",
+    },
+    {
       label: "View my payslips",
       description: "Check released payroll records and monthly slips.",
       href: "/my-payslips",

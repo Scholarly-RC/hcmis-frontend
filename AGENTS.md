@@ -95,6 +95,9 @@ Follow these rules before making changes.
 - For any UI element with an available shadcn primitive (for example buttons, inputs, selects, textareas, dialogs, tables, popovers, sheets, menus, tooltips), use the shadcn component and do not introduce raw HTML primitives in feature code.
 - If the needed primitive is missing, add it through the shadcn CLI/MCP flow before building a custom alternative.
 - If a shadcn component requires provider wiring (for example `TooltipProvider`), ensure it is added in `app/layout.tsx` or the appropriate shared layout.
+- Button text labels must use `Title Case` (for example `Change Password`, `Save Changes`, `Reset Password`).
+- Text buttons should include an explicit semantic icon in the callsite (for example save/edit/delete/refresh icons) rather than relying on generic fallback icons.
+- Keep `components/ui/button.tsx` as a neutral primitive; do not add automatic text transformation or automatic fallback icon injection there.
 
 ## Styling Rules
 

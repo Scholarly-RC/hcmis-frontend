@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronDown, Loader2, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -254,6 +255,14 @@ function getQuestionRowId(
   return `evaluation-${evaluationId}-question-${domainIndex}-${questionIndex}`;
 }
 
+function parsePositiveInt(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function PerformanceEvaluationsClient({
   currentUser,
   isStaff,
@@ -261,6 +270,7 @@ export function PerformanceEvaluationsClient({
   currentUser: AuthUser;
   isStaff: boolean;
 }) {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -291,6 +301,11 @@ export function PerformanceEvaluationsClient({
   const [selectedEvaluateeId, setSelectedEvaluateeId] = useState("");
   const [staffPanel, setStaffPanel] = useState<StaffPanel>("assignments");
   const [isCreateCycleDialogOpen, setIsCreateCycleDialogOpen] = useState(false);
+  const [highlightedCycleId, setHighlightedCycleId] = useState<number | null>(
+    null,
+  );
+  const appliedDeepLinkCycleIdRef = useRef<number | null>(null);
+  const deepLinkedCycleId = parsePositiveInt(searchParams.get("cycle_id"));
 
   const selectedCycle = useMemo(
     () => cycles.find((cycle) => cycle.id === selectedCycleId) ?? null,
@@ -657,6 +672,38 @@ export function PerformanceEvaluationsClient({
       };
     });
   }, [autoQuestionnaireIdForSelectedUser, isStaff]);
+
+  useEffect(() => {
+    if (!deepLinkedCycleId || cycles.length === 0) {
+      return;
+    }
+    const targetCycle = cycles.find((cycle) => cycle.id === deepLinkedCycleId);
+    if (!targetCycle) {
+      return;
+    }
+    if (appliedDeepLinkCycleIdRef.current === deepLinkedCycleId) {
+      return;
+    }
+    appliedDeepLinkCycleIdRef.current = deepLinkedCycleId;
+    if (isStaff) {
+      setSelectedEvaluateeId(String(targetCycle.evaluatee_id));
+    }
+    setSelectedCycleId(targetCycle.id);
+    setHighlightedCycleId(targetCycle.id);
+    requestAnimationFrame(() => {
+      document
+        .getElementById("cycle-workspace")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedCycleId((current) =>
+        current === targetCycle.id ? null : current,
+      );
+    }, 4000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [cycles, deepLinkedCycleId, isStaff]);
 
   function updateEvaluationQuestionRating(
     evaluationId: number,
@@ -1158,7 +1205,13 @@ export function PerformanceEvaluationsClient({
   if (isStaff) {
     return (
       <div className="flex w-full flex-col gap-6">
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+        <Card
+          className={
+            selectedCycleId && highlightedCycleId === selectedCycleId
+              ? "border-border/70 bg-card/85 shadow-lg shadow-black/5 ring-1 ring-primary/40"
+              : "border-border/70 bg-card/85 shadow-lg shadow-black/5"
+          }
+        >
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div>
               <CardTitle>Performance Evaluations</CardTitle>
@@ -1551,7 +1604,7 @@ export function PerformanceEvaluationsClient({
                     <CollapsibleTrigger asChild>
                       <Button type="button" variant="ghost" className="px-0">
                         <ChevronDown className="mr-2 size-4" />
-                        Show details
+                        Show Details
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="space-y-4">
@@ -1789,7 +1842,10 @@ export function PerformanceEvaluationsClient({
               setSelectedCycleId(value === "__none__" ? null : Number(value))
             }
           >
-            <SelectTrigger className="h-10 w-full max-w-2xl">
+            <SelectTrigger
+              id="cycle-workspace"
+              className="h-10 w-full max-w-2xl"
+            >
               <SelectValue placeholder="Select cycle" />
             </SelectTrigger>
             <SelectContent>

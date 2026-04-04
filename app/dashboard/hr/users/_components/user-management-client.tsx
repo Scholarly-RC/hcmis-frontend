@@ -1,7 +1,17 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Pencil, Plus, Search, UserCircle2 } from "lucide-react";
+import {
+  Copy,
+  KeyRound,
+  Loader2,
+  Pencil,
+  Plus,
+  Save,
+  Search,
+  UserCircle2,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, type ReactNode, useEffect, useState } from "react";
@@ -35,6 +45,9 @@ import { cn } from "@/utils/cn";
 
 type UsersResponse = AuthUser[];
 type DepartmentsResponse = AuthDepartment[];
+type ResetPasswordResponse = {
+  temporary_password: string;
+};
 
 type UserStatusFilter = "all" | "active" | "inactive";
 export type UserEditorMode = "create" | "edit";
@@ -342,6 +355,134 @@ function FormSection({
   );
 }
 
+function ResetPasswordDialog({
+  open,
+  user,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  user: AuthUser | null;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: () => Promise<string>;
+}) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
+    null,
+  );
+
+  async function handleGenerate() {
+    setSubmitError(null);
+    setIsSubmitting(true);
+    try {
+      const nextTemporaryPassword = await onSubmit();
+      setTemporaryPassword(nextTemporaryPassword);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Unable to reset password.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function handleClose(nextOpen: boolean) {
+    onOpenChange(nextOpen);
+    if (!nextOpen) {
+      setSubmitError(null);
+      setIsSubmitting(false);
+      setTemporaryPassword(null);
+    }
+  }
+
+  async function copyTemporaryPassword() {
+    if (!temporaryPassword) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(temporaryPassword);
+      toast.success("Temporary password copied.");
+    } catch {
+      toast.error("Unable to copy password.");
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Reset Password</DialogTitle>
+          <DialogDescription>
+            Create a temporary password for{" "}
+            <span className="font-medium text-foreground">
+              {user ? buildDisplayName(user) || user.email : "selected user"}
+            </span>
+            . The user will be required to change it on next login.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            The temporary password expires in 24 hours.
+          </p>
+          {temporaryPassword ? (
+            <div className="space-y-2 rounded-xl border border-border/70 bg-muted/30 p-4">
+              <p className="text-sm font-medium text-foreground">
+                Temporary password
+              </p>
+              <p className="rounded-md bg-background px-3 py-2 font-mono text-sm">
+                {temporaryPassword}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                This value is shown once. Share it securely with the user.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={copyTemporaryPassword}
+              >
+                <Copy className="size-4" />
+                Copy Password
+              </Button>
+            </div>
+          ) : null}
+
+          {submitError ? (
+            <p className="text-sm text-destructive" role="alert">
+              {submitError}
+            </p>
+          ) : null}
+
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleClose(false)}
+              disabled={isSubmitting}
+            >
+              <X className="size-4" />
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={handleGenerate}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <KeyRound className="size-4" />
+              )}
+              {isSubmitting ? "Generating..." : "Generate Temporary Password"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function UserEditorDialog({
   open,
   mode,
@@ -422,7 +563,7 @@ export function UserEditorDialog({
       <DialogContent className="!max-w-5xl flex w-[min(96vw,64rem)] max-h-[90vh] flex-col gap-1 overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b bg-background px-6 py-4">
           <DialogTitle>
-            {mode === "create" ? "Add user" : "Edit user"}
+            {mode === "create" ? "Add User" : "Edit User"}
           </DialogTitle>
           <DialogDescription>
             {mode === "create"
@@ -678,14 +819,20 @@ export function UserEditorDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
+              <X className="size-4" />
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting || !isDirty}>
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
               {isSubmitting
                 ? "Saving..."
                 : mode === "create"
-                  ? "Create user"
-                  : "Save changes"}
+                  ? "Create User"
+                  : "Save Changes"}
             </Button>
           </div>
         </form>
@@ -712,6 +859,10 @@ export function UserManagementClient({
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorMode, setEditorMode] = useState<UserEditorMode>("create");
   const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
+  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<AuthUser | null>(
+    null,
+  );
   const departmentFilterOptions = [
     { value: "all", label: "All departments" },
     ...departments.map((department) => ({
@@ -831,6 +982,18 @@ export function UserManagementClient({
     }
   }
 
+  function openResetPasswordDialog(user: AuthUser) {
+    setResetPasswordUser(user);
+    setResetPasswordOpen(true);
+  }
+
+  function closeResetPasswordDialog(nextOpen: boolean) {
+    setResetPasswordOpen(nextOpen);
+    if (!nextOpen) {
+      setResetPasswordUser(null);
+    }
+  }
+
   async function handleSaveUser(payload: UserEditorPayload) {
     try {
       const targetUserId = editingUser?.id;
@@ -908,6 +1071,32 @@ export function UserManagementClient({
     }
   }
 
+  async function handleResetPassword(): Promise<string> {
+    if (!resetPasswordUser) {
+      throw new Error("No user selected.");
+    }
+
+    try {
+      const response = await requestJson<ResetPasswordResponse>(
+        `/api/users/${resetPasswordUser.id}/reset-password`,
+        {
+          method: "POST",
+        },
+      );
+      toast.success("Temporary password generated.");
+      return response.temporary_password;
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        router.replace("/login");
+        throw err;
+      }
+
+      throw err instanceof Error
+        ? err
+        : new Error("Unable to reset user password.");
+    }
+  }
+
   return (
     <div className="flex w-full flex-col gap-6">
       <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -927,7 +1116,7 @@ export function UserManagementClient({
           </Button>
           <Button onClick={openCreateDialog} type="button" variant="secondary">
             <Plus className="size-4" />
-            Add user
+            Add User
           </Button>
         </div>
       </section>
@@ -1098,6 +1287,15 @@ export function UserManagementClient({
                           <Pencil className="size-4" />
                           Edit
                         </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => openResetPasswordDialog(user)}
+                        >
+                          <KeyRound className="size-4" />
+                          Reset Password
+                        </Button>
 
                         <ConfirmationModal
                           trigger={
@@ -1148,6 +1346,12 @@ export function UserManagementClient({
         departments={departments}
         onOpenChange={closeEditor}
         onSubmit={handleSaveUser}
+      />
+      <ResetPasswordDialog
+        open={resetPasswordOpen}
+        user={resetPasswordUser}
+        onOpenChange={closeResetPasswordDialog}
+        onSubmit={handleResetPassword}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { buildBackendUrl, readBackendJson } from "@/lib/backend";
 import type {
   AuthLoginResponse,
   AuthUser,
+  AuthUserChangePassword,
   AuthUserProfileUpdate,
 } from "@/types/auth";
 
@@ -101,6 +102,28 @@ export async function updateCurrentUserProfile(
   }
 
   return responsePayload as AuthUser;
+}
+
+export async function changeCurrentUserPassword(
+  token: string,
+  payload: AuthUserChangePassword,
+): Promise<void> {
+  const response = await fetch(buildBackendUrl("/auth/change-password"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  const responsePayload = await readBackendJson<{ detail?: string }>(response);
+  if (!response.ok) {
+    throw new Error(
+      responsePayload?.detail ?? "Unable to update your password.",
+    );
+  }
 }
 
 export function getAuthCookieOptions(token: string) {

@@ -1,6 +1,14 @@
 "use client";
 
-import { Check, Loader2, Trash2, X } from "lucide-react";
+import {
+  Check,
+  ClipboardCheck,
+  Eraser,
+  Layers3,
+  Loader2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SelectField } from "@/components/form-select-field";
@@ -65,6 +73,18 @@ type DebouncedReplace = {
   (state: OvertimeFilterState): void;
   cancel: () => void;
 };
+
+function isSameFilterState(a: OvertimeFilterState, b: OvertimeFilterState) {
+  return (
+    a.scope === b.scope &&
+    a.query === b.query &&
+    a.status === b.status &&
+    a.month === b.month &&
+    a.year === b.year &&
+    a.departmentId === b.departmentId &&
+    a.approverId === b.approverId
+  );
+}
 
 function buildUrl(pathname: string, state: OvertimeFilterState) {
   const search = new URLSearchParams();
@@ -156,12 +176,17 @@ export function OvertimeManagementClient({
   }, [initialRequests]);
 
   useEffect(() => {
-    setFormState(filters);
+    setFormState((prev) => (isSameFilterState(prev, filters) ? prev : filters));
   }, [filters]);
 
   if (!debouncedReplaceRef.current) {
     debouncedReplaceRef.current = debounce((nextState: OvertimeFilterState) => {
-      router.replace(buildUrl(pathname, nextState));
+      const nextUrl = buildUrl(pathname, nextState);
+      const currentUrl = `${pathname}${window.location.search}`;
+      if (nextUrl === currentUrl) {
+        return;
+      }
+      router.replace(nextUrl);
     }, 300);
   }
 
@@ -288,7 +313,8 @@ export function OvertimeManagementClient({
               setFormState((prev) => ({ ...prev, scope: "approvals" }))
             }
           >
-            Needs My Approval
+            <ClipboardCheck className="size-4" />
+            To Review
           </Button>
           {isStaff ? (
             <Button
@@ -298,7 +324,8 @@ export function OvertimeManagementClient({
                 setFormState((prev) => ({ ...prev, scope: "all" }))
               }
             >
-              All Requests
+              <Layers3 className="size-4" />
+              All
             </Button>
           ) : null}
         </div>
@@ -435,7 +462,8 @@ export function OvertimeManagementClient({
                   }))
                 }
               >
-                Clear filters
+                <Eraser className="size-4" />
+                Clear
               </Button>
             </div>
           </div>

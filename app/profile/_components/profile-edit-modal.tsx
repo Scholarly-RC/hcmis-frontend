@@ -20,7 +20,7 @@ export function ProfileEditModal({ user }: ProfileEditModalProps) {
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">
           <PencilLine className="size-4" />
-          Edit profile
+          Edit Profile
         </Button>
       </DialogTrigger>
 
@@ -38,7 +38,7 @@ export function ProfileEditModal({ user }: ProfileEditModalProps) {
                 id="profile-edit-title"
                 className="font-heading text-2xl font-semibold tracking-tight text-foreground"
               >
-                Edit profile
+                Edit Profile
               </h2>
             </div>
             <Button

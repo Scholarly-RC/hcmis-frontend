@@ -32,7 +32,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const auth = await loginWithBackend(body.email, body.password);
-    const response = NextResponse.json({ user: auth.user });
+    const response = NextResponse.json({
+      user: auth.user,
+      must_change_password: auth.user.must_change_password,
+    });
 
     response.cookies.set(
       AUTH_COOKIE_NAME,
@@ -47,7 +50,14 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { detail: message },
-      { status: message === "Incorrect email or password." ? 401 : 502 },
+      {
+        status:
+          message === "Incorrect email or password." ||
+          message ===
+            "Temporary password has expired. Please contact HR for reset."
+            ? 401
+            : 502,
+      },
     );
   }
 }

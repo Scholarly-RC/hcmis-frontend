@@ -17,6 +17,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
+import { SidebarNotificationMenu } from "@/components/sidebar-notification-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -363,7 +364,10 @@ export function DashboardShell({
                     </p>
                   </div>
                 </div>
-                <ThemeToggle />
+                <div className="flex items-center gap-2">
+                  <ThemeToggle />
+                  <SidebarNotificationMenu />
+                </div>
               </div>
             </div>
 

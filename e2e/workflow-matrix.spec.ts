@@ -29,6 +29,7 @@ const hrWorkflowPages: Array<{ route: string; marker: string | RegExp }> = [
 const employeeWorkflowPages: Array<{ route: string; marker: string | RegExp }> =
   [
     { route: "/leave", marker: "My Leave" },
+    { route: "/overtime", marker: "My Overtime" },
     { route: "/my-payslips", marker: "My Payslips" },
     { route: "/attendance", marker: "My Attendance" },
     {

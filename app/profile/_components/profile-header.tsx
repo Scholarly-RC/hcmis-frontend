@@ -21,14 +21,12 @@ export function ProfileHeader({
 }: ProfileHeaderProps) {
   const router = useRouter();
   const [isEditingPhoto, setIsEditingPhoto] = useState(false);
-  const [profilePictureUrl, setProfilePictureUrl] = useState(
-    user.profile_picture_url ?? "",
-  );
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   function resetEditor() {
-    setProfilePictureUrl(user.profile_picture_url ?? "");
+    setSelectedPhoto(null);
     setIsEditingPhoto(false);
     setFeedback(null);
   }
@@ -37,19 +35,21 @@ export function ProfileHeader({
     if (isSaving) {
       return;
     }
+    if (!selectedPhoto) {
+      setFeedback("Please select an image file first.");
+      return;
+    }
 
     setIsSaving(true);
     setFeedback(null);
 
     try {
-      const response = await fetch("/api/profile/me", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          profile_picture_url: profilePictureUrl || null,
-        }),
+      const formData = new FormData();
+      formData.append("uploaded_file", selectedPhoto);
+
+      const response = await fetch("/api/profile/me/photo", {
+        method: "POST",
+        body: formData,
       });
 
       const payload = (await response.json().catch(() => null)) as {
@@ -78,7 +78,7 @@ export function ProfileHeader({
           {user.profile_picture_url ? (
             // biome-ignore lint/performance/noImgElement: backend profile URLs are already normalized and may be remote
             <img
-              src={user.profile_picture_url}
+              src={`/api/profile/me/photo?v=${encodeURIComponent(user.updated_at)}`}
               alt={displayName}
               className="h-full w-full object-cover"
             />
@@ -99,19 +99,19 @@ export function ProfileHeader({
               <div className="space-y-3">
                 <div className="flex flex-col gap-3 sm:flex-row">
                   <Input
-                    value={profilePictureUrl}
+                    type="file"
+                    accept="image/*"
                     onChange={(event) =>
-                      setProfilePictureUrl(event.target.value)
+                      setSelectedPhoto(event.target.files?.[0] ?? null)
                     }
-                    placeholder="https://..."
                   />
                   <Button
                     type="button"
                     onClick={handleSave}
-                    disabled={isSaving}
+                    disabled={isSaving || !selectedPhoto}
                   >
                     <Check className="size-4" />
-                    {isSaving ? "Saving..." : "Save photo"}
+                    {isSaving ? "Saving..." : "Save Photo"}
                   </Button>
                   <Button
                     type="button"
@@ -124,7 +124,7 @@ export function ProfileHeader({
                   </Button>
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">
-                  Paste a direct image URL here to update the profile picture.
+                  Upload a JPG, PNG, GIF, WEBP, or BMP file.
                 </p>
               </div>
             ) : (
@@ -135,7 +135,7 @@ export function ProfileHeader({
                 onClick={() => setIsEditingPhoto(true)}
               >
                 <Camera className="size-4" />
-                Change photo
+                Change Photo
               </Button>
             )}
           </div>

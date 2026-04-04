@@ -11,7 +11,7 @@ export default async function Home() {
     const user = await fetchCurrentUser(token);
 
     if (user) {
-      redirect("/dashboard");
+      redirect(user.must_change_password ? "/change-password" : "/dashboard");
     }
   }
 

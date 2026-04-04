@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { CalendarDays, RotateCcw, SlidersHorizontal } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
@@ -215,6 +216,7 @@ export function AttendanceFilters({
                     });
                   }}
                 >
+                  <CalendarDays className="size-4" />
                   Today
                 </Button>
                 <Button
@@ -230,6 +232,7 @@ export function AttendanceFilters({
                     })
                   }
                 >
+                  <RotateCcw className="size-4" />
                   Clear
                 </Button>
               </div>
@@ -243,7 +246,8 @@ export function AttendanceFilters({
                 variant="outline"
                 className="w-full sm:w-auto"
               >
-                More filters
+                <SlidersHorizontal className="size-4" />
+                More Filters
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-4 grid gap-3 sm:grid-cols-2">

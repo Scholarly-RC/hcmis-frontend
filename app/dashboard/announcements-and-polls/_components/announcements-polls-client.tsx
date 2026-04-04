@@ -1,7 +1,8 @@
 "use client";
 
-import { Loader2, Megaphone, Vote } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { FilePenLine, Loader2, Megaphone, Vote } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,7 +93,16 @@ function truncateText(value: string, maxLength: number) {
   return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
 }
 
+function parsePositiveInt(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
@@ -119,9 +129,17 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
   const [archivedPolls, setArchivedPolls] = useState<PollRecord[]>([]);
   const [actionItemId, setActionItemId] = useState<number | null>(null);
   const [previewItem, setPreviewItem] = useState<FeedItemRecord | null>(null);
+  const [highlightedItemKey, setHighlightedItemKey] = useState<string | null>(
+    null,
+  );
   const [voteSelectionByPoll, setVoteSelectionByPoll] = useState<
     Record<number, number[]>
   >({});
+  const appliedDeepLinkItemKeyRef = useRef<string | null>(null);
+  const deepLinkedAnnouncementId = parsePositiveInt(
+    searchParams.get("announcement_id"),
+  );
+  const deepLinkedPollId = parsePositiveInt(searchParams.get("poll_id"));
 
   const loadFeed = useCallback(
     async (nextFilter: FilterType, showSpinner: boolean) => {
@@ -153,6 +171,67 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
   useEffect(() => {
     void loadFeed(filter, false);
   }, [filter, loadFeed]);
+
+  useEffect(() => {
+    if (deepLinkedAnnouncementId && filter !== "announcement") {
+      setFilter("announcement");
+      return;
+    }
+    if (deepLinkedPollId && filter !== "poll") {
+      setFilter("poll");
+    }
+  }, [deepLinkedAnnouncementId, deepLinkedPollId, filter]);
+
+  useEffect(() => {
+    if (!deepLinkedAnnouncementId && !deepLinkedPollId) {
+      return;
+    }
+    const matchedItem = feed.find((item) => {
+      if (
+        deepLinkedAnnouncementId &&
+        item.item_type === "announcement" &&
+        item.announcement
+      ) {
+        return item.announcement.id === deepLinkedAnnouncementId;
+      }
+      if (deepLinkedPollId && item.item_type === "poll" && item.poll) {
+        return item.poll.id === deepLinkedPollId;
+      }
+      return false;
+    });
+    if (!matchedItem) {
+      return;
+    }
+
+    const targetId =
+      matchedItem.item_type === "announcement"
+        ? matchedItem.announcement?.id
+        : matchedItem.poll?.id;
+    if (!targetId) {
+      return;
+    }
+
+    const targetKey = `${matchedItem.item_type}-${targetId}`;
+    if (appliedDeepLinkItemKeyRef.current === targetKey) {
+      return;
+    }
+    appliedDeepLinkItemKeyRef.current = targetKey;
+    setPreviewItem(matchedItem);
+    setHighlightedItemKey(targetKey);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`feed-card-${targetKey}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedItemKey((current) =>
+        current === targetKey ? null : current,
+      );
+    }, 4000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [deepLinkedAnnouncementId, deepLinkedPollId, feed]);
 
   const feedCountLabel = useMemo(() => {
     if (filter === "all") {
@@ -655,8 +734,13 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
 
             return (
               <Card
+                id={`feed-card-announcement-${announcement.id}`}
                 key={`announcement-${announcement.id}`}
-                className="border-border/70 bg-card/85 shadow-lg shadow-black/5"
+                className={
+                  highlightedItemKey === `announcement-${announcement.id}`
+                    ? "border-border/70 bg-card/85 shadow-lg shadow-black/5 ring-1 ring-primary/40"
+                    : "border-border/70 bg-card/85 shadow-lg shadow-black/5"
+                }
               >
                 <CardHeader className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
@@ -703,7 +787,8 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                           void runAnnouncementAction(announcement.id, "draft")
                         }
                       >
-                        Move to Draft
+                        <FilePenLine className="size-4" />
+                        Move To Draft
                       </Button>
                     ) : null}
                     {isStaff && announcement.status !== "archived" ? (
@@ -733,8 +818,13 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
 
             return (
               <Card
+                id={`feed-card-poll-${poll.id}`}
                 key={`poll-${poll.id}`}
-                className="border-border/70 bg-card/85 shadow-lg shadow-black/5"
+                className={
+                  highlightedItemKey === `poll-${poll.id}`
+                    ? "border-border/70 bg-card/85 shadow-lg shadow-black/5 ring-1 ring-primary/40"
+                    : "border-border/70 bg-card/85 shadow-lg shadow-black/5"
+                }
               >
                 <CardHeader className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
@@ -967,7 +1057,8 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                         )
                       }
                     >
-                      Move to Draft
+                      <FilePenLine className="size-4" />
+                      Move To Draft
                     </Button>
                   ) : null}
                   {previewAnnouncement.status !== "archived" ? (
@@ -1124,7 +1215,8 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       disabled={actionItemId === previewPoll.id}
                       onClick={() => void submitVote(previewPoll)}
                     >
-                      Submit vote
+                      <Vote className="size-4" />
+                      Submit Vote
                     </Button>
                   ) : null}
 

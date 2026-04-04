@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, Loader2, X } from "lucide-react";
 import {
   type ComponentProps,
   type ReactElement,
@@ -78,6 +79,7 @@ export function ConfirmationModal({
             onClick={() => setOpen(false)}
             disabled={isConfirming}
           >
+            <X className="size-4" />
             {cancelLabel}
           </Button>
           <Button
@@ -86,7 +88,12 @@ export function ConfirmationModal({
             onClick={handleConfirm}
             disabled={isConfirming}
           >
-            {isConfirming ? "Please wait..." : confirmLabel}
+            {isConfirming ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Check className="size-4" />
+            )}
+            {isConfirming ? "Please Wait..." : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

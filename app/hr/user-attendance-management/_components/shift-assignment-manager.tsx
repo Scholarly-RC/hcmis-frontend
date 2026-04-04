@@ -1,6 +1,13 @@
 "use client";
 
-import { CalendarDays, Loader2, Trash2, XCircle } from "lucide-react";
+import {
+  CalendarDays,
+  Copy,
+  Loader2,
+  Save,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type KeyboardEvent, useEffect, useState } from "react";
 
@@ -616,7 +623,8 @@ export function ShiftAssignmentManager({
               onClick={() => void handleCopyPreviousMonth()}
               disabled={isCopyingPreviousMonth}
             >
-              {isCopyingPreviousMonth ? "Copying..." : "Copy previous month"}
+              <Copy className="size-4" />
+              {isCopyingPreviousMonth ? "Copying..." : "Copy Previous Month"}
             </Button>
             <Button
               type="button"
@@ -628,7 +636,8 @@ export function ShiftAssignmentManager({
                 departmentShiftPolicy.shifts.length === 0
               }
             >
-              {isGeneratingMonth ? "Generating..." : "Generate month"}
+              <CalendarDays className="size-4" />
+              {isGeneratingMonth ? "Generating..." : "Generate Month"}
             </Button>
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-foreground">
               <CalendarDays className="size-5" />
@@ -660,7 +669,8 @@ export function ShiftAssignmentManager({
               onClick={handleDiscardAllChanges}
               disabled={isSavingAll || changedDays.length === 0}
             >
-              Discard all
+              <Trash2 className="size-4" />
+              Discard All
             </Button>
             <Button
               type="button"
@@ -673,7 +683,8 @@ export function ShiftAssignmentManager({
                 allowedTemplates.length === 0
               }
             >
-              {isSavingAll ? "Saving..." : "Save all changed rows"}
+              <Save className="size-4" />
+              {isSavingAll ? "Saving..." : "Save All Changed Rows"}
             </Button>
           </div>
         </div>

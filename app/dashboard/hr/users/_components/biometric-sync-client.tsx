@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -374,7 +374,7 @@ export function BiometricSyncClient() {
             ) : (
               <RefreshCw className="size-4" />
             )}
-            Refresh sync
+            Refresh Sync
           </Button>
           <Button
             type="button"
@@ -386,7 +386,7 @@ export function BiometricSyncClient() {
             ) : (
               <RefreshCw className="size-4" />
             )}
-            Sync biometric users
+            Sync Biometric Users
           </Button>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -486,7 +486,8 @@ export function BiometricSyncClient() {
                         variant="secondary"
                         onClick={() => openCreateUserDialog(row)}
                       >
-                        Create app user
+                        <UserPlus className="size-4" />
+                        Create App User
                       </Button>
                     ) : null}
                   </TableCell>

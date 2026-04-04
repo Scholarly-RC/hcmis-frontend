@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -121,6 +122,14 @@ function parseMonthValue(value: string) {
   return Number.isFinite(parsed) && parsed >= 1 && parsed <= 12 ? parsed : null;
 }
 
+function parsePositiveInt(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 function filterRequests(requests: LeaveRequestRecord[], filters: FilterState) {
   const selectedYear = parseYearValue(filters.year);
   const selectedMonth = parseMonthValue(filters.month);
@@ -141,6 +150,7 @@ function filterRequests(requests: LeaveRequestRecord[], filters: FilterState) {
 }
 
 export function MyLeaveClient() {
+  const searchParams = useSearchParams();
   const [requests, setRequests] = useState<LeaveRequestRecord[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeOption[]>([]);
   const [credit, setCredit] = useState<LeaveCredit | null>(null);
@@ -152,6 +162,9 @@ export function MyLeaveClient() {
     status: "all",
   });
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [highlightedLeaveId, setHighlightedLeaveId] = useState<number | null>(
+    null,
+  );
   const {
     register,
     handleSubmit,
@@ -220,6 +233,33 @@ export function MyLeaveClient() {
     () => filterRequests(requests, filters),
     [requests, filters],
   );
+  const deepLinkedLeaveId = parsePositiveInt(searchParams.get("leave_id"));
+
+  useEffect(() => {
+    if (!deepLinkedLeaveId) {
+      return;
+    }
+    const exists = filteredRequests.some(
+      (item) => item.id === deepLinkedLeaveId,
+    );
+    if (!exists) {
+      return;
+    }
+    setHighlightedLeaveId(deepLinkedLeaveId);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`leave-row-${deepLinkedLeaveId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedLeaveId((current) =>
+        current === deepLinkedLeaveId ? null : current,
+      );
+    }, 4000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [deepLinkedLeaveId, filteredRequests]);
 
   const canCreatePaidLeave = (credit?.remaining_credits ?? 0) > 0;
 
@@ -534,7 +574,14 @@ export function MyLeaveClient() {
                     </TableRow>
                   ) : (
                     filteredRequests.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow
+                        id={`leave-row-${item.id}`}
+                        key={item.id}
+                        className={cn(
+                          highlightedLeaveId === item.id &&
+                            "bg-primary/5 ring-1 ring-primary/40",
+                        )}
+                      >
                         <TableCell>{formatDate(item.leave_date)}</TableCell>
                         <TableCell>{leaveTypeLabel(item.leave_type)}</TableCell>
                         <TableCell>

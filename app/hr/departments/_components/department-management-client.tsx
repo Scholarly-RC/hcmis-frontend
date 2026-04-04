@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search, SquarePen, Trash2 } from "lucide-react";
+import { Plus, Save, Search, SquarePen, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 
@@ -376,7 +376,7 @@ export function DepartmentManagementClient() {
 
         <Button onClick={openCreateDialog} className="self-start">
           <Plus className="size-4" />
-          Add department
+          Add Department
         </Button>
       </section>
 
@@ -558,7 +558,7 @@ export function DepartmentManagementClient() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editorMode === "create" ? "Add department" : "Edit department"}
+              {editorMode === "create" ? "Add Department" : "Edit Department"}
             </DialogTitle>
             <DialogDescription>
               {editorMode === "create"
@@ -629,6 +629,7 @@ export function DepartmentManagementClient() {
               onClick={() => closeEditor(false)}
               disabled={isSaving}
             >
+              <X className="size-4" />
               Cancel
             </Button>
             <Button
@@ -636,6 +637,13 @@ export function DepartmentManagementClient() {
               onClick={() => void saveDepartment()}
               disabled={isSaving}
             >
+              {isSaving ? (
+                <Save className="size-4" />
+              ) : editorMode === "create" ? (
+                <Plus className="size-4" />
+              ) : (
+                <Save className="size-4" />
+              )}
               {isSaving
                 ? "Saving..."
                 : editorMode === "create"

@@ -39,6 +39,13 @@ export default function MyWorkflowsPage() {
               href: "/attendance",
               requiredCapabilities: ["view_attendance_self"],
             },
+            {
+              label: "My Overtime",
+              description:
+                "Submit overtime requests and track approval status.",
+              href: "/overtime",
+              requiredCapabilities: ["view_attendance_self"],
+            },
           ]}
         />
       )}

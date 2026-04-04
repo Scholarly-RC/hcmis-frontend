@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -32,7 +33,16 @@ type MyPayslipsClientProps = {
   user: AuthUser;
 };
 
+function parsePositiveInt(value: string | null) {
+  if (!value) {
+    return null;
+  }
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [payslips, setPayslips] = useState<PayrollPayslip[]>([]);
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -41,6 +51,11 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
   const [selectedPayslip, setSelectedPayslip] = useState<PayrollPayslip | null>(
     null,
   );
+  const [highlightedPayslipId, setHighlightedPayslipId] = useState<
+    number | null
+  >(null);
+  const handledDeepLinkPayslipIdRef = useRef<number | null>(null);
+  const deepLinkedPayslipId = parsePositiveInt(searchParams.get("payslip_id"));
 
   useEffect(() => {
     async function load() {
@@ -61,26 +76,57 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
     void load();
   }, [user.id]);
 
-  async function openSummary(payslipId: number) {
-    try {
-      setSummaryOpen(true);
-      setSummaryLoading(true);
-      setSelectedPayslip(
-        payslips.find((item) => item.id === payslipId) ?? null,
-      );
-      const payload = await requestJson<PayslipSummary>(
-        `/api/payroll/payslips/${payslipId}/summary`,
-      );
-      setSummary(payload);
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to load summary.",
-      );
-      setSummaryOpen(false);
-    } finally {
-      setSummaryLoading(false);
+  const openSummary = useCallback(
+    async (payslipId: number) => {
+      try {
+        setSummaryOpen(true);
+        setSummaryLoading(true);
+        setSelectedPayslip(
+          payslips.find((item) => item.id === payslipId) ?? null,
+        );
+        const payload = await requestJson<PayslipSummary>(
+          `/api/payroll/payslips/${payslipId}/summary`,
+        );
+        setSummary(payload);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Unable to load summary.",
+        );
+        setSummaryOpen(false);
+      } finally {
+        setSummaryLoading(false);
+      }
+    },
+    [payslips],
+  );
+
+  useEffect(() => {
+    if (!deepLinkedPayslipId || loading) {
+      return;
     }
-  }
+    const exists = payslips.some((item) => item.id === deepLinkedPayslipId);
+    if (!exists) {
+      return;
+    }
+    setHighlightedPayslipId(deepLinkedPayslipId);
+    requestAnimationFrame(() => {
+      document
+        .getElementById(`my-payslip-row-${deepLinkedPayslipId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    const timer = window.setTimeout(() => {
+      setHighlightedPayslipId((current) =>
+        current === deepLinkedPayslipId ? null : current,
+      );
+    }, 4000);
+    if (handledDeepLinkPayslipIdRef.current !== deepLinkedPayslipId) {
+      handledDeepLinkPayslipIdRef.current = deepLinkedPayslipId;
+      void openSummary(deepLinkedPayslipId);
+    }
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [deepLinkedPayslipId, loading, openSummary, payslips]);
 
   function downloadSummaryPdf() {
     if (!summary || !selectedPayslip) {
@@ -141,7 +187,15 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
               </TableRow>
             ) : (
               payslips.map((payslip) => (
-                <TableRow key={payslip.id}>
+                <TableRow
+                  id={`my-payslip-row-${payslip.id}`}
+                  key={payslip.id}
+                  className={
+                    highlightedPayslipId === payslip.id
+                      ? "bg-primary/5 ring-1 ring-primary/40"
+                      : undefined
+                  }
+                >
                   <TableCell>
                     {payslip.month ?? "-"} / {payslip.year ?? "-"}
                   </TableCell>
