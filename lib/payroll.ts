@@ -7,9 +7,38 @@ export type PayrollSetting = {
   basic_salary_multiplier: string;
   basic_salary_step_multiplier: string;
   basic_salary_steps: number;
-  max_job_rank: number;
+  max_position_rank: number;
   created_at: string;
   updated_at: string;
+};
+
+export type PayrollPolicyVersion = {
+  id: number;
+  policy_key: string;
+  version_label: string;
+  effective_from: string;
+  effective_to: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayrollPolicySource = {
+  id: number;
+  source_type: string;
+  reference_code: string;
+  source_url: string;
+  effective_from: string;
+  effective_to: string | null;
+  applied_by: string | null;
+  applied_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayrollPolicySourcesDetail = {
+  version: PayrollPolicyVersion;
+  sources: PayrollPolicySource[];
 };
 
 export type DeductionConfigData = {
@@ -46,7 +75,7 @@ export type Mp2Account = {
   users: AuthUser[];
 };
 
-export type PayrollJob = {
+export type PayrollPosition = {
   id: number;
   title: string;
   code: string;

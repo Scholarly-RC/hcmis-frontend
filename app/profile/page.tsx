@@ -259,7 +259,7 @@ export default function ProfilePage() {
                 />
                 <DetailGroup
                   title="Employment details"
-                  description="The information that defines your role and job record."
+                  description="The information that defines your role and position record."
                   items={employmentItems}
                 />
               </div>

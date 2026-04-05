@@ -5,14 +5,8 @@ import { proxyJson } from "@/app/api/_proxy";
 export async function GET(request: NextRequest) {
   const query = request.nextUrl.searchParams.toString();
   const pathname =
-    query.length > 0 ? `/payroll/jobs?${query}` : "/payroll/jobs";
+    query.length > 0
+      ? `/payroll/policy-versions?${query}`
+      : "/payroll/policy-versions";
   return proxyJson(request, pathname);
-}
-
-export async function POST(request: NextRequest) {
-  const body = await request.text();
-  return proxyJson(request, "/payroll/jobs", {
-    method: "POST",
-    body,
-  });
 }

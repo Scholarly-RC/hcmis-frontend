@@ -4,22 +4,22 @@ import { proxyJson } from "@/app/api/_proxy";
 
 type RouteContext = {
   params: Promise<{
-    job_id: string;
+    position_id: string;
   }>;
 };
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const { job_id } = await context.params;
+  const { position_id } = await context.params;
   const body = await request.text();
-  return proxyJson(request, `/payroll/jobs/${job_id}`, {
+  return proxyJson(request, `/payroll/positions/${position_id}`, {
     method: "PATCH",
     body,
   });
 }
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
-  const { job_id } = await context.params;
-  return proxyJson(request, `/payroll/jobs/${job_id}`, {
+  const { position_id } = await context.params;
+  return proxyJson(request, `/payroll/positions/${position_id}`, {
     method: "DELETE",
   });
 }

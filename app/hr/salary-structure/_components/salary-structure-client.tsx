@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +21,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { type PayrollJob, requestJson } from "@/lib/payroll";
+import { type PayrollPosition, requestJson } from "@/lib/payroll";
 import { toast } from "@/lib/toast";
 import type { AuthDepartment } from "@/types/auth";
 
-type JobForm = {
+type PositionForm = {
   title: string;
   code: string;
   salary_grade: string;
@@ -33,7 +33,7 @@ type JobForm = {
   is_active: boolean;
 };
 
-const emptyForm: JobForm = {
+const emptyForm: PositionForm = {
   title: "",
   code: "",
   salary_grade: "1",
@@ -42,72 +42,57 @@ const emptyForm: JobForm = {
 };
 
 export function SalaryStructureClient() {
-  const [jobs, setJobs] = useState<PayrollJob[]>([]);
+  const [positions, setPositions] = useState<PayrollPosition[]>([]);
   const [departments, setDepartments] = useState<AuthDepartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editingJobId, setEditingJobId] = useState<number | null>(null);
-  const [form, setForm] = useState<JobForm>(emptyForm);
+  const [editingPositionId, setEditingPositionId] = useState<number | null>(
+    null,
+  );
+  const [form, setForm] = useState<PositionForm>(emptyForm);
 
   const departmentMap = useMemo(
     () => new Map(departments.map((department) => [department.id, department])),
     [departments],
   );
 
-  async function reload() {
+  const reload = useCallback(async () => {
     try {
       setLoading(true);
-      const [jobList, departmentList] = await Promise.all([
-        requestJson<PayrollJob[]>("/api/payroll/jobs"),
+      const [positionList, departmentList] = await Promise.all([
+        requestJson<PayrollPosition[]>("/api/payroll/positions"),
         requestJson<AuthDepartment[]>("/api/departments"),
       ]);
-      setJobs(jobList);
+      setPositions(positionList);
       setDepartments(departmentList);
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Unable to load jobs.",
+        error instanceof Error ? error.message : "Unable to load positions.",
       );
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    async function loadInitialData() {
-      try {
-        setLoading(true);
-        const [jobList, departmentList] = await Promise.all([
-          requestJson<PayrollJob[]>("/api/payroll/jobs"),
-          requestJson<AuthDepartment[]>("/api/departments"),
-        ]);
-        setJobs(jobList);
-        setDepartments(departmentList);
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Unable to load jobs.",
-        );
-      } finally {
-        setLoading(false);
-      }
-    }
-    void loadInitialData();
   }, []);
 
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
   function openCreate() {
-    setEditingJobId(null);
+    setEditingPositionId(null);
     setForm(emptyForm);
     setDialogOpen(true);
   }
 
-  function openEdit(job: PayrollJob) {
-    setEditingJobId(job.id);
+  function openEdit(position: PayrollPosition) {
+    setEditingPositionId(position.id);
     setForm({
-      title: job.title,
-      code: job.code,
-      salary_grade: String(job.salary_grade),
-      department_ids: job.departments.map((department) => department.id),
-      is_active: job.is_active,
+      title: position.title,
+      code: position.code,
+      salary_grade: String(position.salary_grade),
+      department_ids: position.departments.map((department) => department.id),
+      is_active: position.is_active,
     });
     setDialogOpen(true);
   }
@@ -141,51 +126,61 @@ export function SalaryStructureClient() {
       };
 
       if (!payload.title || !payload.code || payload.salary_grade < 1) {
-        toast.error("Please fill valid job details.");
+        toast.error("Please fill valid position details.");
         return;
       }
 
-      if (editingJobId) {
-        await requestJson<PayrollJob>(`/api/payroll/jobs/${editingJobId}`, {
-          method: "PATCH",
-          body: JSON.stringify(payload),
-        });
-        toast.success("Job updated.");
+      if (editingPositionId) {
+        await requestJson<PayrollPosition>(
+          `/api/payroll/positions/${editingPositionId}`,
+          {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          },
+        );
+        toast.success("Position updated.");
       } else {
-        await requestJson<PayrollJob>("/api/payroll/jobs", {
+        await requestJson<PayrollPosition>("/api/payroll/positions", {
           method: "POST",
           body: JSON.stringify(payload),
         });
-        toast.success("Job created.");
+        toast.success("Position created.");
       }
       setDialogOpen(false);
       await reload();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Unable to save job.",
+        error instanceof Error ? error.message : "Unable to save position.",
       );
     } finally {
       setSaving(false);
     }
   }
 
-  async function deactivate(job: PayrollJob) {
+  async function deactivate(position: PayrollPosition) {
     try {
-      await requestJson<PayrollJob>(`/api/payroll/jobs/${job.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          title: job.title,
-          code: job.code,
-          salary_grade: job.salary_grade,
-          department_ids: job.departments.map((department) => department.id),
-          is_active: false,
-        }),
-      });
-      toast.success(`Job ${job.code} deactivated.`);
+      await requestJson<PayrollPosition>(
+        `/api/payroll/positions/${position.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            title: position.title,
+            code: position.code,
+            salary_grade: position.salary_grade,
+            department_ids: position.departments.map(
+              (department) => department.id,
+            ),
+            is_active: false,
+          }),
+        },
+      );
+      toast.success(`Position ${position.code} deactivated.`);
       await reload();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Unable to deactivate job.",
+        error instanceof Error
+          ? error.message
+          : "Unable to deactivate position.",
       );
     }
   }
@@ -196,10 +191,10 @@ export function SalaryStructureClient() {
         <div>
           <h1 className="text-2xl font-semibold">Salary Structure</h1>
           <p className="text-sm text-muted-foreground">
-            Manage job codes, salary grades, and department assignment.
+            Manage position codes, salary grades, and department assignment.
           </p>
         </div>
-        <Button onClick={openCreate}>Add Job</Button>
+        <Button onClick={openCreate}>Add Position</Button>
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -217,37 +212,39 @@ export function SalaryStructureClient() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6}>Loading jobs...</TableCell>
+                <TableCell colSpan={6}>Loading positions...</TableCell>
               </TableRow>
-            ) : jobs.length === 0 ? (
+            ) : positions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6}>No jobs configured yet.</TableCell>
+                <TableCell colSpan={6}>No positions configured yet.</TableCell>
               </TableRow>
             ) : (
-              jobs.map((job) => (
-                <TableRow key={job.id}>
-                  <TableCell>{job.code}</TableCell>
-                  <TableCell>{job.title}</TableCell>
-                  <TableCell>{job.salary_grade}</TableCell>
+              positions.map((position) => (
+                <TableRow key={position.id}>
+                  <TableCell>{position.code}</TableCell>
+                  <TableCell>{position.title}</TableCell>
+                  <TableCell>{position.salary_grade}</TableCell>
                   <TableCell>
-                    {job.departments
+                    {position.departments
                       .map((department) => department.name)
                       .join(", ") || "-"}
                   </TableCell>
-                  <TableCell>{job.is_active ? "Active" : "Inactive"}</TableCell>
+                  <TableCell>
+                    {position.is_active ? "Active" : "Inactive"}
+                  </TableCell>
                   <TableCell className="space-x-2 text-right">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => openEdit(job)}
+                      onClick={() => openEdit(position)}
                     >
                       Edit
                     </Button>
-                    {job.is_active ? (
+                    {position.is_active ? (
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => void deactivate(job)}
+                        onClick={() => void deactivate(position)}
                       >
                         Deactivate
                       </Button>
@@ -263,17 +260,19 @@ export function SalaryStructureClient() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingJobId ? "Edit Job" : "Add Job"}</DialogTitle>
+            <DialogTitle>
+              {editingPositionId ? "Edit Position" : "Add Position"}
+            </DialogTitle>
             <DialogDescription>
-              Define job code, salary grade, and department mapping.
+              Define position code, salary grade, and department mapping.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="job_title">Title</Label>
+              <Label htmlFor="position_title">Title</Label>
               <Input
-                id="job_title"
+                id="position_title"
                 value={form.title}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -284,9 +283,9 @@ export function SalaryStructureClient() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="job_code">Code</Label>
+              <Label htmlFor="position_code">Code</Label>
               <Input
-                id="job_code"
+                id="position_code"
                 value={form.code}
                 onChange={(event) =>
                   setForm((current) => ({

@@ -6,7 +6,7 @@ import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
   title: "Salary Structure",
-  description: "Manage jobs, salary grades, and department mappings",
+  description: "Manage positions, salary grades, and department mappings",
 };
 
 export default function SalaryStructurePage() {
