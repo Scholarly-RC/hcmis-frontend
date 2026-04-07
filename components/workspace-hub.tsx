@@ -1,9 +1,8 @@
-import { ArrowRight } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -14,6 +13,7 @@ import { can } from "@/utils/capabilities";
 type WorkspaceHubItem = {
   label: string;
   description: string;
+  icon?: LucideIcon;
   href?: string;
   requiredCapabilities?: string[];
   status?: "active" | "coming_soon";
@@ -67,11 +67,19 @@ export function WorkspaceHub({
           {visibleItems.map((item) => {
             const isComingSoon = item.status === "coming_soon";
             const key = `${item.label}-${item.href ?? "soon"}`;
+            const Icon = item.icon;
 
             const content = (
-              <>
-                <CardHeader className="space-y-2">
-                  <div className="flex items-center justify-between gap-3">
+              <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-4">
+                {Icon ? (
+                  <span className="inline-flex size-16 items-center justify-center rounded-3xl border border-border/70 bg-muted/60 text-foreground transition-colors group-hover:border-primary/30 group-hover:bg-primary/10 group-hover:text-primary">
+                    <Icon className="size-8" />
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <div className="min-w-0 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
                     <CardTitle className="text-base">{item.label}</CardTitle>
                     {isComingSoon ? (
                       <Badge
@@ -83,20 +91,14 @@ export function WorkspaceHub({
                     ) : null}
                   </div>
                   <CardDescription>{item.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0 text-sm font-medium text-primary">
-                  {isComingSoon ? "Not yet available" : "Open module"}
-                  {!isComingSoon ? (
-                    <ArrowRight className="ml-1 inline size-4" />
-                  ) : null}
-                </CardContent>
-              </>
+                </div>
+              </div>
             );
 
             if (item.href && !isComingSoon) {
               return (
                 <Link key={key} href={item.href} className="group">
-                  <Card className="h-full border-border/70 bg-card/85 transition-colors group-hover:border-primary/40">
+                  <Card className="h-full border-border/70 bg-card/85 p-5 transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-primary/40 group-hover:shadow-lg group-hover:shadow-primary/5 sm:p-6">
                     {content}
                   </Card>
                 </Link>
@@ -107,7 +109,7 @@ export function WorkspaceHub({
               <Card
                 key={key}
                 aria-disabled="true"
-                className="h-full border-dashed border-border/70 bg-muted/20 opacity-85"
+                className="h-full border-dashed border-border/70 bg-muted/20 p-5 opacity-85 sm:p-6"
               >
                 {content}
               </Card>

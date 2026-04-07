@@ -78,7 +78,7 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md border-border/80 bg-[linear-gradient(160deg,color-mix(in_oklab,var(--color-card)_97%,white)_0%,color-mix(in_oklab,var(--color-muted)_40%,white)_100%)] py-0 shadow-[0_30px_70px_-40px_color-mix(in_oklab,var(--color-primary)_40%,transparent)] backdrop-blur">
+    <Card className="w-full max-w-md border-border/80 bg-card py-0 shadow-[0_30px_70px_-40px_rgba(15,23,42,0.22)] backdrop-blur-sm dark:border-white/12 dark:bg-card dark:shadow-[0_36px_90px_-54px_rgba(0,0,0,0.9)]">
       <CardHeader className="space-y-2 border-b border-border/60 pb-5 pt-5">
         <CardTitle className="text-3xl tracking-tight">Sign In</CardTitle>
         <CardDescription className="text-sm">
@@ -96,7 +96,7 @@ export function LoginForm() {
               type="email"
               autoComplete="email"
               placeholder="name@hcmis.org"
-              className="h-10 rounded-xl border-border/80 bg-muted/30 text-base transition-all duration-200 focus-visible:border-primary/30 focus-visible:ring-primary/20 md:text-sm"
+              className="h-10 rounded-xl border-border/80 bg-muted/30 text-base transition-all duration-200 focus-visible:border-primary/30 focus-visible:ring-primary/20 dark:bg-background/40 dark:hover:bg-background/55 md:text-sm"
               disabled={isSubmitting}
               aria-invalid={errors.email ? "true" : "false"}
               {...register("email")}
@@ -118,7 +118,7 @@ export function LoginForm() {
                 type={isPasswordVisible ? "text" : "password"}
                 autoComplete="current-password"
                 placeholder="••••••••"
-                className="h-10 rounded-xl border-border/80 bg-muted/30 pr-11 text-base transition-all duration-200 focus-visible:border-primary/30 focus-visible:ring-primary/20 md:text-sm"
+                className="h-10 rounded-xl border-border/80 bg-muted/30 pr-11 text-base transition-all duration-200 focus-visible:border-primary/30 focus-visible:ring-primary/20 dark:bg-background/40 dark:hover:bg-background/55 md:text-sm"
                 disabled={isSubmitting}
                 aria-invalid={errors.password ? "true" : "false"}
                 {...register("password")}
@@ -155,7 +155,7 @@ export function LoginForm() {
           ) : null}
 
           <Button
-            className="h-11 w-full rounded-xl bg-[linear-gradient(135deg,var(--color-primary),color-mix(in_oklab,var(--color-primary)_68%,white))] text-primary-foreground shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5"
+            className="h-11 w-full rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 transition-transform duration-200 hover:-translate-y-0.5 hover:bg-primary/90 dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary/90"
             size="lg"
             type="submit"
             disabled={isSubmitting}

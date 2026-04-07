@@ -1,6 +1,12 @@
 export type SharedResourceRecord = {
   id: number;
   uploader_id: string;
+  uploader: {
+    id: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+  } | null;
   resource_name: string;
   description: string | null;
   original_filename: string;

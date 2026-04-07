@@ -16,7 +16,14 @@ export default function SharedResourcesPage() {
         if (!isStaff(user)) {
           redirect("/dashboard");
         }
-        return <SharedResourcesClient />;
+        return (
+          <SharedResourcesClient
+            currentUserId={user.id}
+            canManageAll={true}
+            title="Shared Resources Management"
+            pageDescription="Upload files and maintain shared access resources for teams."
+          />
+        );
       }}
     </DashboardPageFrame>
   );

@@ -91,7 +91,7 @@ export function ProfileHeader({
               onError={() => setImageFailed(true)}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-primary/80 to-foreground/80 text-2xl font-semibold text-primary-foreground">
+            <div className="flex h-full w-full items-center justify-center bg-primary text-2xl font-semibold text-primary-foreground">
               {initials}
             </div>
           )}

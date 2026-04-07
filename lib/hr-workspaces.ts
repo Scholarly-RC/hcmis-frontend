@@ -1,6 +1,25 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  BadgeDollarSign,
+  CalendarClock,
+  CalendarRange,
+  ClipboardCheck,
+  FileBarChart,
+  FileCog,
+  FileSearch,
+  FileSpreadsheet,
+  Files,
+  Megaphone,
+  ReceiptText,
+  Scale,
+  Timer,
+  Vote,
+} from "lucide-react";
+
 export type WorkspaceItem = {
   label: string;
   description: string;
+  icon?: LucideIcon;
   href: string;
   keywords?: string[];
   requiredCapabilities?: string[];
@@ -52,6 +71,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
       {
         label: "Shift Management",
         description: "Configure shift templates and department shift policies.",
+        icon: CalendarClock,
         href: "/hr/shift-management",
         keywords: ["shift", "schedule", "templates", "policies"],
         requiredCapabilities: ["manage_shift_templates"],
@@ -60,6 +80,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         label: "User Attendance Management",
         description:
           "Review and update employee attendance records and assignments.",
+        icon: ClipboardCheck,
         href: "/hr/user-attendance-management",
         keywords: ["attendance records", "employee attendance", "assignments"],
         requiredCapabilities: ["manage_attendance_records"],
@@ -67,6 +88,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
       {
         label: "Overtime Management",
         description: "Review and resolve overtime requests.",
+        icon: Timer,
         href: "/hr/overtime-management",
         keywords: ["overtime", "extra hours", "ot requests"],
         requiredCapabilities: ["manage_overtime_requests"],
@@ -76,7 +98,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
   payroll: {
     title: "Payroll",
     description:
-      "Manage salary structures, payroll configuration, and payslip release.",
+      "Set up salary rules, prepare payslips, and release employee payroll.",
     sidebar: {
       label: "Payroll",
       href: "/hr/payroll",
@@ -89,20 +111,43 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         label: "Salary Structure",
         description:
           "Manage positions, salary grades, and department mappings.",
+        icon: BadgeDollarSign,
         href: "/hr/salary-structure",
         keywords: ["positions", "salary grade", "mapping"],
         requiredCapabilities: ["manage_salary_structure"],
       },
       {
         label: "Payslip Management",
-        description: "Generate, review, and release payroll payslip records.",
+        description:
+          "Create payslips, review the payroll breakdown, and release them when ready.",
+        icon: ReceiptText,
         href: "/hr/payslips",
         keywords: ["payslip", "release", "payroll records"],
         requiredCapabilities: ["manage_payslips"],
       },
       {
-        label: "Payroll Settings",
-        description: "Configure deductions, payroll rules, and MP2 settings.",
+        label: "Payroll Run Inputs",
+        description:
+          "Encode variable earnings and deductions, then validate and approve payroll runs.",
+        icon: FileSpreadsheet,
+        href: "/hr/payroll-run-inputs",
+        keywords: ["variable pay", "deduction", "payroll run", "adjustments"],
+        requiredCapabilities: ["manage_payslips"],
+      },
+      {
+        label: "Payroll Item Types",
+        description:
+          "Manage the earning and deduction definitions used by payroll runs.",
+        icon: FileCog,
+        href: "/hr/payroll-item-types",
+        keywords: ["payroll items", "earnings", "deductions", "catalog"],
+        requiredCapabilities: ["manage_payroll_settings"],
+      },
+      {
+        label: "Payroll Rules And Deductions",
+        description:
+          "Maintain statutory payroll rules, legal references, and MP2 membership settings.",
+        icon: Scale,
         href: "/hr/payroll-settings",
         keywords: ["deductions", "mp2", "rules"],
         requiredCapabilities: ["manage_payroll_settings"],
@@ -125,6 +170,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         label: "Performance Evaluations",
         description:
           "Manage HR evaluation cycles and peer/self evaluation workflows.",
+        icon: Vote,
         href: "/performance-evaluations",
         keywords: ["evaluation", "peer review", "self review"],
         requiredCapabilities: ["access_hr_workspace"],
@@ -133,6 +179,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         label: "Announcements and Polls",
         description:
           "Publish announcements and run company participation polls.",
+        icon: Megaphone,
         href: "/announcements-and-polls",
         keywords: ["announcement", "poll", "engagement"],
         requiredCapabilities: ["manage_announcements_polls"],
@@ -140,6 +187,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
       {
         label: "Shared Resources",
         description: "Upload and manage shared resource documents for staff.",
+        icon: Files,
         href: "/hr/shared-resources",
         keywords: ["resources", "documents", "uploads"],
         requiredCapabilities: ["manage_shared_resources"],
@@ -161,6 +209,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         label: "Leave Management",
         description:
           "Manage leave approvers, balances, and department leave controls.",
+        icon: CalendarRange,
         href: "/hr/leave-management",
         keywords: ["leave balances", "leave approvals", "leave approvers"],
         requiredCapabilities: ["manage_leave_requests"],
@@ -169,6 +218,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         label: "Leave Review Inbox",
         description:
           "Review and decide leave requests assigned to your account.",
+        icon: ClipboardCheck,
         href: "/leave/inbox",
         keywords: ["leave inbox", "pending leave", "review requests"],
         requiredCapabilities: ["manage_leave_requests"],
@@ -189,6 +239,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
       {
         label: "Reports and Analytics",
         description: "Generate HR and operational reports from backend data.",
+        icon: FileBarChart,
         href: "/hr/reports",
         keywords: ["reports", "analytics", "exports"],
         requiredCapabilities: ["view_reports"],
@@ -196,6 +247,7 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
       {
         label: "App Logs",
         description: "Inspect application logs by user and timeline.",
+        icon: FileSearch,
         href: "/hr/app-logs",
         keywords: ["audit", "activity", "logs"],
         requiredCapabilities: ["view_app_logs"],

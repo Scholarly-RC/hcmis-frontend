@@ -141,9 +141,54 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
         monthYear: `${selectedPayslip.month ?? "-"} / ${selectedPayslip.year ?? "-"}`,
         period: selectedPayslip.period ?? "-",
         rank: selectedPayslip.rank ?? "-",
+        status: selectedPayslip.released ? "Released" : "Draft",
+        basePay: toNumber(summary.salary).toFixed(2),
         grossPay: toNumber(summary.gross_pay).toFixed(2),
         totalDeductions: toNumber(summary.total_deductions).toFixed(2),
         netSalary: toNumber(summary.net_salary).toFixed(2),
+        earnings: [
+          {
+            label: "Base Pay",
+            amount: toNumber(summary.salary).toFixed(2),
+          },
+          ...summary.compensations.map((item) => ({
+            label: item.name,
+            amount: toNumber(item.amount).toFixed(2),
+            note: "Fixed compensation",
+          })),
+          ...summary.variable_compensations.map((item) => ({
+            label: item.name,
+            amount: toNumber(item.amount).toFixed(2),
+            note: "Variable compensation",
+          })),
+        ],
+        deductions: [
+          {
+            label: "SSS",
+            amount: toNumber(summary.sss_deduction).toFixed(2),
+          },
+          {
+            label: "PhilHealth",
+            amount: toNumber(summary.philhealth_deduction).toFixed(2),
+          },
+          {
+            label: "Pag-IBIG",
+            amount: toNumber(summary.pag_ibig_deduction).toFixed(2),
+          },
+          {
+            label: "MP2",
+            amount: toNumber(summary.mp2_deduction).toFixed(2),
+          },
+          {
+            label: "Tax",
+            amount: toNumber(summary.tax_deduction).toFixed(2),
+          },
+          ...summary.variable_deductions.map((item) => ({
+            label: item.name,
+            amount: toNumber(item.amount).toFixed(2),
+            note: "Variable deduction",
+          })),
+        ],
       });
     } catch (error) {
       toast.error(

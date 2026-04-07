@@ -10,10 +10,14 @@ test("reports page can run multiple report actions", async ({ page }) => {
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Daily Staffing" }).click();
-  await expect(page.locator("pre")).not.toContainText("No report output yet.");
+  await expect(
+    page.getByRole("heading", { name: "Department Staffing" }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Yearly Payroll Expense" }).click();
-  await expect(page.locator("pre")).toContainText("selected_year");
+  await expect(
+    page.getByRole("heading", { name: "Monthly Payroll Trend" }),
+  ).toBeVisible();
 
   await logout(page);
 });
