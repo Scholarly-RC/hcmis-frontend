@@ -93,6 +93,14 @@ function truncateText(value: string, maxLength: number) {
   return `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
 }
 
+function itemTypeLabel(itemType: "announcement" | "poll") {
+  return itemType === "announcement" ? "Announcement" : "Poll";
+}
+
+function itemTypeAccentClasses(_itemType: "announcement" | "poll") {
+  return "border-border/70 bg-card";
+}
+
 function parsePositiveInt(value: string | null) {
   if (!value) {
     return null;
@@ -104,7 +112,6 @@ function parsePositiveInt(value: string | null) {
 export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>("all");
   const [feed, setFeed] = useState<FeedItemRecord[]>([]);
 
@@ -141,35 +148,27 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
   );
   const deepLinkedPollId = parsePositiveInt(searchParams.get("poll_id"));
 
-  const loadFeed = useCallback(
-    async (nextFilter: FilterType, showSpinner: boolean) => {
-      if (showSpinner) {
-        setRefreshing(true);
-      }
-
-      try {
-        const query =
-          nextFilter === "all"
-            ? ""
-            : `?item_type=${encodeURIComponent(nextFilter)}`;
-        const data = await requestJson<FeedItemRecord[]>(
-          `/api/performance/feed${query}`,
-        );
-        setFeed(data);
-      } catch (error) {
-        toast.error(
-          error instanceof Error ? error.message : "Unable to load feed.",
-        );
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    },
-    [],
-  );
+  const loadFeed = useCallback(async (nextFilter: FilterType) => {
+    try {
+      const query =
+        nextFilter === "all"
+          ? ""
+          : `?item_type=${encodeURIComponent(nextFilter)}`;
+      const data = await requestJson<FeedItemRecord[]>(
+        `/api/performance/feed${query}`,
+      );
+      setFeed(data);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to load feed.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    void loadFeed(filter, false);
+    void loadFeed(filter);
   }, [filter, loadFeed]);
 
   useEffect(() => {
@@ -280,7 +279,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
           ? "Announcement published."
           : "Announcement draft created.",
       );
-      await loadFeed(filter, true);
+      await loadFeed(filter);
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -336,7 +335,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
       setPollChoices(["", ""]);
       setPollModalOpen(false);
       toast.success(shouldPublish ? "Poll published." : "Poll draft created.");
-      await loadFeed(filter, true);
+      await loadFeed(filter);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to create poll.",
@@ -397,7 +396,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
         draft: "Announcement moved back to draft.",
       } as const;
       toast.success(messageByAction[action]);
-      await loadFeed(filter, true);
+      await loadFeed(filter);
       if (archivedModalOpen) {
         await loadArchivedItems();
       }
@@ -410,7 +409,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
 
   async function runPollAction(
     id: number,
-    action: "publish" | "close" | "archive" | "unarchive",
+    action: "publish" | "close" | "reopen" | "archive" | "unarchive",
   ) {
     setActionItemId(id);
     try {
@@ -420,11 +419,12 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
       const messageByAction = {
         publish: "Poll published.",
         close: "Poll closed.",
+        reopen: "Poll reopened.",
         archive: "Poll archived.",
         unarchive: "Poll restored.",
       } as const;
       toast.success(messageByAction[action]);
-      await loadFeed(filter, true);
+      await loadFeed(filter);
       if (archivedModalOpen) {
         await loadArchivedItems();
       }
@@ -471,12 +471,30 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
       const payload: PollVotePayload = {
         choice_ids: selectedChoiceIds,
       };
-      await requestJson(`/api/performance/polls/${poll.id}/votes`, {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      const updatedPoll = await requestJson<PollRecord>(
+        `/api/performance/polls/${poll.id}/votes`,
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        },
+      );
+      setFeed((current) =>
+        current.map((item) =>
+          item.item_type === "poll" && item.poll?.id === updatedPoll.id
+            ? { ...item, poll: updatedPoll }
+            : item,
+        ),
+      );
+      setPreviewItem((current) =>
+        current?.item_type === "poll" && current.poll?.id === updatedPoll.id
+          ? { ...current, poll: updatedPoll }
+          : current,
+      );
+      setVoteSelectionByPoll((current) => ({
+        ...current,
+        [updatedPoll.id]: updatedPoll.user_vote_choice_ids,
+      }));
       toast.success("Vote submitted.");
-      await loadFeed(filter, true);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Unable to submit vote.",
@@ -490,6 +508,8 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
     previewItem?.item_type === "announcement" ? previewItem.announcement : null;
   const previewPoll =
     previewItem?.item_type === "poll" ? previewItem.poll : null;
+  const previewPollHasSubmittedVote =
+    previewPoll !== null && previewPoll.user_vote_choice_ids.length > 0;
   const showAnnouncementCreate = filter !== "poll";
   const showPollCreate = filter !== "announcement";
 
@@ -500,44 +520,61 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
   }, [archivedModalOpen, loadArchivedItems]);
 
   return (
-    <div className="flex w-full flex-col gap-6">
-      <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
-            <CardTitle>Announcements and Polls</CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {feedCountLabel}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={filter === "all" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilter("all")}
-            >
-              All
-            </Button>
-            <Button
-              variant={filter === "announcement" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilter("announcement")}
-            >
-              Announcements
-            </Button>
-            <Button
-              variant={filter === "poll" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setFilter("poll")}
-            >
-              Polls
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void loadFeed(filter, true)}
-            >
-              Refresh
-            </Button>
+    <div className="flex w-full flex-col gap-5">
+      <Card className="overflow-hidden border-border/70 bg-card shadow-lg shadow-black/5">
+        <CardHeader className="gap-4 border-b border-border/60 pb-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1 text-[11px] font-medium tracking-[0.18em] text-muted-foreground uppercase">
+                <Megaphone className="size-3.5" />
+                Workspace Bulletin
+              </div>
+              <div className="space-y-1.5">
+                <CardTitle className="text-xl tracking-tight sm:text-2xl">
+                  Announcements and Polls
+                </CardTitle>
+                <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+                  Follow published announcements, scan active polls, and open
+                  items without digging through notifications.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <div className="rounded-full border border-border/60 bg-background/75 px-3 py-1.5">
+                  {feedCountLabel}
+                </div>
+                <div className="rounded-full border border-border/60 bg-background/75 px-3 py-1.5">
+                  {filter === "all"
+                    ? "Showing all updates"
+                    : `Filtered to ${filter}s`}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 self-start rounded-2xl border border-border/60 bg-background/70 p-1.5">
+              <Button
+                variant={filter === "all" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-xl"
+                onClick={() => setFilter("all")}
+              >
+                All
+              </Button>
+              <Button
+                variant={filter === "announcement" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-xl"
+                onClick={() => setFilter("announcement")}
+              >
+                Announcements
+              </Button>
+              <Button
+                variant={filter === "poll" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-xl"
+                onClick={() => setFilter("poll")}
+              >
+                Polls
+              </Button>
+            </div>
           </div>
         </CardHeader>
       </Card>
@@ -706,8 +743,8 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
         </section>
       ) : null}
 
-      <section className="space-y-4">
-        {loading || refreshing ? (
+      <section className="space-y-3">
+        {loading ? (
           <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
             <CardContent className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin" />
@@ -738,38 +775,67 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                 key={`announcement-${announcement.id}`}
                 className={
                   highlightedItemKey === `announcement-${announcement.id}`
-                    ? "border-border/70 bg-card/85 shadow-lg shadow-black/5 ring-1 ring-primary/40"
-                    : "border-border/70 bg-card/85 shadow-lg shadow-black/5"
+                    ? `shadow-lg shadow-black/5 ring-1 ring-border ${itemTypeAccentClasses("announcement")}`
+                    : `shadow-md shadow-black/5 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg ${itemTypeAccentClasses("announcement")}`
                 }
               >
-                <CardHeader className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <CardTitle className="text-lg">
-                      {announcement.title}
-                    </CardTitle>
-                    <Badge variant={statusVariant(announcement.status)}>
+                <CardHeader className="space-y-3 pb-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-3">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                        <Megaphone className="size-3.5" />
+                        {itemTypeLabel("announcement")}
+                      </div>
+                      <CardTitle className="max-w-3xl text-lg tracking-tight sm:text-xl">
+                        {announcement.title}
+                      </CardTitle>
+                    </div>
+                    <Badge
+                      variant={statusVariant(announcement.status)}
+                      className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]"
+                    >
                       {announcement.status}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {announcement.status === "published"
-                      ? `Published ${formatDate(announcement.published_at)}`
-                      : `Created ${formatDate(announcement.created_at)}`}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                    <span>
+                      {announcement.status === "published"
+                        ? `Published ${formatDate(announcement.published_at)}`
+                        : `Created ${formatDate(announcement.created_at)}`}
+                    </span>
+                    {announcement.summary ? (
+                      <span className="rounded-full bg-background/80 px-2.5 py-1">
+                        Summary Available
+                      </span>
+                    ) : null}
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-3 pt-0">
-                  <p className="text-sm text-muted-foreground">{previewText}</p>
-                  <div className="flex flex-wrap gap-2">
+                <CardContent className="space-y-4 pt-0">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                    <div className="space-y-3">
+                      {announcement.summary ? (
+                        <p className="max-w-3xl text-sm font-medium leading-6 text-foreground/85">
+                          {announcement.summary}
+                        </p>
+                      ) : null}
+                      <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                        {previewText}
+                      </p>
+                    </div>
                     <Button
                       size="sm"
                       variant="outline"
+                      className="rounded-xl bg-background/80"
                       onClick={() => setPreviewItem(item)}
                     >
-                      Preview
+                      Read Notice
                     </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 border-t border-border/60 pt-3">
                     {isStaff && announcement.status === "draft" ? (
                       <Button
                         size="sm"
+                        className="rounded-xl"
                         disabled={actionItemId === announcement.id}
                         onClick={() =>
                           void runAnnouncementAction(announcement.id, "publish")
@@ -782,6 +848,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       <Button
                         size="sm"
                         variant="outline"
+                        className="rounded-xl bg-background/80"
                         disabled={actionItemId === announcement.id}
                         onClick={() =>
                           void runAnnouncementAction(announcement.id, "draft")
@@ -795,6 +862,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       <Button
                         size="sm"
                         variant="destructive"
+                        className="rounded-xl"
                         disabled={actionItemId === announcement.id}
                         onClick={() =>
                           void runAnnouncementAction(announcement.id, "archive")
@@ -822,46 +890,70 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                 key={`poll-${poll.id}`}
                 className={
                   highlightedItemKey === `poll-${poll.id}`
-                    ? "border-border/70 bg-card/85 shadow-lg shadow-black/5 ring-1 ring-primary/40"
-                    : "border-border/70 bg-card/85 shadow-lg shadow-black/5"
+                    ? `shadow-lg shadow-black/5 ring-1 ring-border ${itemTypeAccentClasses("poll")}`
+                    : `shadow-md shadow-black/5 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg ${itemTypeAccentClasses("poll")}`
                 }
               >
-                <CardHeader className="space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <CardTitle className="text-lg">{poll.question}</CardTitle>
-                    <Badge variant={statusVariant(poll.status)}>
+                <CardHeader className="space-y-3 pb-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-3">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                        <Vote className="size-3.5" />
+                        {itemTypeLabel("poll")}
+                      </div>
+                      <CardTitle className="max-w-3xl text-lg tracking-tight sm:text-xl">
+                        {poll.question}
+                      </CardTitle>
+                    </div>
+                    <Badge
+                      variant={statusVariant(poll.status)}
+                      className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]"
+                    >
                       {poll.status}
                     </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {poll.status === "published"
-                      ? `Published ${formatDate(poll.published_at)}`
-                      : `Created ${formatDate(poll.created_at)}`}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                    <span>
+                      {poll.status === "published"
+                        ? `Published ${formatDate(poll.published_at)}`
+                        : `Created ${formatDate(poll.created_at)}`}
+                    </span>
+                    <span className="rounded-full bg-background/80 px-2.5 py-1">
+                      {poll.choices.length} choice
+                      {poll.choices.length === 1 ? "" : "s"}
+                    </span>
+                    <span className="rounded-full bg-background/80 px-2.5 py-1">
+                      {totalVotes} total vote{totalVotes === 1 ? "" : "s"}
+                    </span>
+                  </div>
                 </CardHeader>
-                <CardContent className="space-y-3 pt-0">
-                  <p className="text-sm text-muted-foreground">
-                    {truncateText(
-                      poll.description ?? "No description provided.",
-                      160,
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {poll.choices.length} choice
-                    {poll.choices.length === 1 ? "" : "s"} | Total votes:{" "}
-                    {totalVotes}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
+                <CardContent className="space-y-4 pt-0">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                    <div className="space-y-3">
+                      <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+                        {truncateText(
+                          poll.description ??
+                            "Open the poll to review choices and cast a vote.",
+                          180,
+                        )}
+                      </p>
+                    </div>
                     <Button
                       size="sm"
                       variant="outline"
+                      className="rounded-xl bg-background/80"
                       onClick={() => setPreviewItem(item)}
                     >
-                      Preview
+                      {poll.status === "published"
+                        ? "Participate"
+                        : "View Poll"}
                     </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2 border-t border-border/60 pt-3">
                     {isStaff && poll.status === "draft" ? (
                       <Button
                         size="sm"
+                        className="rounded-xl"
                         disabled={actionItemId === poll.id}
                         onClick={() => void runPollAction(poll.id, "publish")}
                       >
@@ -872,16 +964,29 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       <Button
                         size="sm"
                         variant="outline"
+                        className="rounded-xl bg-background/80"
                         disabled={actionItemId === poll.id}
                         onClick={() => void runPollAction(poll.id, "close")}
                       >
                         Close
                       </Button>
                     ) : null}
+                    {isStaff && poll.status === "closed" ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-xl bg-background/80"
+                        disabled={actionItemId === poll.id}
+                        onClick={() => void runPollAction(poll.id, "reopen")}
+                      >
+                        Reopen
+                      </Button>
+                    ) : null}
                     {isStaff && poll.status !== "archived" ? (
                       <Button
                         size="sm"
                         variant="destructive"
+                        className="rounded-xl"
                         disabled={actionItemId === poll.id}
                         onClick={() => void runPollAction(poll.id, "archive")}
                       >
@@ -1005,35 +1110,61 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
           }
         }}
       >
-        <DialogContent className="max-h-[90vh] w-[min(96vw,52rem)] !max-w-4xl overflow-y-auto">
+        <DialogContent className="max-h-[90vh] w-[min(96vw,52rem)] !max-w-4xl overflow-y-auto border-border/70 bg-background p-0 shadow-2xl shadow-black/10">
           {previewAnnouncement ? (
             <>
-              <DialogHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <DialogTitle>{previewAnnouncement.title}</DialogTitle>
-                  <Badge variant={statusVariant(previewAnnouncement.status)}>
+              <DialogHeader className="gap-4 border-b border-border/60 px-5 py-5 sm:px-6 sm:py-6">
+                <div className="flex flex-wrap items-start justify-between gap-4 pr-10">
+                  <div className="space-y-3">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                      <Megaphone className="size-3.5" />
+                      Announcement
+                    </div>
+                    <DialogTitle className="max-w-3xl text-xl leading-tight tracking-tight sm:text-2xl">
+                      {previewAnnouncement.title}
+                    </DialogTitle>
+                  </div>
+                  <Badge
+                    variant={statusVariant(previewAnnouncement.status)}
+                    className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]"
+                  >
                     {previewAnnouncement.status}
                   </Badge>
                 </div>
-                <DialogDescription>
-                  {previewAnnouncement.status === "published"
-                    ? `Published ${formatDate(previewAnnouncement.published_at)}`
-                    : `Created ${formatDate(previewAnnouncement.created_at)}`}
+                <DialogDescription className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                  <span>
+                    {previewAnnouncement.status === "published"
+                      ? `Published ${formatDate(previewAnnouncement.published_at)}`
+                      : `Created ${formatDate(previewAnnouncement.created_at)}`}
+                  </span>
                 </DialogDescription>
               </DialogHeader>
-              {previewAnnouncement.summary ? (
-                <p className="text-sm text-muted-foreground">
-                  {previewAnnouncement.summary}
-                </p>
-              ) : null}
-              <p className="text-sm leading-6 whitespace-pre-wrap">
-                {previewAnnouncement.content}
-              </p>
+              <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+                {previewAnnouncement.summary ? (
+                  <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                    <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                      Summary
+                    </p>
+                    <p className="mt-1.5 text-sm leading-6 text-foreground/85">
+                      {previewAnnouncement.summary}
+                    </p>
+                  </div>
+                ) : null}
+                <div className="rounded-xl border border-border/60 bg-background/78 p-3 sm:p-4">
+                  <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                    Full Notice
+                  </p>
+                  <p className="mt-2 text-sm leading-6 whitespace-pre-wrap">
+                    {previewAnnouncement.content}
+                  </p>
+                </div>
+              </div>
               {isStaff ? (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 border-t border-border/60 px-5 py-4 sm:px-6">
                   {previewAnnouncement.status === "draft" ? (
                     <Button
                       size="sm"
+                      className="rounded-xl"
                       disabled={actionItemId === previewAnnouncement.id}
                       onClick={() =>
                         void runAnnouncementAction(
@@ -1049,6 +1180,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="rounded-xl bg-background/80"
                       disabled={actionItemId === previewAnnouncement.id}
                       onClick={() =>
                         void runAnnouncementAction(
@@ -1065,6 +1197,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                     <Button
                       size="sm"
                       variant="destructive"
+                      className="rounded-xl"
                       disabled={actionItemId === previewAnnouncement.id}
                       onClick={() =>
                         void runAnnouncementAction(
@@ -1083,135 +1216,186 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
 
           {previewPoll ? (
             <>
-              <DialogHeader>
-                <div className="flex items-center justify-between gap-3">
-                  <DialogTitle>{previewPoll.question}</DialogTitle>
-                  <Badge variant={statusVariant(previewPoll.status)}>
+              <DialogHeader className="gap-4 border-b border-border/60 px-5 py-5 sm:px-6 sm:py-6">
+                <div className="flex flex-wrap items-start justify-between gap-4 pr-10">
+                  <div className="space-y-3">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/80 px-2.5 py-1 text-[11px] font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                      <Vote className="size-3.5" />
+                      Poll
+                    </div>
+                    <DialogTitle className="max-w-3xl text-xl leading-tight tracking-tight sm:text-2xl">
+                      {previewPoll.question}
+                    </DialogTitle>
+                  </div>
+                  <Badge
+                    variant={statusVariant(previewPoll.status)}
+                    className="rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em]"
+                  >
                     {previewPoll.status}
                   </Badge>
                 </div>
-                <DialogDescription>
-                  {previewPoll.status === "published"
-                    ? `Published ${formatDate(previewPoll.published_at)}`
-                    : `Created ${formatDate(previewPoll.created_at)}`}
+                <DialogDescription className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                  <span>
+                    {previewPoll.status === "published"
+                      ? `Published ${formatDate(previewPoll.published_at)}`
+                      : `Created ${formatDate(previewPoll.created_at)}`}
+                  </span>
+                  <span className="rounded-full border border-border/60 bg-background/75 px-2.5 py-1">
+                    {previewPoll.choices.length} choice
+                    {previewPoll.choices.length === 1 ? "" : "s"}
+                  </span>
                 </DialogDescription>
               </DialogHeader>
 
-              {previewPoll.description ? (
-                <p className="text-sm text-muted-foreground">
-                  {previewPoll.description}
-                </p>
-              ) : null}
+              <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+                {previewPoll.description ? (
+                  <div className="rounded-xl border border-border/60 bg-background/70 p-3">
+                    <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                      Description
+                    </p>
+                    <p className="mt-1.5 text-sm leading-6 text-foreground/85">
+                      {previewPoll.description}
+                    </p>
+                  </div>
+                ) : null}
 
-              {(() => {
-                const sortedChoices = previewPoll.choices
-                  .slice()
-                  .sort((left, right) => left.position - right.position);
-                const selectedChoiceIds =
-                  voteSelectionByPoll[previewPoll.id] ??
-                  previewPoll.user_vote_choice_ids ??
-                  [];
-                const selectedChoiceId = selectedChoiceIds[0]
-                  ? String(selectedChoiceIds[0])
-                  : "";
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-medium tracking-[0.16em] text-muted-foreground uppercase">
+                      Choices
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Total votes:{" "}
+                      {previewPoll.choices.reduce(
+                        (sum, choice) => sum + choice.vote_count,
+                        0,
+                      )}
+                    </p>
+                  </div>
+                  {(() => {
+                    const sortedChoices = previewPoll.choices
+                      .slice()
+                      .sort((left, right) => left.position - right.position);
+                    const selectedChoiceIds =
+                      voteSelectionByPoll[previewPoll.id] ??
+                      previewPoll.user_vote_choice_ids ??
+                      [];
+                    const selectedChoiceId = selectedChoiceIds[0]
+                      ? String(selectedChoiceIds[0])
+                      : "";
 
-                if (previewPoll.allow_multiple_choices) {
-                  return (
-                    <div className="space-y-2">
-                      {sortedChoices.map((choice) => {
-                        const checked = selectedChoiceIds.includes(choice.id);
-                        const controlId = `preview-poll-${previewPoll.id}-choice-${choice.id}`;
-                        return (
-                          <div
-                            key={choice.id}
-                            className="rounded-lg border border-border/70 p-3"
-                          >
-                            <Label
-                              htmlFor={controlId}
-                              className="flex cursor-pointer items-start justify-between gap-3"
-                            >
-                              <div className="flex items-start gap-2">
-                                <Checkbox
-                                  id={controlId}
-                                  checked={checked}
-                                  disabled={previewPoll.status !== "published"}
-                                  onCheckedChange={(value) =>
-                                    toggleMultiChoiceSelection(
-                                      previewPoll.id,
-                                      choice.id,
-                                      value === true,
-                                    )
-                                  }
-                                />
-                                <span className="text-sm">{choice.text}</span>
-                              </div>
-                              <span className="text-xs text-muted-foreground">
-                                {choice.vote_count} vote
-                                {choice.vote_count === 1 ? "" : "s"}
-                              </span>
-                            </Label>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                }
-
-                return (
-                  <RadioGroup
-                    value={selectedChoiceId}
-                    disabled={previewPoll.status !== "published"}
-                    onValueChange={(value) => {
-                      const choiceId = Number(value);
-                      if (Number.isNaN(choiceId)) {
-                        return;
-                      }
-                      setSingleChoiceSelection(previewPoll.id, choiceId);
-                    }}
-                    className="space-y-2"
-                  >
-                    {sortedChoices.map((choice) => {
-                      const controlId = `preview-poll-${previewPoll.id}-choice-${choice.id}`;
+                    if (previewPoll.allow_multiple_choices) {
                       return (
-                        <div
-                          key={choice.id}
-                          className="rounded-lg border border-border/70 p-3"
-                        >
-                          <Label
-                            htmlFor={controlId}
-                            className="flex cursor-pointer items-start justify-between gap-3"
-                          >
-                            <div className="flex items-start gap-2">
-                              <RadioGroupItem
-                                id={controlId}
-                                value={String(choice.id)}
-                              />
-                              <span className="text-sm">{choice.text}</span>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {choice.vote_count} vote
-                              {choice.vote_count === 1 ? "" : "s"}
-                            </span>
-                          </Label>
+                        <div className="space-y-3">
+                          {sortedChoices.map((choice) => {
+                            const checked = selectedChoiceIds.includes(
+                              choice.id,
+                            );
+                            const controlId = `preview-poll-${previewPoll.id}-choice-${choice.id}`;
+                            return (
+                              <div
+                                key={choice.id}
+                                className="rounded-xl border border-border/60 bg-background/78 p-3.5 transition-colors hover:bg-background"
+                              >
+                                <Label
+                                  htmlFor={controlId}
+                                  className="flex cursor-pointer items-start justify-between gap-3"
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <Checkbox
+                                      id={controlId}
+                                      checked={checked}
+                                      disabled={
+                                        previewPoll.status !== "published" ||
+                                        previewPollHasSubmittedVote
+                                      }
+                                      onCheckedChange={(value) =>
+                                        toggleMultiChoiceSelection(
+                                          previewPoll.id,
+                                          choice.id,
+                                          value === true,
+                                        )
+                                      }
+                                    />
+                                    <span className="text-sm leading-6">
+                                      {choice.text}
+                                    </span>
+                                  </div>
+                                  <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
+                                    {choice.vote_count} vote
+                                    {choice.vote_count === 1 ? "" : "s"}
+                                  </span>
+                                </Label>
+                              </div>
+                            );
+                          })}
                         </div>
                       );
-                    })}
-                  </RadioGroup>
-                );
-              })()}
+                    }
 
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
-                <p className="text-xs text-muted-foreground">
-                  Total votes:{" "}
-                  {previewPoll.choices.reduce(
-                    (sum, choice) => sum + choice.vote_count,
-                    0,
-                  )}
-                </p>
+                    return (
+                      <RadioGroup
+                        value={selectedChoiceId}
+                        disabled={
+                          previewPoll.status !== "published" ||
+                          previewPollHasSubmittedVote
+                        }
+                        onValueChange={(value) => {
+                          const choiceId = Number(value);
+                          if (Number.isNaN(choiceId)) {
+                            return;
+                          }
+                          setSingleChoiceSelection(previewPoll.id, choiceId);
+                        }}
+                        className="space-y-3"
+                      >
+                        {sortedChoices.map((choice) => {
+                          const controlId = `preview-poll-${previewPoll.id}-choice-${choice.id}`;
+                          return (
+                            <div
+                              key={choice.id}
+                              className="rounded-xl border border-border/60 bg-background/78 p-3.5 transition-colors hover:bg-background"
+                            >
+                              <Label
+                                htmlFor={controlId}
+                                className="flex cursor-pointer items-start justify-between gap-3"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <RadioGroupItem
+                                    id={controlId}
+                                    value={String(choice.id)}
+                                  />
+                                  <span className="text-sm leading-6">
+                                    {choice.text}
+                                  </span>
+                                </div>
+                                <span className="shrink-0 rounded-full bg-muted px-2.5 py-1 text-[11px] text-muted-foreground">
+                                  {choice.vote_count} vote
+                                  {choice.vote_count === 1 ? "" : "s"}
+                                </span>
+                              </Label>
+                            </div>
+                          );
+                        })}
+                      </RadioGroup>
+                    );
+                  })()}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 px-5 py-4 sm:px-6">
+                {previewPollHasSubmittedVote ? (
+                  <p className="text-xs text-muted-foreground">
+                    Your vote has already been submitted.
+                  </p>
+                ) : (
+                  <span />
+                )}
                 <div className="flex flex-wrap gap-2">
-                  {previewPoll.status === "published" ? (
+                  {previewPoll.status === "published" &&
+                  !previewPollHasSubmittedVote ? (
                     <Button
                       size="sm"
+                      className="rounded-xl"
                       disabled={actionItemId === previewPoll.id}
                       onClick={() => void submitVote(previewPoll)}
                     >
@@ -1223,6 +1407,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                   {isStaff && previewPoll.status === "draft" ? (
                     <Button
                       size="sm"
+                      className="rounded-xl"
                       disabled={actionItemId === previewPoll.id}
                       onClick={() =>
                         void runPollAction(previewPoll.id, "publish")
@@ -1236,6 +1421,7 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                     <Button
                       size="sm"
                       variant="outline"
+                      className="rounded-xl bg-background/80"
                       disabled={actionItemId === previewPoll.id}
                       onClick={() =>
                         void runPollAction(previewPoll.id, "close")
@@ -1244,11 +1430,25 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
                       Close
                     </Button>
                   ) : null}
+                  {isStaff && previewPoll.status === "closed" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl bg-background/80"
+                      disabled={actionItemId === previewPoll.id}
+                      onClick={() =>
+                        void runPollAction(previewPoll.id, "reopen")
+                      }
+                    >
+                      Reopen
+                    </Button>
+                  ) : null}
 
                   {isStaff && previewPoll.status !== "archived" ? (
                     <Button
                       size="sm"
                       variant="destructive"
+                      className="rounded-xl"
                       disabled={actionItemId === previewPoll.id}
                       onClick={() =>
                         void runPollAction(previewPoll.id, "archive")

@@ -9,10 +9,10 @@ import {
   NotebookTabs,
   ReceiptText,
   Search,
-  ShieldCheck,
   User,
   Users,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
@@ -221,6 +221,11 @@ const sidebarItems: SidebarItem[] = [
         requiredCapabilities: ["view_performance_self"],
       },
       {
+        label: "Shared Resources",
+        href: "/my/shared-resources",
+        keywords: ["shared", "resources", "documents", "files"],
+      },
+      {
         label: "My Attendance",
         href: "/attendance",
         keywords: ["attendance", "timeline", "summary"],
@@ -255,6 +260,23 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
+  const resolvedSidebarItems = sidebarItems.map((item) => {
+    if (item.label !== "My Workflows") {
+      return item;
+    }
+
+    return {
+      ...item,
+      children: [
+        ...(item.children ?? []),
+        {
+          label: "Announcements and Polls",
+          href: "/announcements-and-polls",
+          keywords: ["announcement", "poll", "updates", "news"],
+        },
+      ],
+    };
+  });
 
   function hasRequiredCapabilities(requiredCapabilities?: string[]) {
     if (!requiredCapabilities || requiredCapabilities.length === 0) {
@@ -317,7 +339,7 @@ export function DashboardShell({
   }
 
   const hasSearchQuery = searchQuery.trim().length > 0;
-  const visibleSidebarItems = sidebarItems.filter((item) =>
+  const visibleSidebarItems = resolvedSidebarItems.filter((item) =>
     isItemVisible(item),
   );
   const sidebarResults = hasSearchQuery
@@ -348,18 +370,37 @@ export function DashboardShell({
       }));
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_right,_color-mix(in_oklab,var(--color-primary)_9%,transparent)_0%,_transparent_30%),linear-gradient(180deg,var(--color-background),color-mix(in_oklab,var(--color-muted)_25%,var(--color-background)))]">
+    <main className="min-h-screen bg-background">
       <div className="grid min-h-screen lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="border-b border-border/70 bg-card/80 px-4 py-6 backdrop-blur-xl lg:sticky lg:top-0 lg:h-screen lg:overflow-hidden lg:border-b-0 lg:border-r lg:px-5">
-          <div className="flex h-full min-h-0 flex-col gap-6">
-            <div className="space-y-4">
+          <div className="flex h-full min-h-0 flex-col gap-4">
+            <div className="space-y-1">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm shadow-black/10">
-                    <ShieldCheck className="size-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold tracking-tight">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 flex-col gap-1">
+                    <Link
+                      href="/dashboard"
+                      className="inline-flex w-fit rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      aria-label="Go to Dashboard"
+                    >
+                      <Image
+                        src="/scholarly-logo-light.png"
+                        alt="Scholarly"
+                        width={173}
+                        height={57}
+                        priority
+                        className="h-9 w-auto object-contain dark:hidden"
+                      />
+                      <Image
+                        src="/scholarly-logo-dark.png"
+                        alt="Scholarly"
+                        width={173}
+                        height={57}
+                        priority
+                        className="hidden h-9 w-auto object-contain dark:block"
+                      />
+                    </Link>
+                    <p className="pl-1 text-sm font-semibold tracking-[0.22em] text-muted-foreground uppercase">
                       HCMIS
                     </p>
                   </div>
