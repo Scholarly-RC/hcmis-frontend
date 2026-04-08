@@ -1,6 +1,15 @@
 "use client";
 
-import { ChevronDown, Loader2, RefreshCw } from "lucide-react";
+import {
+  BarChart3,
+  ChevronDown,
+  ClipboardList,
+  Loader2,
+  Plus,
+  RefreshCw,
+  User,
+  Users,
+} from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -1252,7 +1261,10 @@ export function PerformanceEvaluationsClient({
                 onOpenChange={setIsCreateCycleDialogOpen}
               >
                 <DialogTrigger asChild>
-                  <Button>New Cycle</Button>
+                  <Button>
+                    <Plus className="size-4" />
+                    New Cycle
+                  </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-xl">
                   <DialogHeader>
@@ -1436,6 +1448,7 @@ export function PerformanceEvaluationsClient({
                   onClick={() => setStaffPanel("assignments")}
                   disabled={!selectedCycle}
                 >
+                  <ClipboardList className="size-4" />
                   Assignments
                 </Button>
                 <Button
@@ -1445,6 +1458,7 @@ export function PerformanceEvaluationsClient({
                   onClick={() => setStaffPanel("summary")}
                   disabled={!selectedCycle}
                 >
+                  <BarChart3 className="size-4" />
                   Summary
                 </Button>
               </div>
@@ -1870,6 +1884,7 @@ export function PerformanceEvaluationsClient({
                 disabled={!hasSelfForms}
                 onClick={() => setWorkspaceView("self")}
               >
+                <User className="size-4" />
                 Self {selfSubmittedCount}/{mySelfForms.length}
               </Button>
               <Button
@@ -1879,6 +1894,7 @@ export function PerformanceEvaluationsClient({
                 disabled={!hasPeerForms}
                 onClick={() => setWorkspaceView("peer")}
               >
+                <Users className="size-4" />
                 Peer {peerSubmittedCount}/{myPeerForms.length}
               </Button>
               {isStaff ? (
@@ -1888,6 +1904,7 @@ export function PerformanceEvaluationsClient({
                   variant={workspaceView === "hr_cycle" ? "default" : "outline"}
                   onClick={() => setWorkspaceView("hr_cycle")}
                 >
+                  <BarChart3 className="size-4" />
                   HR Cycle
                 </Button>
               ) : null}

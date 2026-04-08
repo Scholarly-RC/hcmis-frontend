@@ -1,3 +1,4 @@
+import { CalendarDays, Clock3 } from "lucide-react";
 import Link from "next/link";
 import { AttendancePeriodControls } from "@/app/attendance/_components/attendance-period-controls";
 import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-frame";
@@ -90,9 +91,13 @@ export default async function AttendancePage({
         : "Unable to load attendance data.";
   }
 
-  const availableTabs: { key: AttendanceTab; label: string }[] = [
-    { key: "today", label: "Today" },
-    { key: "monthly", label: "Monthly" },
+  const availableTabs: {
+    key: AttendanceTab;
+    label: string;
+    icon: typeof Clock3;
+  }[] = [
+    { key: "today", label: "Today", icon: Clock3 },
+    { key: "monthly", label: "Monthly", icon: CalendarDays },
   ];
 
   function buildTabHref(tab: AttendanceTab) {
@@ -133,7 +138,13 @@ export default async function AttendancePage({
                   activeTab === tab.key ? "shadow-sm" : "bg-background",
                 )}
               >
-                <Link href={buildTabHref(tab.key)}>{tab.label}</Link>
+                <Link
+                  href={buildTabHref(tab.key)}
+                  className="inline-flex items-center gap-2"
+                >
+                  <tab.icon className="size-4" />
+                  <span>{tab.label}</span>
+                </Link>
               </Button>
             ))}
           </div>

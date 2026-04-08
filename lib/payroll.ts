@@ -199,6 +199,35 @@ export type PayslipSummary = {
   compensations: Array<{ id: number; name: string; amount: string }>;
 };
 
+export type ThirteenthMonthAdjustmentType = "ADD" | "DEDUCT";
+export type ThirteenthMonthPayoutStatus = "DRAFT" | "RELEASED";
+
+export type ThirteenthMonthAdjustment = {
+  id: number;
+  payout_id: number;
+  type: ThirteenthMonthAdjustmentType;
+  label: string;
+  amount: string;
+  reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ThirteenthMonthPayout = {
+  id: number;
+  user_id: string;
+  year: number;
+  gross_amount: string;
+  total_deductions: string;
+  net_amount: string;
+  status: ThirteenthMonthPayoutStatus;
+  released_at: string | null;
+  user?: AuthUser | null;
+  adjustments: ThirteenthMonthAdjustment[];
+  created_at: string;
+  updated_at: string;
+};
+
 type PayslipPrintLineItem = {
   label: string;
   amount: string;

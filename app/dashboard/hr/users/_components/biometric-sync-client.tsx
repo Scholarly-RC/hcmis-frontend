@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, RefreshCw, UserPlus } from "lucide-react";
+import { ArrowLeft, Loader2, RefreshCw, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
@@ -340,7 +340,10 @@ export function BiometricSyncClient() {
         </div>
 
         <Button asChild type="button" variant="outline">
-          <Link href="/hr/users">Back to user management</Link>
+          <Link href="/hr/users">
+            <ArrowLeft className="size-4" />
+            Back to User Management
+          </Link>
         </Button>
       </section>
 

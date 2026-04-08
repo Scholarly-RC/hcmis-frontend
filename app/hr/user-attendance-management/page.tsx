@@ -1,3 +1,4 @@
+import { CalendarDays, Clock3, Users } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-frame";
@@ -162,10 +163,14 @@ export default async function UserAttendanceManagementPage({
     id: user.id,
     label: buildUserLabel(user),
   }));
-  const availableTabs: { key: AttendanceTab; label: string }[] = [
-    { key: "today", label: "Today" },
-    { key: "monthly", label: "Monthly" },
-    { key: "shifts", label: "Shift Assignments" },
+  const availableTabs: {
+    key: AttendanceTab;
+    label: string;
+    icon: typeof Clock3;
+  }[] = [
+    { key: "today", label: "Today", icon: Clock3 },
+    { key: "monthly", label: "Monthly", icon: CalendarDays },
+    { key: "shifts", label: "Shift Assignments", icon: Users },
   ];
 
   function buildTabHref(tab: AttendanceTab) {
@@ -218,7 +223,13 @@ export default async function UserAttendanceManagementPage({
                     activeTab === tab.key ? "shadow-sm" : "bg-background",
                   )}
                 >
-                  <Link href={buildTabHref(tab.key)}>{tab.label}</Link>
+                  <Link
+                    href={buildTabHref(tab.key)}
+                    className="inline-flex items-center gap-2"
+                  >
+                    <tab.icon className="size-4" />
+                    <span>{tab.label}</span>
+                  </Link>
                 </Button>
               ))}
             </div>

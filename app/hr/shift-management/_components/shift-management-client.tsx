@@ -11,6 +11,7 @@ import {
   Save,
   Trash2,
   Users,
+  X,
 } from "lucide-react";
 import {
   type ComponentType,
@@ -496,9 +497,15 @@ function ShiftEditorDialog({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
+              <X className="size-4" />
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting || !isDirty}>
+              {mode === "create" ? (
+                <Plus className="size-4" />
+              ) : (
+                <Save className="size-4" />
+              )}
               {isSubmitting
                 ? "Saving..."
                 : mode === "create"

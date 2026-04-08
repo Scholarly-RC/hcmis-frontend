@@ -1,4 +1,5 @@
 import {
+  BadgeDollarSign,
   CalendarDays,
   Clock3,
   FolderOpen,
@@ -25,6 +26,13 @@ export default function MyWorkflowsPage() {
           description="Access your personal leave, payroll, performance, and attendance tasks from one place."
           items={[
             {
+              label: "Attendance",
+              description: "Personal attendance timeline and summary view.",
+              icon: Clock3,
+              href: "/attendance",
+              requiredCapabilities: ["view_attendance_self"],
+            },
+            {
               label: "My Leave",
               description: "Submit leave requests and track approval status.",
               icon: CalendarDays,
@@ -32,10 +40,25 @@ export default function MyWorkflowsPage() {
               requiredCapabilities: ["manage_leave_self"],
             },
             {
+              label: "My Overtime",
+              description:
+                "Submit overtime requests and track approval status.",
+              icon: Timer,
+              href: "/overtime",
+              requiredCapabilities: ["view_attendance_self"],
+            },
+            {
               label: "My Payslips",
               description: "View released payslip records by period.",
               icon: ReceiptText,
               href: "/my-payslips",
+              requiredCapabilities: ["view_payslips_self"],
+            },
+            {
+              label: "My 13th Month",
+              description: "View released 13th month payouts and adjustments.",
+              icon: BadgeDollarSign,
+              href: "/my-thirteenth-month",
               requiredCapabilities: ["view_payslips_self"],
             },
             {
@@ -57,21 +80,6 @@ export default function MyWorkflowsPage() {
               description: "Upload files and access resources shared with you.",
               icon: FolderOpen,
               href: "/my/shared-resources",
-            },
-            {
-              label: "Attendance",
-              description: "Personal attendance timeline and summary view.",
-              icon: Clock3,
-              href: "/attendance",
-              requiredCapabilities: ["view_attendance_self"],
-            },
-            {
-              label: "My Overtime",
-              description:
-                "Submit overtime requests and track approval status.",
-              icon: Timer,
-              href: "/overtime",
-              requiredCapabilities: ["view_attendance_self"],
             },
           ]}
         />

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, RotateCcw } from "lucide-react";
+import { ClipboardList, Loader2, RotateCcw, Users, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -115,6 +115,10 @@ function roleLabel(role: string | null | undefined) {
     return "HR";
   }
   return normalized;
+}
+
+function normalizeRole(role: string | null | undefined) {
+  return role?.trim().toUpperCase() || "EMP";
 }
 
 type LeaveManagementClientProps = {
@@ -432,9 +436,35 @@ export function LeaveManagementClient({
 
   const approverEligibleUsers = useMemo(() => {
     return users
-      .filter((user) => user.is_active)
+      .filter((user) => user.is_active && normalizeRole(user.role) !== "EMP")
       .sort((a, b) => displayUser(a).localeCompare(displayUser(b)));
   }, [users]);
+
+  const approverEligibleUsersByField = useCallback(
+    (
+      fieldKey:
+        | "department_approver_id"
+        | "director_approver_id"
+        | "president_approver_id"
+        | "hr_approver_id",
+      departmentId: number,
+    ) => {
+      return approverEligibleUsers.filter((user) => {
+        const role = normalizeRole(user.role);
+        if (fieldKey === "department_approver_id") {
+          return role === "DH" && user.department_id === departmentId;
+        }
+        if (fieldKey === "director_approver_id") {
+          return role === "DIR";
+        }
+        if (fieldKey === "president_approver_id") {
+          return role === "PRES";
+        }
+        return role === "HR";
+      });
+    },
+    [approverEligibleUsers],
+  );
 
   const setTabWithUrl = useCallback(
     (nextTab: ManagementTab) => {
@@ -481,7 +511,10 @@ export function LeaveManagementClient({
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/leave">Open Employee Leave View</Link>
+            <Link href="/leave">
+              <Users className="size-4" />
+              Open Employee Leave View
+            </Link>
           </Button>
         </div>
 
@@ -491,6 +524,7 @@ export function LeaveManagementClient({
             variant={tab === "requests" ? "default" : "outline"}
             onClick={() => setTabWithUrl("requests")}
           >
+            <ClipboardList className="size-4" />
             Request Monitor
           </Button>
           <Button
@@ -498,6 +532,7 @@ export function LeaveManagementClient({
             variant={tab === "approvers" ? "default" : "outline"}
             onClick={() => setTabWithUrl("approvers")}
           >
+            <Users className="size-4" />
             Approver Settings
           </Button>
           <Button
@@ -505,6 +540,7 @@ export function LeaveManagementClient({
             variant={tab === "credits" ? "default" : "outline"}
             onClick={() => setTabWithUrl("credits")}
           >
+            <Wallet className="size-4" />
             Leave Credits
           </Button>
         </div>
@@ -761,7 +797,10 @@ export function LeaveManagementClient({
                         }}
                         options={[
                           { value: "none", label: "Not set" },
-                          ...approverEligibleUsers.map((user) => ({
+                          ...approverEligibleUsersByField(
+                            field.key,
+                            department.id,
+                          ).map((user) => ({
                             value: user.id.toString(),
                             label: `${displayUser(user)} (${roleLabel(user.role)})`,
                           })),

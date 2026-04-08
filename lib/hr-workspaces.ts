@@ -124,6 +124,15 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         requiredCapabilities: ["manage_payslips"],
       },
       {
+        label: "13th Month Management",
+        description:
+          "Generate yearly 13th month payouts, apply adjustments, and release to employees.",
+        icon: CalendarClock,
+        href: "/hr/thirteenth-month",
+        keywords: ["13th month", "yearly payout", "adjustments"],
+        requiredCapabilities: ["manage_payslips"],
+      },
+      {
         label: "Payroll Rules And Deductions",
         description:
           "Maintain statutory payroll rules, legal references, and MP2 membership settings.",

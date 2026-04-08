@@ -33,6 +33,15 @@ export type LeaveCredit = {
 
 export type LeaveRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
+export type LeaveRequestApproverRecord = {
+  id: number;
+  leave_request_id: number;
+  approver_id: string;
+  status: LeaveRequestStatus;
+  acted_at: string | null;
+  approver: AuthUser | null;
+};
+
 export type LeaveRequestRecord = {
   id: number;
   user_id: string;
@@ -49,6 +58,7 @@ export type LeaveRequestRecord = {
   user: AuthUser | null;
   first_approver: AuthUser | null;
   second_approver: AuthUser | null;
+  approver_pool: LeaveRequestApproverRecord[];
   created_at: string;
   updated_at: string;
 };

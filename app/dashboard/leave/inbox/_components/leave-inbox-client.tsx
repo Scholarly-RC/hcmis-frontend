@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, X } from "lucide-react";
+import { ArrowLeft, Check, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -264,7 +264,10 @@ export function LeaveInboxClient() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/leave">Back to My Leave</Link>
+            <Link href="/leave">
+              <ArrowLeft className="size-4" />
+              Back to My Leave
+            </Link>
           </Button>
         </div>
       </section>
@@ -333,7 +336,7 @@ export function LeaveInboxClient() {
         <CardHeader>
           <CardTitle>Requests</CardTitle>
           <CardDescription>
-            Requests where you are first or second approver.
+            Requests where you are in the eligible approver pool.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -371,6 +374,12 @@ export function LeaveInboxClient() {
                       const approving = actionState[item.id] === "approve";
                       const rejecting = actionState[item.id] === "reject";
                       const canRespond = item.status === "PENDING";
+                      const actedAssignment = item.approver_pool.find(
+                        (assignment) => assignment.acted_at !== null,
+                      );
+                      const actedByLabel = actedAssignment?.approver
+                        ? `${actedAssignment.approver.first_name} ${actedAssignment.approver.last_name}`.trim()
+                        : "Pending";
 
                       return (
                         <TableRow
@@ -402,10 +411,10 @@ export function LeaveInboxClient() {
                           </TableCell>
                           <TableCell>
                             <p className="text-xs text-muted-foreground">
-                              1st: {item.first_approver_status}
+                              Eligible: {item.approver_pool.length}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              2nd: {item.second_approver_status ?? "N/A"}
+                              Acted: {actedByLabel}
                             </p>
                           </TableCell>
                           <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">

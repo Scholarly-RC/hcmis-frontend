@@ -7,6 +7,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
   Search,
   UserCircle2,
@@ -1257,7 +1258,10 @@ export function UserManagementClient({
 
         <div className="flex flex-wrap items-center gap-2 self-start">
           <Button asChild type="button" variant="outline">
-            <Link href="/hr/users/biometric-sync">Biometric Sync</Link>
+            <Link href="/hr/users/biometric-sync">
+              <RefreshCw className="size-4" />
+              Biometric Sync
+            </Link>
           </Button>
           <Button onClick={openCreateDialog} type="button" variant="secondary">
             <Plus className="size-4" />

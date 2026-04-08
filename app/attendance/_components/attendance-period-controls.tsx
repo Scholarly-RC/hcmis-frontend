@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -134,6 +134,7 @@ export function AttendancePeriodControls({
             />
 
             <Button type="submit" className="h-10">
+              <CalendarDays className="size-4" />
               Apply
             </Button>
           </div>
@@ -154,7 +155,10 @@ export function AttendancePeriodControls({
             </Button>
 
             <Button asChild variant="outline" className="h-10">
-              <Link href={buildHref(todayYear, todayMonth)}>Current month</Link>
+              <Link href={buildHref(todayYear, todayMonth)}>
+                <CalendarDays className="size-4" />
+                Current month
+              </Link>
             </Button>
           </div>
         </form>

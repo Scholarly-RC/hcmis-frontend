@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
+  BarChart3,
   BookOpenText,
   Building2,
   LayoutDashboard,
@@ -10,7 +11,6 @@ import {
   ReceiptText,
   Search,
   User,
-  Users,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -40,6 +40,7 @@ type SidebarItem = {
   href?: string;
   keywords?: string[];
   children?: SidebarChildItem[];
+  showChildrenByDefault?: boolean;
   active?: boolean;
   requiredCapabilities?: string[];
   status?: "active" | "coming_soon" | "hidden";
@@ -157,7 +158,7 @@ const hrWorkspaceSidebarIcons: Record<HrWorkspaceKey, LucideIcon> = {
   payroll: ReceiptText,
   performance: User,
   leave: BookOpenText,
-  reports: BookOpenText,
+  reports: BarChart3,
 };
 
 const hrWorkspaceSidebarOrder: HrWorkspaceKey[] = [
@@ -215,6 +216,12 @@ const sidebarItems: SidebarItem[] = [
         requiredCapabilities: ["view_payslips_self"],
       },
       {
+        label: "My 13th Month",
+        href: "/my-thirteenth-month",
+        keywords: ["13th month", "yearly payout"],
+        requiredCapabilities: ["view_payslips_self"],
+      },
+      {
         label: "Performance Evaluations",
         href: "/performance-evaluations",
         keywords: ["performance", "evaluation", "review"],
@@ -234,20 +241,26 @@ const sidebarItems: SidebarItem[] = [
     ],
   },
   {
-    label: "Users",
-    icon: Users,
-    href: "/hr/users",
-    keywords: ["employees", "staff", "accounts", "people"],
-    requiredCapabilities: ["manage_hr_users"],
-    status: "active",
-  },
-  {
-    label: "Departments",
+    label: "Organization",
     icon: Building2,
-    href: "/hr/departments",
-    keywords: ["department", "teams", "organization"],
+    href: "/hr/organizations",
+    keywords: ["organization", "users", "departments", "teams", "employees"],
     requiredCapabilities: ["access_hr_workspace"],
     status: "active",
+    children: [
+      {
+        label: "Users",
+        href: "/hr/users",
+        keywords: ["employees", "staff", "accounts", "people"],
+        requiredCapabilities: ["manage_hr_users"],
+      },
+      {
+        label: "Departments",
+        href: "/hr/departments",
+        keywords: ["department", "teams", "organization"],
+        requiredCapabilities: ["access_hr_workspace"],
+      },
+    ],
   },
   ...hrWorkspaceSidebarItems,
 ];
@@ -327,6 +340,13 @@ export function DashboardShell({
   }
 
   function isActive(item: SidebarItem) {
+    const hasActiveChild = (item.children ?? []).some((child) =>
+      isChildActive(child),
+    );
+    if (hasActiveChild) {
+      return true;
+    }
+
     if (!item.href || item.status === "coming_soon") {
       return item.active === true;
     }
@@ -438,6 +458,15 @@ export function DashboardShell({
               <section className="space-y-2">
                 {sidebarResults.map((result) => {
                   const { item, matchedChildren } = result;
+                  const defaultChildren = item.showChildrenByDefault
+                    ? (item.children ?? []).filter(
+                        (child) =>
+                          isChildVisible(child) && isChildClickable(child),
+                      )
+                    : [];
+                  const visibleChildren = hasSearchQuery
+                    ? matchedChildren
+                    : defaultChildren;
                   const ItemIcon = item.icon;
                   const active = isActive(item);
                   const isComingSoon = item.status === "coming_soon";
@@ -497,9 +526,9 @@ export function DashboardShell({
                         </div>
                       )}
 
-                      {hasSearchQuery && matchedChildren.length > 0 ? (
+                      {visibleChildren.length > 0 ? (
                         <div className="space-y-1 pl-4">
-                          {matchedChildren.map((child) => {
+                          {visibleChildren.map((child) => {
                             const childHref = child.href;
                             if (!childHref) {
                               return null;

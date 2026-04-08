@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { ClipboardList, Loader2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -343,7 +343,10 @@ export function MyLeaveClient() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/leave/inbox">Open Review Inbox</Link>
+            <Link href="/leave/inbox">
+              <ClipboardList className="size-4" />
+              Open Review Inbox
+            </Link>
           </Button>
         </div>
       </section>
@@ -573,56 +576,66 @@ export function MyLeaveClient() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredRequests.map((item) => (
-                      <TableRow
-                        id={`leave-row-${item.id}`}
-                        key={item.id}
-                        className={cn(
-                          highlightedLeaveId === item.id &&
-                            "bg-primary/5 ring-1 ring-primary/40",
-                        )}
-                      >
-                        <TableCell>{formatDate(item.leave_date)}</TableCell>
-                        <TableCell>{leaveTypeLabel(item.leave_type)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            className={cn(
-                              "border-0 font-medium",
-                              leaveStatusClass(item.status),
-                            )}
-                          >
-                            {item.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-xs text-muted-foreground">
-                            1st: {item.first_approver_status}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            2nd: {item.second_approver_status ?? "N/A"}
-                          </p>
-                        </TableCell>
-                        <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
-                          {item.info || "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={deletingId === item.id}
-                            onClick={() => handleDeleteRequest(item.id)}
-                          >
-                            {deletingId === item.id ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="mr-2 h-4 w-4" />
-                            )}
-                            Delete
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    filteredRequests.map((item) => {
+                      const actedAssignment = item.approver_pool.find(
+                        (assignment) => assignment.acted_at !== null,
+                      );
+                      const actedByLabel = actedAssignment?.approver
+                        ? `${actedAssignment.approver.first_name} ${actedAssignment.approver.last_name}`.trim()
+                        : "Pending";
+                      return (
+                        <TableRow
+                          id={`leave-row-${item.id}`}
+                          key={item.id}
+                          className={cn(
+                            highlightedLeaveId === item.id &&
+                              "bg-primary/5 ring-1 ring-primary/40",
+                          )}
+                        >
+                          <TableCell>{formatDate(item.leave_date)}</TableCell>
+                          <TableCell>
+                            {leaveTypeLabel(item.leave_type)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={cn(
+                                "border-0 font-medium",
+                                leaveStatusClass(item.status),
+                              )}
+                            >
+                              {item.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-xs text-muted-foreground">
+                              Eligible: {item.approver_pool.length}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Acted: {actedByLabel}
+                            </p>
+                          </TableCell>
+                          <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
+                            {item.info || "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={deletingId === item.id}
+                              onClick={() => handleDeleteRequest(item.id)}
+                            >
+                              {deletingId === item.id ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="mr-2 h-4 w-4" />
+                              )}
+                              Delete
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

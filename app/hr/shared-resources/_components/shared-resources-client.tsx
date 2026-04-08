@@ -87,10 +87,19 @@ function formatSize(bytes: number) {
 
 function formatUserLabel(user: AuthUser) {
   const fullName = `${user.first_name} ${user.last_name}`.trim();
+  const departmentCode = user.department?.code?.trim();
+
   if (fullName.length === 0) {
-    return user.email;
+    return departmentCode && departmentCode.length > 0
+      ? departmentCode
+      : "Unknown user";
   }
-  return `${fullName} (${user.email})`;
+
+  if (departmentCode && departmentCode.length > 0) {
+    return `${fullName} (${departmentCode})`;
+  }
+
+  return fullName;
 }
 
 function formatUploaderLabel(resource: SharedResourceRecord) {
@@ -859,7 +868,7 @@ export function SharedResourcesClient({
                 id="shared-resource-user-search"
                 value={userSearch}
                 onChange={(event) => setUserSearch(event.target.value)}
-                placeholder="Search by name or email"
+                placeholder="Search by name or department"
               />
             </div>
 

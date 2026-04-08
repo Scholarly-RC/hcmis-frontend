@@ -93,6 +93,17 @@ export type OvertimeApprover = {
 export type OvertimeApproverAssignment = {
   approver_id: string | null;
   approver: AuthUser | null;
+  approver_ids: string[];
+  approvers: AuthUser[];
+};
+
+export type OvertimeRequestApproverRecord = {
+  id: number;
+  overtime_request_id: number;
+  approver_id: string;
+  status: OvertimeRequestStatus;
+  acted_at: string | null;
+  approver: AuthUser | null;
 };
 
 export type OvertimeRequestRecord = {
@@ -106,6 +117,7 @@ export type OvertimeRequestRecord = {
   user_email: string | null;
   user_department_name: string | null;
   approver_name: string | null;
+  approver_pool: OvertimeRequestApproverRecord[];
   created_at: string;
   updated_at: string;
 };

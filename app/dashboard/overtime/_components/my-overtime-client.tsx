@@ -303,7 +303,7 @@ export function MyOvertimeClient({
   const infoValue = watch("info");
 
   const isSubmitDisabled =
-    !assignedApprover?.approver_id ||
+    (assignedApprover?.approver_ids.length ?? 0) === 0 ||
     !selectedDate ||
     !infoValue?.trim() ||
     isSubmitting;
@@ -335,7 +335,7 @@ export function MyOvertimeClient({
 
   async function handleCreateRequest(values: CreateOvertimeRequestFormValues) {
     try {
-      if (!assignedApprover?.approver_id) {
+      if ((assignedApprover?.approver_ids.length ?? 0) === 0) {
         toast.error("No overtime approver is configured for your account.");
         return;
       }
@@ -443,7 +443,10 @@ export function MyOvertimeClient({
               }}
             >
               <DialogTrigger asChild>
-                <Button type="button" disabled={!assignedApprover?.approver_id}>
+                <Button
+                  type="button"
+                  disabled={(assignedApprover?.approver_ids.length ?? 0) === 0}
+                >
                   <Plus className="size-4" />
                   New Request
                 </Button>
@@ -453,7 +456,7 @@ export function MyOvertimeClient({
                   <DialogTitle>Submit Overtime Request</DialogTitle>
                   <DialogDescription>
                     Select a date and add context. The approver is assigned
-                    automatically using HR-configured overtime routing.
+                    automatically using the overtime approver pool.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -479,20 +482,23 @@ export function MyOvertimeClient({
 
                     <div className="space-y-2">
                       <Label htmlFor="overtime-approver">
-                        Assigned Approver
+                        Eligible Approvers
                       </Label>
                       <Input
                         id="overtime-approver"
                         className="h-10"
                         value={
-                          assignedApprover?.approver
-                            ? [
-                                assignedApprover.approver.first_name,
-                                assignedApprover.approver.last_name,
-                              ]
-                                .filter(Boolean)
-                                .join(" ")
-                                .trim() || assignedApprover.approver.email
+                          assignedApprover &&
+                          assignedApprover.approvers.length > 0
+                            ? `${assignedApprover.approvers
+                                .map(
+                                  (item) =>
+                                    [item.first_name, item.last_name]
+                                      .filter(Boolean)
+                                      .join(" ")
+                                      .trim() || item.email,
+                                )
+                                .join(", ")}`
                             : "No approver configured"
                         }
                         readOnly
@@ -536,10 +542,10 @@ export function MyOvertimeClient({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!assignedApprover?.approver_id ? (
+          {(assignedApprover?.approver_ids.length ?? 0) === 0 ? (
             <p className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
-              No overtime approver is configured for your role and department.
-              Please contact HR.
+              No eligible overtime approvers are configured for your role and
+              department. Please contact HR.
             </p>
           ) : null}
 
@@ -652,6 +658,9 @@ export function MyOvertimeClient({
                       <TableCell>
                         {request.approver_name ??
                           `User #${request.approver_id}`}
+                        <p className="text-xs text-muted-foreground">
+                          Pool: {request.approver_pool.length}
+                        </p>
                       </TableCell>
                       <TableCell className="max-w-[320px]">
                         <p className="line-clamp-2 text-sm text-muted-foreground">

@@ -9,7 +9,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SelectField } from "@/components/form-select-field";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ type ApproverOption = {
 };
 
 type OvertimeManagementClientProps = {
+  initialTab: "requests" | "approvers";
   initialRequests: OvertimeRequestRecord[];
   overtimeApprovers: OvertimeApprover[];
   departments: DepartmentOption[];
@@ -89,28 +90,44 @@ function isSameFilterState(a: OvertimeFilterState, b: OvertimeFilterState) {
   );
 }
 
-function buildUrl(pathname: string, state: OvertimeFilterState) {
-  const search = new URLSearchParams();
+function buildUrl(
+  pathname: string,
+  state: OvertimeFilterState,
+  currentSearch: string,
+) {
+  const search = new URLSearchParams(currentSearch);
 
   search.set("scope", state.scope);
 
   if (state.query.trim().length > 0) {
     search.set("q", state.query.trim());
+  } else {
+    search.delete("q");
   }
   if (state.status !== "all") {
     search.set("status", state.status);
+  } else {
+    search.delete("status");
   }
   if (state.month !== "all") {
     search.set("month", state.month);
+  } else {
+    search.delete("month");
   }
   if (state.year !== "all") {
     search.set("year", state.year);
+  } else {
+    search.delete("year");
   }
   if (state.departmentId !== "all") {
     search.set("department_id", state.departmentId);
+  } else {
+    search.delete("department_id");
   }
   if (state.approverId !== "all") {
     search.set("approver_id", state.approverId);
+  } else {
+    search.delete("approver_id");
   }
 
   const query = search.toString();
@@ -156,6 +173,7 @@ function formatDateTime(value: string) {
 }
 
 export function OvertimeManagementClient({
+  initialTab,
   initialRequests,
   overtimeApprovers,
   departments,
@@ -167,6 +185,8 @@ export function OvertimeManagementClient({
 }: OvertimeManagementClientProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<"requests" | "approvers">(initialTab);
   const [requests, setRequests] = useState(initialRequests);
   const [approverSettings, setApproverSettings] = useState(overtimeApprovers);
   const [formState, setFormState] = useState<OvertimeFilterState>(filters);
@@ -191,9 +211,13 @@ export function OvertimeManagementClient({
     setFormState((prev) => (isSameFilterState(prev, filters) ? prev : filters));
   }, [filters]);
 
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
+
   if (!debouncedReplaceRef.current) {
     debouncedReplaceRef.current = debounce((nextState: OvertimeFilterState) => {
-      const nextUrl = buildUrl(pathname, nextState);
+      const nextUrl = buildUrl(pathname, nextState, window.location.search);
       const currentUrl = `${pathname}${window.location.search}`;
       if (nextUrl === currentUrl) {
         return;
@@ -363,6 +387,16 @@ export function OvertimeManagementClient({
     }
   }
 
+  function setTabWithUrl(nextTab: "requests" | "approvers") {
+    setTab(nextTab);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("tab", nextTab);
+    const queryString = nextParams.toString();
+    router.replace(
+      queryString.length > 0 ? `${pathname}?${queryString}` : pathname,
+    );
+  }
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-lg shadow-black/5 sm:p-5">
@@ -377,419 +411,437 @@ export function OvertimeManagementClient({
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
             type="button"
-            variant={formState.scope === "approvals" ? "default" : "outline"}
-            onClick={() =>
-              setFormState((prev) => ({ ...prev, scope: "approvals" }))
-            }
+            variant={tab === "requests" ? "default" : "outline"}
+            onClick={() => setTabWithUrl("requests")}
           >
             <ClipboardCheck className="size-4" />
-            To Review
+            Requests
           </Button>
           {isStaff ? (
             <Button
               type="button"
-              variant={formState.scope === "all" ? "default" : "outline"}
-              onClick={() =>
-                setFormState((prev) => ({ ...prev, scope: "all" }))
-              }
+              variant={tab === "approvers" ? "default" : "outline"}
+              onClick={() => setTabWithUrl("approvers")}
             >
               <Layers3 className="size-4" />
-              All
+              Approver Settings
             </Button>
           ) : null}
         </div>
       </section>
 
-      <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>
-            Search and refine overtime requests without leaving this page.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-4">
-            <div className="space-y-2 lg:col-span-2">
-              <Label htmlFor="q" className="text-sm font-medium">
-                Search
-              </Label>
-              <Input
-                id="q"
-                value={formState.query}
-                onChange={(event) =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    query: event.target.value,
-                  }))
-                }
-                placeholder="Requestor name or email"
-              />
-            </div>
-
-            <SelectField
-              id="status"
-              label="Status"
-              value={formState.status}
-              onChange={(_, value) =>
-                setFormState((prev) => ({ ...prev, status: value }))
-              }
-              options={[
-                { value: "all", label: "All statuses" },
-                { value: "PEND", label: "Pending" },
-                { value: "APP", label: "Approved" },
-                { value: "REJ", label: "Rejected" },
-              ]}
-              placeholder="Status"
-            />
-
-            <SelectField
-              id="month"
-              label="Month"
-              value={formState.month}
-              onChange={(_, value) =>
-                setFormState((prev) => ({ ...prev, month: value }))
-              }
-              options={[
-                { value: "all", label: "All months" },
-                ...Array.from({ length: 12 }, (_, index) => ({
-                  value: (index + 1).toString(),
-                  label: new Date(2000, index, 1).toLocaleString("en-US", {
-                    month: "long",
-                  }),
-                })),
-              ]}
-              placeholder="Month"
-            />
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-4">
-            <SelectField
-              id="year"
-              label="Year"
-              value={formState.year}
-              onChange={(_, value) =>
-                setFormState((prev) => ({ ...prev, year: value }))
-              }
-              options={[
-                { value: "all", label: "All years" },
-                ...yearOptions.map((yearOption) => ({
-                  value: yearOption.toString(),
-                  label: yearOption.toString(),
-                })),
-              ]}
-              placeholder="Year"
-            />
-
-            <SelectField
-              id="department"
-              label="Department"
-              value={formState.departmentId}
-              onChange={(_, value) =>
-                setFormState((prev) => ({ ...prev, departmentId: value }))
-              }
-              options={[
-                { value: "all", label: "All departments" },
-                ...departments.map((department) => ({
-                  value: department.id.toString(),
-                  label: department.name,
-                })),
-              ]}
-              placeholder="Department"
-            />
-
-            <SelectField
-              id="approver"
-              label="Approver"
-              value={formState.approverId}
-              onChange={(_, value) =>
-                setFormState((prev) => ({ ...prev, approverId: value }))
-              }
-              options={[
-                { value: "all", label: "All approvers" },
-                ...approvers.map((approver) => ({
-                  value: approver.id.toString(),
-                  label: approver.name,
-                })),
-              ]}
-              placeholder="Approver"
-            />
-
-            <div className="flex items-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10"
-                onClick={() =>
-                  setFormState((prev) => ({
-                    ...prev,
-                    query: "",
-                    status: "all",
-                    month: "all",
-                    year: "all",
-                    departmentId: "all",
-                    approverId: "all",
-                  }))
-                }
-              >
-                <Eraser className="size-4" />
-                Clear
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Pending</p>
-            <p className="text-2xl font-semibold">{stats.pending}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-2xl font-semibold">{stats.approved}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Rejected</p>
-            <p className="text-2xl font-semibold">{stats.rejected}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-semibold">{stats.total}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-        <CardHeader>
-          <CardTitle>Approver Settings</CardTitle>
-          <CardDescription>
-            Set department overtime approvers using the same role slots as the
-            leave workflow. The system assigns the request approver
-            automatically.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {approverRows.map(({ department, approver }) => {
-            const currentValue: OvertimeApproverUpsertPayload = {
-              department_approver_id: approver?.department_approver_id ?? null,
-              director_approver_id: approver?.director_approver_id ?? null,
-              president_approver_id: approver?.president_approver_id ?? null,
-              hr_approver_id: approver?.hr_approver_id ?? null,
-            };
-
-            return (
-              <div
-                key={department.id}
-                className="rounded-xl border border-border/70 bg-background/70 p-4"
-              >
-                <div className="mb-3">
-                  <p className="font-medium text-foreground">
-                    {department.name}
-                  </p>
+      {tab === "requests" ? (
+        <>
+          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+            <CardHeader>
+              <CardTitle>Filters</CardTitle>
+              <CardDescription>
+                Search and refine overtime requests without leaving this page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-4">
+                <div className="space-y-2 lg:col-span-2">
+                  <Label htmlFor="q" className="text-sm font-medium">
+                    Search
+                  </Label>
+                  <Input
+                    id="q"
+                    value={formState.query}
+                    onChange={(event) =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        query: event.target.value,
+                      }))
+                    }
+                    placeholder="Requestor name or email"
+                  />
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {[
-                    {
-                      id: "department_approver",
-                      label: "Department Approver",
-                      key: "department_approver_id" as const,
-                    },
-                    {
-                      id: "director_approver",
-                      label: "Director Approver",
-                      key: "director_approver_id" as const,
-                    },
-                    {
-                      id: "president_approver",
-                      label: "President Approver",
-                      key: "president_approver_id" as const,
-                    },
-                    {
-                      id: "hr_approver",
-                      label: "HR Approver",
-                      key: "hr_approver_id" as const,
-                    },
-                  ].map((field) => (
-                    <SelectField
-                      key={`${department.id}-${field.id}`}
-                      id={`${department.id}-${field.id}`}
-                      label={field.label}
-                      value={
-                        currentValue[field.key] === null
-                          ? "none"
-                          : String(currentValue[field.key])
-                      }
-                      onChange={(_, value) => {
-                        const nextPayload: OvertimeApproverUpsertPayload = {
-                          ...currentValue,
-                          [field.key]: value === "none" ? null : value,
-                        };
-                        void saveApprover(department.id, nextPayload);
-                      }}
-                      options={[
-                        { value: "none", label: "Not set" },
-                        ...approvers.map((user) => ({
-                          value: user.id.toString(),
-                          label: user.name,
-                        })),
-                      ]}
-                      placeholder={field.label}
-                    />
-                  ))}
-                </div>
+                <SelectField
+                  id="status"
+                  label="Status"
+                  value={formState.status}
+                  onChange={(_, value) =>
+                    setFormState((prev) => ({ ...prev, status: value }))
+                  }
+                  options={[
+                    { value: "all", label: "All statuses" },
+                    { value: "PEND", label: "Pending" },
+                    { value: "APP", label: "Approved" },
+                    { value: "REJ", label: "Rejected" },
+                  ]}
+                  placeholder="Status"
+                />
 
-                {approverSavingDepartmentId === department.id ? (
-                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Saving approver settings...
-                  </div>
-                ) : null}
+                <SelectField
+                  id="month"
+                  label="Month"
+                  value={formState.month}
+                  onChange={(_, value) =>
+                    setFormState((prev) => ({ ...prev, month: value }))
+                  }
+                  options={[
+                    { value: "all", label: "All months" },
+                    ...Array.from({ length: 12 }, (_, index) => ({
+                      value: (index + 1).toString(),
+                      label: new Date(2000, index, 1).toLocaleString("en-US", {
+                        month: "long",
+                      }),
+                    })),
+                  ]}
+                  placeholder="Month"
+                />
               </div>
-            );
-          })}
-        </CardContent>
-      </Card>
 
-      <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-        <CardContent className="pt-6">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Requestor</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Approver</TableHead>
-                  <TableHead>Info</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {requests.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="py-10 text-center text-sm text-muted-foreground"
-                    >
-                      No overtime requests match the current filters.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  requests.map((request) => {
-                    const actionInProgress = actionMap[request.id];
-                    const canRespond =
-                      request.status === "PEND" &&
-                      request.approver_id === currentUserId;
+              <div className="grid gap-4 lg:grid-cols-4">
+                <SelectField
+                  id="year"
+                  label="Year"
+                  value={formState.year}
+                  onChange={(_, value) =>
+                    setFormState((prev) => ({ ...prev, year: value }))
+                  }
+                  options={[
+                    { value: "all", label: "All years" },
+                    ...yearOptions.map((yearOption) => ({
+                      value: yearOption.toString(),
+                      label: yearOption.toString(),
+                    })),
+                  ]}
+                  placeholder="Year"
+                />
 
-                    return (
-                      <TableRow key={request.id}>
-                        <TableCell>
-                          <p className="font-medium text-foreground">
-                            {request.user_name ?? `User #${request.user_id}`}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {request.user_department_name ?? "No department"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {request.user_email ?? ""}
-                          </p>
-                        </TableCell>
-                        <TableCell>{formatDate(request.date)}</TableCell>
-                        <TableCell>
-                          {request.approver_name ??
-                            `User #${request.approver_id}`}
-                        </TableCell>
-                        <TableCell className="max-w-[280px]">
-                          <p className="line-clamp-2 text-sm text-muted-foreground">
-                            {request.info?.trim() || "No details provided."}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className={cn(
-                              "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-                              statusClass(request.status),
-                            )}
-                          >
-                            {statusLabel(request.status)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDateTime(request.updated_at)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            {canRespond ? (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="h-8"
-                                  onClick={() => respond(request, "APPROVE")}
-                                  disabled={actionInProgress !== undefined}
-                                >
-                                  {actionInProgress === "approve" ? (
-                                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                                  ) : (
-                                    <Check className="mr-1.5 size-3.5" />
-                                  )}
-                                  Approve
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8"
-                                  onClick={() => respond(request, "REJECT")}
-                                  disabled={actionInProgress !== undefined}
-                                >
-                                  {actionInProgress === "reject" ? (
-                                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                                  ) : (
-                                    <X className="mr-1.5 size-3.5" />
-                                  )}
-                                  Reject
-                                </Button>
-                              </>
-                            ) : null}
+                <SelectField
+                  id="department"
+                  label="Department"
+                  value={formState.departmentId}
+                  onChange={(_, value) =>
+                    setFormState((prev) => ({ ...prev, departmentId: value }))
+                  }
+                  options={[
+                    { value: "all", label: "All departments" },
+                    ...departments.map((department) => ({
+                      value: department.id.toString(),
+                      label: department.name,
+                    })),
+                  ]}
+                  placeholder="Department"
+                />
 
-                            {isStaff ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                className="h-8 text-destructive hover:text-destructive"
-                                onClick={() => remove(request)}
-                                disabled={actionInProgress !== undefined}
-                              >
-                                {actionInProgress === "delete" ? (
-                                  <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                                ) : (
-                                  <Trash2 className="mr-1.5 size-3.5" />
-                                )}
-                                Delete
-                              </Button>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+                <SelectField
+                  id="approver"
+                  label="Approver"
+                  value={formState.approverId}
+                  onChange={(_, value) =>
+                    setFormState((prev) => ({ ...prev, approverId: value }))
+                  }
+                  options={[
+                    { value: "all", label: "All approvers" },
+                    ...approvers.map((approver) => ({
+                      value: approver.id.toString(),
+                      label: approver.name,
+                    })),
+                  ]}
+                  placeholder="Approver"
+                />
+
+                <div className="flex items-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-10"
+                    onClick={() =>
+                      setFormState((prev) => ({
+                        ...prev,
+                        query: "",
+                        status: "all",
+                        month: "all",
+                        year: "all",
+                        departmentId: "all",
+                        approverId: "all",
+                      }))
+                    }
+                  >
+                    <Eraser className="size-4" />
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-2xl font-semibold">{stats.pending}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Approved</p>
+                <p className="text-2xl font-semibold">{stats.approved}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Rejected</p>
+                <p className="text-2xl font-semibold">{stats.rejected}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-2xl font-semibold">{stats.total}</p>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+        </>
+      ) : null}
+
+      {tab === "approvers" ? (
+        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+          <CardHeader>
+            <CardTitle>Approver Settings</CardTitle>
+            <CardDescription>
+              Set department overtime approvers using the same role slots as the
+              leave workflow. The system assigns the request approver
+              automatically.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {approverRows.map(({ department, approver }) => {
+              const currentValue: OvertimeApproverUpsertPayload = {
+                department_approver_id:
+                  approver?.department_approver_id ?? null,
+                director_approver_id: approver?.director_approver_id ?? null,
+                president_approver_id: approver?.president_approver_id ?? null,
+                hr_approver_id: approver?.hr_approver_id ?? null,
+              };
+
+              return (
+                <div
+                  key={department.id}
+                  className="rounded-xl border border-border/70 bg-background/70 p-4"
+                >
+                  <div className="mb-3">
+                    <p className="font-medium text-foreground">
+                      {department.name}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    {[
+                      {
+                        id: "department_approver",
+                        label: "Department Approver",
+                        key: "department_approver_id" as const,
+                      },
+                      {
+                        id: "director_approver",
+                        label: "Director Approver",
+                        key: "director_approver_id" as const,
+                      },
+                      {
+                        id: "president_approver",
+                        label: "President Approver",
+                        key: "president_approver_id" as const,
+                      },
+                      {
+                        id: "hr_approver",
+                        label: "HR Approver",
+                        key: "hr_approver_id" as const,
+                      },
+                    ].map((field) => (
+                      <SelectField
+                        key={`${department.id}-${field.id}`}
+                        id={`${department.id}-${field.id}`}
+                        label={field.label}
+                        value={
+                          currentValue[field.key] === null
+                            ? "none"
+                            : String(currentValue[field.key])
+                        }
+                        onChange={(_, value) => {
+                          const nextPayload: OvertimeApproverUpsertPayload = {
+                            ...currentValue,
+                            [field.key]: value === "none" ? null : value,
+                          };
+                          void saveApprover(department.id, nextPayload);
+                        }}
+                        options={[
+                          { value: "none", label: "Not set" },
+                          ...approvers.map((user) => ({
+                            value: user.id.toString(),
+                            label: user.name,
+                          })),
+                        ]}
+                        placeholder={field.label}
+                      />
+                    ))}
+                  </div>
+
+                  {approverSavingDepartmentId === department.id ? (
+                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Saving approver settings...
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {tab === "requests" ? (
+        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+          <CardContent className="pt-6">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Requestor</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Approver</TableHead>
+                    <TableHead>Info</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Updated</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="py-10 text-center text-sm text-muted-foreground"
+                      >
+                        No overtime requests match the current filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    requests.map((request) => {
+                      const actionInProgress = actionMap[request.id];
+                      const currentAssignee = request.approver_pool.find(
+                        (item) => item.approver_id === currentUserId,
+                      );
+                      const canRespond =
+                        request.status === "PEND" &&
+                        currentAssignee?.status === "PEND";
+                      const actedByAssignment = request.approver_pool.find(
+                        (item) => item.acted_at !== null,
+                      );
+                      const actedBy = actedByAssignment?.approver
+                        ? `${actedByAssignment.approver.first_name} ${actedByAssignment.approver.last_name}`.trim() ||
+                          actedByAssignment.approver.email
+                        : (request.approver_name ??
+                          `User #${request.approver_id}`);
+
+                      return (
+                        <TableRow key={request.id}>
+                          <TableCell>
+                            <p className="font-medium text-foreground">
+                              {request.user_name ?? `User #${request.user_id}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {request.user_department_name ?? "No department"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {request.user_email ?? ""}
+                            </p>
+                          </TableCell>
+                          <TableCell>{formatDate(request.date)}</TableCell>
+                          <TableCell>
+                            <p>{actedBy}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Pool: {request.approver_pool.length}
+                            </p>
+                          </TableCell>
+                          <TableCell className="max-w-[280px]">
+                            <p className="line-clamp-2 text-sm text-muted-foreground">
+                              {request.info?.trim() || "No details provided."}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <span
+                              className={cn(
+                                "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                                statusClass(request.status),
+                              )}
+                            >
+                              {statusLabel(request.status)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDateTime(request.updated_at)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-2">
+                              {canRespond ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8"
+                                    onClick={() => respond(request, "APPROVE")}
+                                    disabled={actionInProgress !== undefined}
+                                  >
+                                    {actionInProgress === "approve" ? (
+                                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                                    ) : (
+                                      <Check className="mr-1.5 size-3.5" />
+                                    )}
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8"
+                                    onClick={() => respond(request, "REJECT")}
+                                    disabled={actionInProgress !== undefined}
+                                  >
+                                    {actionInProgress === "reject" ? (
+                                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                                    ) : (
+                                      <X className="mr-1.5 size-3.5" />
+                                    )}
+                                    Reject
+                                  </Button>
+                                </>
+                              ) : null}
+
+                              {isStaff ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 text-destructive hover:text-destructive"
+                                  onClick={() => remove(request)}
+                                  disabled={actionInProgress !== undefined}
+                                >
+                                  {actionInProgress === "delete" ? (
+                                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="mr-1.5 size-3.5" />
+                                  )}
+                                  Delete
+                                </Button>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

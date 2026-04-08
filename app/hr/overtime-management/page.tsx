@@ -16,6 +16,8 @@ export const metadata = {
   description: "Review, approve, and track overtime requests",
 };
 
+type OvertimeManagementTab = "requests" | "approvers";
+
 type SearchParams =
   | Record<string, string | string[] | undefined>
   | Promise<Record<string, string | string[] | undefined>>;
@@ -37,6 +39,13 @@ function parseScope(value: string): OvertimeRequestScope {
     return value;
   }
   return "approvals";
+}
+
+function parseTab(value: string): OvertimeManagementTab {
+  if (value === "approvers") {
+    return value;
+  }
+  return "requests";
 }
 
 function parsePositiveInteger(value: string) {
@@ -72,6 +81,7 @@ export default async function OvertimeManagementPage({
   const params = (await searchParams) ?? {};
 
   const scope = parseScope(firstValue(params.scope));
+  const tab = parseTab(firstValue(params.tab));
   const query = firstValue(params.q).trim();
   const status = firstValue(params.status).toUpperCase();
   const month = parseMonth(firstValue(params.month));
@@ -182,6 +192,7 @@ export default async function OvertimeManagementPage({
           </Card>
         ) : (
           <OvertimeManagementClient
+            initialTab={tab}
             initialRequests={overtimeRequests}
             overtimeApprovers={overtimeApprovers}
             departments={departments}

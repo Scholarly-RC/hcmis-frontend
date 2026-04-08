@@ -1,5 +1,6 @@
 "use client";
 
+import { PencilLine, Plus, Save, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -203,7 +204,10 @@ export function SalaryStructureClient() {
             Manage position codes, salary grades, and department assignment.
           </p>
         </div>
-        <Button onClick={openCreate}>Add Position</Button>
+        <Button onClick={openCreate}>
+          <Plus className="size-4" />
+          Add Position
+        </Button>
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -247,6 +251,7 @@ export function SalaryStructureClient() {
                       size="sm"
                       onClick={() => openEdit(position)}
                     >
+                      <PencilLine className="size-4" />
                       Edit
                     </Button>
                     {position.is_active ? (
@@ -255,6 +260,7 @@ export function SalaryStructureClient() {
                         size="sm"
                         onClick={() => void deactivate(position)}
                       >
+                        <Trash2 className="size-4" />
                         Deactivate
                       </Button>
                     ) : null}
@@ -365,9 +371,11 @@ export function SalaryStructureClient() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <X className="size-4" />
               Cancel
             </Button>
             <Button onClick={() => void submit()} disabled={saving}>
+              <Save className="size-4" />
               {saving ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
