@@ -41,6 +41,8 @@ const emptyForm: PositionForm = {
   is_active: true,
 };
 
+const POSITION_CODE_PATTERN = /^[A-Z0-9]{1,10}$/;
+
 export function SalaryStructureClient() {
   const [positions, setPositions] = useState<PayrollPosition[]>([]);
   const [departments, setDepartments] = useState<AuthDepartment[]>([]);
@@ -127,6 +129,13 @@ export function SalaryStructureClient() {
 
       if (!payload.title || !payload.code || payload.salary_grade < 1) {
         toast.error("Please fill valid position details.");
+        return;
+      }
+
+      if (!POSITION_CODE_PATTERN.test(payload.code)) {
+        toast.error(
+          "Code must be 1-10 characters using only letters and numbers.",
+        );
         return;
       }
 
@@ -287,10 +296,11 @@ export function SalaryStructureClient() {
               <Input
                 id="position_code"
                 value={form.code}
+                maxLength={10}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    code: event.target.value,
+                    code: event.target.value.toUpperCase(),
                   }))
                 }
               />

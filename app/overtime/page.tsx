@@ -12,8 +12,6 @@ export default function OvertimePage() {
       {(user) => (
         <MyOvertimeClient
           currentUserId={user.id}
-          currentUserDepartmentId={user.department_id}
-          currentUserRole={user.role}
           canManageOvertime={Boolean(
             user.capabilities?.includes("manage_overtime_requests"),
           )}

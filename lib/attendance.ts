@@ -1,4 +1,4 @@
-import type { AuthUser } from "@/types/auth";
+import type { AuthDepartment, AuthUser } from "@/types/auth";
 
 export type AttendanceRecord = {
   id: number;
@@ -74,6 +74,27 @@ export type OvertimeRequestStatus = "PEND" | "APP" | "REJ";
 
 export type OvertimeRequestScope = "mine" | "approvals" | "all";
 
+export type OvertimeApprover = {
+  id: number;
+  department_id: number;
+  department: AuthDepartment | null;
+  department_approver_id: string | null;
+  director_approver_id: string | null;
+  president_approver_id: string | null;
+  hr_approver_id: string | null;
+  department_approver: AuthUser | null;
+  director_approver: AuthUser | null;
+  president_approver: AuthUser | null;
+  hr_approver: AuthUser | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OvertimeApproverAssignment = {
+  approver_id: string | null;
+  approver: AuthUser | null;
+};
+
 export type OvertimeRequestRecord = {
   id: number;
   user_id: string;
@@ -87,4 +108,11 @@ export type OvertimeRequestRecord = {
   approver_name: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type OvertimeApproverUpsertPayload = {
+  department_approver_id: string | null;
+  director_approver_id: string | null;
+  president_approver_id: string | null;
+  hr_approver_id: string | null;
 };

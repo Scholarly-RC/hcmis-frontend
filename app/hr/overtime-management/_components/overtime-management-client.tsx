@@ -31,6 +31,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type {
+  OvertimeApprover,
+  OvertimeApproverUpsertPayload,
   OvertimeRequestRecord,
   OvertimeRequestScope,
   OvertimeRequestStatus,
@@ -61,6 +63,7 @@ type ApproverOption = {
 
 type OvertimeManagementClientProps = {
   initialRequests: OvertimeRequestRecord[];
+  overtimeApprovers: OvertimeApprover[];
   departments: DepartmentOption[];
   approvers: ApproverOption[];
   currentUserId: string;
@@ -154,6 +157,7 @@ function formatDateTime(value: string) {
 
 export function OvertimeManagementClient({
   initialRequests,
+  overtimeApprovers,
   departments,
   approvers,
   currentUserId,
@@ -164,16 +168,24 @@ export function OvertimeManagementClient({
   const pathname = usePathname();
   const router = useRouter();
   const [requests, setRequests] = useState(initialRequests);
+  const [approverSettings, setApproverSettings] = useState(overtimeApprovers);
   const [formState, setFormState] = useState<OvertimeFilterState>(filters);
   const [actionMap, setActionMap] = useState<
     Record<number, "approve" | "reject" | "delete" | undefined>
   >({});
+  const [approverSavingDepartmentId, setApproverSavingDepartmentId] = useState<
+    number | null
+  >(null);
   const debouncedReplaceRef = useRef<DebouncedReplace | null>(null);
   const mountedRef = useRef(false);
 
   useEffect(() => {
     setRequests(initialRequests);
   }, [initialRequests]);
+
+  useEffect(() => {
+    setApproverSettings(overtimeApprovers);
+  }, [overtimeApprovers]);
 
   useEffect(() => {
     setFormState((prev) => (isSameFilterState(prev, filters) ? prev : filters));
@@ -218,6 +230,63 @@ export function OvertimeManagementClient({
       total: requests.length,
     };
   }, [requests]);
+
+  const approverRows = useMemo(() => {
+    const existingByDepartment = new Map(
+      approverSettings.map((item) => [item.department_id, item]),
+    );
+    return departments.map((department) => ({
+      department,
+      approver: existingByDepartment.get(department.id) ?? null,
+    }));
+  }, [approverSettings, departments]);
+
+  async function saveApprover(
+    departmentId: number,
+    payload: OvertimeApproverUpsertPayload,
+  ) {
+    setApproverSavingDepartmentId(departmentId);
+
+    try {
+      const response = await fetch(
+        `/api/attendance/overtime-approvers/${departmentId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+      const result = (await response.json().catch(() => null)) as
+        | OvertimeApprover
+        | { detail?: string }
+        | null;
+
+      if (!response.ok) {
+        const detail = result && "detail" in result ? result.detail : null;
+        toast.error(detail ?? "Unable to update overtime approvers.");
+        return;
+      }
+
+      const nextApprover = result as OvertimeApprover;
+      setApproverSettings((prev) => {
+        const next = prev.filter((item) => item.department_id !== departmentId);
+        next.push(nextApprover);
+        next.sort((a, b) => {
+          const aName = a.department?.name ?? "";
+          const bName = b.department?.name ?? "";
+          return aName.localeCompare(bName);
+        });
+        return next;
+      });
+      toast.success("Overtime approver settings updated.");
+    } catch {
+      toast.error("Unable to update overtime approvers.");
+    } finally {
+      setApproverSavingDepartmentId(null);
+    }
+  }
 
   async function respond(
     request: OvertimeRequestRecord,
@@ -496,6 +565,98 @@ export function OvertimeManagementClient({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+        <CardHeader>
+          <CardTitle>Approver Settings</CardTitle>
+          <CardDescription>
+            Set department overtime approvers using the same role slots as the
+            leave workflow. The system assigns the request approver
+            automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {approverRows.map(({ department, approver }) => {
+            const currentValue: OvertimeApproverUpsertPayload = {
+              department_approver_id: approver?.department_approver_id ?? null,
+              director_approver_id: approver?.director_approver_id ?? null,
+              president_approver_id: approver?.president_approver_id ?? null,
+              hr_approver_id: approver?.hr_approver_id ?? null,
+            };
+
+            return (
+              <div
+                key={department.id}
+                className="rounded-xl border border-border/70 bg-background/70 p-4"
+              >
+                <div className="mb-3">
+                  <p className="font-medium text-foreground">
+                    {department.name}
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    {
+                      id: "department_approver",
+                      label: "Department Approver",
+                      key: "department_approver_id" as const,
+                    },
+                    {
+                      id: "director_approver",
+                      label: "Director Approver",
+                      key: "director_approver_id" as const,
+                    },
+                    {
+                      id: "president_approver",
+                      label: "President Approver",
+                      key: "president_approver_id" as const,
+                    },
+                    {
+                      id: "hr_approver",
+                      label: "HR Approver",
+                      key: "hr_approver_id" as const,
+                    },
+                  ].map((field) => (
+                    <SelectField
+                      key={`${department.id}-${field.id}`}
+                      id={`${department.id}-${field.id}`}
+                      label={field.label}
+                      value={
+                        currentValue[field.key] === null
+                          ? "none"
+                          : String(currentValue[field.key])
+                      }
+                      onChange={(_, value) => {
+                        const nextPayload: OvertimeApproverUpsertPayload = {
+                          ...currentValue,
+                          [field.key]: value === "none" ? null : value,
+                        };
+                        void saveApprover(department.id, nextPayload);
+                      }}
+                      options={[
+                        { value: "none", label: "Not set" },
+                        ...approvers.map((user) => ({
+                          value: user.id.toString(),
+                          label: user.name,
+                        })),
+                      ]}
+                      placeholder={field.label}
+                    />
+                  ))}
+                </div>
+
+                {approverSavingDepartmentId === department.id ? (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Saving approver settings...
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
 
       <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
         <CardContent className="pt-6">

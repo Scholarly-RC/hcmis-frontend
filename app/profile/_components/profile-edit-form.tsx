@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Save } from "lucide-react";
+import { Loader2, Save, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useState } from "react";
 import { type Control, Controller, useForm } from "react-hook-form";
@@ -26,6 +26,7 @@ import {
   RELIGION_OPTIONS,
 } from "@/lib/profile-options";
 import type { AuthUser } from "@/types/auth";
+import { cn } from "@/utils/cn";
 
 const profileSchema = z.object({
   first_name: z.string().trim().min(1, "First name is required."),
@@ -35,7 +36,6 @@ const profileSchema = z.object({
   education: z.string(),
   civil_status: z.string(),
   religion: z.string(),
-  rank: z.string(),
   phone_number: z.string(),
   address: z.string(),
   date_of_birth: z.string(),
@@ -61,7 +61,6 @@ function createInitialValues(user: AuthUser): ProfileFormValues {
     education: user.education ?? "",
     civil_status: user.civil_status ?? "",
     religion: user.religion ?? "",
-    rank: user.rank ?? "",
     phone_number: user.phone_number ?? "",
     address: user.address ?? "",
     date_of_birth: toInputDate(user.date_of_birth),
@@ -80,6 +79,7 @@ type TextFieldProps = {
   label: string;
   type?: string;
   placeholder?: string;
+  className?: string;
 };
 
 function TextField({
@@ -88,13 +88,14 @@ function TextField({
   label,
   type = "text",
   placeholder,
+  className,
 }: TextFieldProps) {
   return (
     <Controller
       control={control}
       name={id}
       render={({ field, fieldState }) => (
-        <div className="space-y-2">
+        <div className={cn("space-y-2", className)}>
           <Label htmlFor={id}>{label}</Label>
           <Input
             id={id}
@@ -104,6 +105,7 @@ function TextField({
             placeholder={placeholder}
             onBlur={field.onBlur}
             onChange={(event) => field.onChange(event.target.value)}
+            className="h-10"
             aria-invalid={fieldState.invalid ? "true" : "false"}
           />
           {fieldState.error ? (
@@ -123,6 +125,7 @@ type SelectFieldProps = {
   label: string;
   options: ProfileOption[];
   placeholder: string;
+  className?: string;
 };
 
 function SelectField({
@@ -131,13 +134,14 @@ function SelectField({
   label,
   options,
   placeholder,
+  className,
 }: SelectFieldProps) {
   return (
     <Controller
       control={control}
       name={id}
       render={({ field, fieldState }) => (
-        <div className="space-y-2">
+        <div className={cn("space-y-2", className)}>
           <Label htmlFor={id}>{label}</Label>
           <Select value={field.value} onValueChange={field.onChange}>
             <SelectTrigger id={id} name={id} className="h-10 w-full">
@@ -168,6 +172,7 @@ type TextAreaFieldProps = {
   label: string;
   placeholder?: string;
   className?: string;
+  wrapperClassName?: string;
 };
 
 function TextAreaField({
@@ -176,13 +181,14 @@ function TextAreaField({
   label,
   placeholder,
   className,
+  wrapperClassName,
 }: TextAreaFieldProps) {
   return (
     <Controller
       control={control}
       name={id}
       render={({ field, fieldState }) => (
-        <div className="space-y-2">
+        <div className={cn("space-y-2", wrapperClassName)}>
           <Label htmlFor={id}>{label}</Label>
           <Textarea
             id={id}
@@ -213,24 +219,27 @@ type ProfileSectionProps = {
 
 function ProfileSection({ title, description, children }: ProfileSectionProps) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-border/70 bg-background/60 shadow-sm shadow-black/5">
-      <div className="space-y-1 px-5 pt-5">
-        <h3 className="font-heading text-base font-medium tracking-tight text-foreground">
-          {title}
-        </h3>
-        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+    <section className="rounded-xl border border-border/70 bg-muted/20 p-4 sm:p-5">
+      <div className="space-y-1">
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        <p className="text-sm leading-5 text-muted-foreground">{description}</p>
       </div>
-      <div className="px-5 pb-5 pt-4">{children}</div>
+      <div className="mt-4 grid gap-4 md:grid-cols-2">{children}</div>
     </section>
   );
 }
 
 type ProfileEditFormProps = {
   user: AuthUser;
+  onCancel?: () => void;
   onSaved?: () => void;
 };
 
-export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
+export function ProfileEditForm({
+  user,
+  onCancel,
+  onSaved,
+}: ProfileEditFormProps) {
   const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const initialValues = createInitialValues(user);
@@ -261,7 +270,6 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
           education: toNullableText(values.education),
           civil_status: toNullableText(values.civil_status),
           religion: toNullableText(values.religion),
-          rank: toNullableText(values.rank),
           phone_number: toNullableText(values.phone_number),
           address: toNullableText(values.address),
           date_of_birth: toNullableText(values.date_of_birth),
@@ -288,21 +296,21 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
 
   return (
     <form
-      className="flex min-h-full flex-col"
+      className="flex h-full min-h-0 w-full flex-1 flex-col gap-1"
       onSubmit={handleSubmit(onSubmit)}
     >
-      <div className="space-y-4 pb-4">
-        {submitError ? (
-          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-            {submitError}
-          </div>
-        ) : null}
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-0 pb-6">
+        <div className="space-y-5">
+          {submitError ? (
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {submitError}
+            </div>
+          ) : null}
 
-        <ProfileSection
-          title="Personal details"
-          description="These fields identify the person behind the account."
-        >
-          <div className="grid gap-4 md:grid-cols-2">
+          <ProfileSection
+            title="Personal Information"
+            description="Employee identity and core personal details."
+          >
             <TextField
               control={control}
               id="first_name"
@@ -355,60 +363,69 @@ export function ProfileEditForm({ user, onSaved }: ProfileEditFormProps) {
               options={EDUCATION_OPTIONS}
               placeholder="Choose education..."
             />
-          </div>
-        </ProfileSection>
+          </ProfileSection>
 
-        <ProfileSection
-          title="Contact details"
-          description="Use this information for day-to-day communication."
-        >
-          <div className="grid gap-4 md:grid-cols-2">
+          <ProfileSection
+            title="Contact Details"
+            description="Day-to-day contact information used across HR records."
+          >
             <TextField
               control={control}
               id="phone_number"
               label="Phone number"
               placeholder="Phone number"
             />
-            <div className="space-y-2 md:col-span-2">
-              <TextAreaField
-                control={control}
-                id="address"
-                label="Address"
-                placeholder="Home address"
-                className="min-h-28"
-              />
-            </div>
-          </div>
-        </ProfileSection>
-
-        <ProfileSection
-          title="Employment details"
-          description="The fields that describe your current assignment."
-        >
-          <div className="grid gap-4 md:grid-cols-2">
-            <TextField
+            <TextAreaField
               control={control}
-              id="rank"
-              label="Rank"
-              placeholder="Rank"
+              id="address"
+              label="Address"
+              placeholder="Home address"
+              className="min-h-28"
+              wrapperClassName="md:col-span-2"
             />
+          </ProfileSection>
+
+          <ProfileSection
+            title="Employment Details"
+            description="Current assignment details that are surfaced from HR records."
+          >
+            <div className="space-y-2">
+              <Label>Position Assignment</Label>
+              <div className="flex min-h-10 items-center rounded-md border border-border/70 bg-background px-3 text-sm text-muted-foreground">
+                {user.rank?.trim() || "Managed by HR"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Payroll assignment changes are managed by HR.
+              </p>
+            </div>
             <TextField
               control={control}
               id="date_of_hiring"
               label="Date of hiring"
               type="date"
             />
-          </div>
-        </ProfileSection>
+          </ProfileSection>
+        </div>
       </div>
 
-      <div className="sticky bottom-0 z-10 -mx-5 border-t border-border/70 bg-background/95 px-5 py-3 shadow-[0_-12px_24px_-18px_rgba(0,0,0,0.35)] backdrop-blur-sm sm:-mx-6 sm:px-6">
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isSubmitting || !isDirty}>
+      <div className="shrink-0 flex items-center justify-end gap-2 border-t bg-background px-6 py-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onCancel?.()}
+          disabled={isSubmitting}
+        >
+          <X className="size-4" />
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isSubmitting || !isDirty}>
+          {isSubmitting ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
             <Save className="size-4" />
-            {isSubmitting ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
+          )}
+          {isSubmitting ? "Saving..." : "Save Changes"}
+        </Button>
       </div>
     </form>
   );

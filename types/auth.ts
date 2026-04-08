@@ -15,6 +15,9 @@ export type AuthUser = {
   civil_status: string | null;
   religion: string | null;
   rank: string | null;
+  position_id: number | null;
+  rank_level: number | null;
+  step_number: number | null;
   employee_number: string | null;
   biometric_uid: number | null;
   role: string | null;
@@ -50,7 +53,6 @@ export type AuthUserProfileUpdate = {
   education?: string | null;
   civil_status?: string | null;
   religion?: string | null;
-  rank?: string | null;
   phone_number?: string | null;
   address?: string | null;
   date_of_birth?: string | null;

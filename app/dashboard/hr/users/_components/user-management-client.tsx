@@ -39,6 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { PayrollPosition } from "@/lib/payroll";
 import { toast } from "@/lib/toast";
 import type { AuthDepartment, AuthUser } from "@/types/auth";
 import { cn } from "@/utils/cn";
@@ -63,7 +64,10 @@ type UserFormState = {
   biometric_uid: string;
   role: (typeof userRoles)[number];
   department_id: string;
-  rank: string;
+  position_id: string;
+  rank_level: string;
+  step_number: string;
+  assignment_effective_from: string;
   phone_number: string;
   date_of_birth: string;
   date_of_hiring: string;
@@ -89,7 +93,10 @@ function buildUserEditorSchema(mode: UserEditorMode) {
       biometric_uid: z.string(),
       role: z.enum(userRoles),
       department_id: z.string(),
-      rank: z.string(),
+      position_id: z.string(),
+      rank_level: z.string(),
+      step_number: z.string(),
+      assignment_effective_from: z.string(),
       phone_number: z.string(),
       date_of_birth: z.string(),
       date_of_hiring: z.string(),
@@ -136,6 +143,52 @@ function buildUserEditorSchema(mode: UserEditorMode) {
           message: "Department selection is invalid.",
         });
       }
+
+      if (
+        values.position_id.trim().length > 0 &&
+        values.position_id.trim() !== "none" &&
+        !/^\d+$/.test(values.position_id.trim())
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["position_id"],
+          message: "Position selection is invalid.",
+        });
+      }
+
+      if (
+        values.rank_level.trim().length > 0 &&
+        !/^\d+$/.test(values.rank_level.trim())
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["rank_level"],
+          message: "Rank level must be a whole number.",
+        });
+      }
+
+      if (
+        values.step_number.trim().length > 0 &&
+        !/^\d+$/.test(values.step_number.trim())
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["step_number"],
+          message: "Step number must be a whole number.",
+        });
+      }
+
+      const hasPosition =
+        values.position_id.trim().length > 0 &&
+        values.position_id.trim() !== "none";
+      const hasRankLevel = values.rank_level.trim().length > 0;
+      if (hasPosition !== hasRankLevel) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: hasPosition ? ["rank_level"] : ["position_id"],
+          message: "Position and rank level are required together.",
+        });
+      }
     });
 }
 
@@ -149,7 +202,10 @@ export type UserEditorPayload = {
   biometric_uid: number | null;
   role: string | null;
   department_id: number | null;
-  rank: string | null;
+  position_id: number | null;
+  rank_level: number | null;
+  step_number: number | null;
+  assignment_effective_from: string | null;
   phone_number: string | null;
   date_of_birth: string | null;
   date_of_hiring: string | null;
@@ -179,7 +235,10 @@ const emptyFormState = (): UserFormState => ({
   biometric_uid: "",
   role: "EMP",
   department_id: "none",
-  rank: "",
+  position_id: "none",
+  rank_level: "",
+  step_number: "",
+  assignment_effective_from: "",
   phone_number: "",
   date_of_birth: "",
   date_of_hiring: "",
@@ -280,7 +339,10 @@ function buildFormState(
         biometric_uid: user.biometric_uid?.toString() ?? "",
         role: normalizeUserRole(user.role),
         department_id: user.department_id?.toString() ?? "none",
-        rank: user.rank ?? "",
+        position_id: user.position_id?.toString() ?? "none",
+        rank_level: user.rank_level?.toString() ?? "",
+        step_number: user.step_number?.toString() ?? "",
+        assignment_effective_from: formatDateInput(user.date_of_hiring),
         phone_number: user.phone_number ?? "",
         date_of_birth: formatDateInput(user.date_of_birth),
         date_of_hiring: formatDateInput(user.date_of_hiring),
@@ -489,6 +551,7 @@ export function UserEditorDialog({
   user,
   initialValues,
   departments,
+  positions,
   onOpenChange,
   onSubmit,
 }: {
@@ -497,6 +560,7 @@ export function UserEditorDialog({
   user: AuthUser | null;
   initialValues?: UserEditorInitialValues;
   departments: AuthDepartment[];
+  positions: PayrollPosition[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: UserEditorPayload) => Promise<void>;
 }) {
@@ -518,6 +582,15 @@ export function UserEditorDialog({
       value: department.id.toString(),
       label: `${department.name} (${department.code})`,
     })),
+  ];
+  const positionOptions = [
+    { value: "none", label: "Unassigned" },
+    ...positions
+      .filter((position) => position.is_active)
+      .map((position) => ({
+        value: position.id.toString(),
+        label: `${position.code} (${position.title})`,
+      })),
   ];
 
   async function handleFormSubmit(values: UserFormState) {
@@ -541,7 +614,22 @@ export function UserEditorDialog({
           values.department_id.trim().length === 0
             ? null
             : Number(values.department_id.trim()),
-        rank: normalizeText(values.rank),
+        position_id:
+          values.position_id.trim() === "none" ||
+          values.position_id.trim().length === 0
+            ? null
+            : Number(values.position_id.trim()),
+        rank_level:
+          values.rank_level.trim().length === 0
+            ? null
+            : Number(values.rank_level.trim()),
+        step_number:
+          values.step_number.trim().length === 0
+            ? null
+            : Number(values.step_number.trim()),
+        assignment_effective_from: normalizeText(
+          values.assignment_effective_from,
+        ),
         phone_number: normalizeText(values.phone_number),
         date_of_birth: normalizeText(values.date_of_birth),
         date_of_hiring: normalizeText(values.date_of_hiring),
@@ -781,17 +869,70 @@ export function UserEditorDialog({
                   />
                 </FormField>
 
+                <Controller
+                  control={control}
+                  name="position_id"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-position"
+                      label="Position"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={positionOptions}
+                      placeholder="Select a position"
+                      triggerClassName={controlHeightClass}
+                      error={errors.position_id?.message}
+                    />
+                  )}
+                />
+
                 <FormField
-                  label="Rank"
-                  htmlFor="user-rank"
-                  error={errors.rank?.message}
+                  label="Rank Level"
+                  htmlFor="user-rank-level"
+                  error={errors.rank_level?.message}
                 >
                   <Input
-                    id="user-rank"
+                    id="user-rank-level"
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    className={controlHeightClass}
+                    aria-invalid={errors.rank_level ? "true" : "false"}
+                    {...register("rank_level")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Step Number"
+                  htmlFor="user-step-number"
+                  error={errors.step_number?.message}
+                  hint="Optional"
+                >
+                  <Input
+                    id="user-step-number"
+                    type="number"
+                    min="1"
                     placeholder="Optional"
                     className={controlHeightClass}
-                    aria-invalid={errors.rank ? "true" : "false"}
-                    {...register("rank")}
+                    aria-invalid={errors.step_number ? "true" : "false"}
+                    {...register("step_number")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Assignment Effective From"
+                  htmlFor="user-assignment-effective-from"
+                  error={errors.assignment_effective_from?.message}
+                  hint="Used when creating a new assignment history record."
+                >
+                  <Input
+                    id="user-assignment-effective-from"
+                    type="date"
+                    className={controlHeightClass}
+                    aria-invalid={
+                      errors.assignment_effective_from ? "true" : "false"
+                    }
+                    {...register("assignment_effective_from")}
                   />
                 </FormField>
 
@@ -851,6 +992,7 @@ export function UserManagementClient({
   const router = useRouter();
   const [users, setUsers] = useState<UsersResponse>([]);
   const [departments, setDepartments] = useState<DepartmentsResponse>([]);
+  const [positions, setPositions] = useState<PayrollPosition[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -884,12 +1026,14 @@ export function UserManagementClient({
       setError(null);
 
       try {
-        const [loadedUsers, loadedDepartments] = await Promise.all([
-          requestJson<UsersResponse>(
-            "/api/users?include_superusers=true&exclude_self=true",
-          ),
-          requestJson<DepartmentsResponse>("/api/departments"),
-        ]);
+        const [loadedUsers, loadedDepartments, loadedPositions] =
+          await Promise.all([
+            requestJson<UsersResponse>(
+              "/api/users?include_superusers=true&exclude_self=true",
+            ),
+            requestJson<DepartmentsResponse>("/api/departments"),
+            requestJson<PayrollPosition[]>("/api/payroll/positions"),
+          ]);
 
         if (cancelled) {
           return;
@@ -897,6 +1041,7 @@ export function UserManagementClient({
 
         setUsers(loadedUsers);
         setDepartments(loadedDepartments);
+        setPositions(loadedPositions);
       } catch (err) {
         if (cancelled) {
           return;
@@ -1172,14 +1317,17 @@ export function UserManagementClient({
               setIsLoading(true);
               void (async () => {
                 try {
-                  const [loadedUsers, loadedDepartments] = await Promise.all([
-                    requestJson<UsersResponse>(
-                      "/api/users?include_superusers=true&exclude_self=true",
-                    ),
-                    requestJson<DepartmentsResponse>("/api/departments"),
-                  ]);
+                  const [loadedUsers, loadedDepartments, loadedPositions] =
+                    await Promise.all([
+                      requestJson<UsersResponse>(
+                        "/api/users?include_superusers=true&exclude_self=true",
+                      ),
+                      requestJson<DepartmentsResponse>("/api/departments"),
+                      requestJson<PayrollPosition[]>("/api/payroll/positions"),
+                    ]);
                   setUsers(loadedUsers);
                   setDepartments(loadedDepartments);
+                  setPositions(loadedPositions);
                 } catch (loadError) {
                   const message =
                     loadError instanceof Error
@@ -1344,6 +1492,7 @@ export function UserManagementClient({
         mode={editorMode}
         user={editingUser}
         departments={departments}
+        positions={positions}
         onOpenChange={closeEditor}
         onSubmit={handleSaveUser}
       />

@@ -1,5 +1,9 @@
 import type { AuthUser } from "@/types/auth";
 
+export type AutomaticDeductionSchedule =
+  | "SECOND_CUTOFF_ONLY"
+  | "SPLIT_BOTH_CUTOFFS";
+
 export type PayrollSetting = {
   id: number;
   minimum_wage_amount: string;
@@ -8,6 +12,7 @@ export type PayrollSetting = {
   basic_salary_step_multiplier: string;
   basic_salary_steps: number;
   max_position_rank: number;
+  automatic_deduction_schedule: AutomaticDeductionSchedule;
   created_at: string;
   updated_at: string;
 };
@@ -160,6 +165,24 @@ export type PayrollPayslip = {
   updated_at: string;
 };
 
+export type PayslipVariableLineItem = {
+  id: number;
+  name: string;
+  amount: string;
+};
+
+export type PayslipVariableCompensation = PayslipVariableLineItem & {
+  payslip_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PayslipVariableDeduction = PayslipVariableLineItem & {
+  payslip_id: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type PayslipSummary = {
   period: string | null;
   salary: string | null;
@@ -171,8 +194,8 @@ export type PayslipSummary = {
   pag_ibig_deduction: string | null;
   mp2_deduction: string | null;
   tax_deduction: string | null;
-  variable_compensations: Array<{ id: number; name: string; amount: string }>;
-  variable_deductions: Array<{ id: number; name: string; amount: string }>;
+  variable_compensations: PayslipVariableLineItem[];
+  variable_deductions: PayslipVariableLineItem[];
   compensations: Array<{ id: number; name: string; amount: string }>;
 };
 
@@ -551,13 +574,48 @@ export async function requestJson<T>(
   }
 
   if (!response.ok) {
-    if (
-      payload &&
-      typeof payload === "object" &&
-      "detail" in payload &&
-      typeof (payload as { detail: unknown }).detail === "string"
-    ) {
-      throw new Error((payload as { detail: string }).detail);
+    if (Array.isArray(payload)) {
+      const messages = payload
+        .map((item) => {
+          if (
+            item &&
+            typeof item === "object" &&
+            "msg" in item &&
+            typeof (item as { msg: unknown }).msg === "string"
+          ) {
+            return (item as { msg: string }).msg;
+          }
+          return null;
+        })
+        .filter((message): message is string => Boolean(message));
+      if (messages.length > 0) {
+        throw new Error(messages.join("; "));
+      }
+    }
+
+    if (payload && typeof payload === "object" && "detail" in payload) {
+      const detail = (payload as { detail: unknown }).detail;
+      if (typeof detail === "string") {
+        throw new Error(detail);
+      }
+      if (Array.isArray(detail)) {
+        const messages = detail
+          .map((item) => {
+            if (
+              item &&
+              typeof item === "object" &&
+              "msg" in item &&
+              typeof (item as { msg: unknown }).msg === "string"
+            ) {
+              return (item as { msg: string }).msg;
+            }
+            return null;
+          })
+          .filter((message): message is string => Boolean(message));
+        if (messages.length > 0) {
+          throw new Error(messages.join("; "));
+        }
+      }
     }
     throw new Error("Request failed.");
   }

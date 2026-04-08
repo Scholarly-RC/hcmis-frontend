@@ -55,8 +55,27 @@ import { toast } from "@/lib/toast";
 import type { AuthUser } from "@/types/auth";
 
 type RequestError = {
-  detail?: string;
+  detail?:
+    | string
+    | {
+        loc?: Array<string | number>;
+        msg?: string;
+      }[];
 };
+
+function getRequestErrorMessage(payload: RequestError | null) {
+  const detail = payload?.detail;
+  if (typeof detail === "string" && detail.trim().length > 0) {
+    return detail;
+  }
+  if (Array.isArray(detail) && detail.length > 0) {
+    const firstDetail = detail[0];
+    if (firstDetail?.msg && firstDetail.msg.trim().length > 0) {
+      return firstDetail.msg;
+    }
+  }
+  return "Request failed.";
+}
 
 type CreateCycleFormState = {
   evaluateeId: string;
@@ -96,9 +115,7 @@ async function requestJson<T>(pathname: string, init: RequestInit = {}) {
     | null;
 
   if (!response.ok) {
-    throw new Error(
-      (payload as RequestError | null)?.detail ?? "Request failed.",
-    );
+    throw new Error(getRequestErrorMessage(payload as RequestError | null));
   }
 
   return payload as T;
@@ -455,6 +472,14 @@ export function PerformanceEvaluationsClient({
       : ADMINISTRATOR_QUESTIONNAIRE_CODE;
     return questionnaireIdByCode.get(expectedCode) ?? "";
   }, [questionnaireIdByCode, selectedCreateCycleUser]);
+
+  const effectiveCreateCycleQuestionnaireId =
+    createCycleForm.questionnaireId || autoQuestionnaireIdForSelectedUser;
+  const selectedCreateCycleQuestionnaire =
+    questionnaires.find(
+      (questionnaire) =>
+        String(questionnaire.id) === effectiveCreateCycleQuestionnaireId,
+    ) ?? null;
 
   const loadCycleDetails = useCallback(async (cycleId: number) => {
     const [cycleEvaluations, aggregateSummary] = await Promise.all([
@@ -838,12 +863,15 @@ export function PerformanceEvaluationsClient({
   }
 
   async function createCycle() {
-    if (
-      !createCycleForm.evaluateeId ||
-      !createCycleForm.questionnaireId ||
-      !createCycleForm.year
-    ) {
-      toast.error("Evaluatee, questionnaire, and year are required.");
+    if (!createCycleForm.evaluateeId || !createCycleForm.year) {
+      toast.error("Evaluatee and year are required.");
+      return;
+    }
+
+    if (!effectiveCreateCycleQuestionnaireId) {
+      toast.error(
+        "No matching questionnaire is available for the selected user's role.",
+      );
       return;
     }
 
@@ -854,8 +882,8 @@ export function PerformanceEvaluationsClient({
         {
           method: "POST",
           body: JSON.stringify({
-            evaluatee_id: Number(createCycleForm.evaluateeId),
-            questionnaire_id: Number(createCycleForm.questionnaireId),
+            evaluatee_id: createCycleForm.evaluateeId,
+            questionnaire_id: Number(effectiveCreateCycleQuestionnaireId),
             quarter: createCycleForm.quarter,
             year: Number(createCycleForm.year),
           }),
@@ -1262,32 +1290,18 @@ export function PerformanceEvaluationsClient({
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="questionnaire">Questionnaire</Label>
-                      <Select
-                        value={createCycleForm.questionnaireId || "__none__"}
-                        disabled
-                      >
-                        <SelectTrigger
-                          id="questionnaire"
-                          className="h-10 w-full"
-                        >
-                          <SelectValue placeholder="Select questionnaire" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">
-                            Select questionnaire
-                          </SelectItem>
-                          {questionnaires.map((questionnaire) => (
-                            <SelectItem
-                              key={questionnaire.id}
-                              value={String(questionnaire.id)}
-                            >
-                              {questionnaire.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Label>Questionnaire</Label>
+                      <div className="flex min-h-10 items-center rounded-md border border-border bg-muted/40 px-3 text-sm text-foreground">
+                        {selectedCreateCycleQuestionnaire?.title ??
+                          "No questionnaire available for this user's role."}
+                      </div>
                     </div>
+                    {!effectiveCreateCycleQuestionnaireId ? (
+                      <p className="text-sm text-destructive">
+                        No questionnaire is configured for the selected user's
+                        role.
+                      </p>
+                    ) : null}
                     <div className="space-y-2">
                       <Label htmlFor="quarter">Quarter</Label>
                       <Select
@@ -1533,9 +1547,7 @@ export function PerformanceEvaluationsClient({
                             className="flex items-center justify-between rounded-md border border-border/70 p-3"
                           >
                             <div className="text-sm">
-                              {evaluatorName
-                                ? `${evaluatorName} (#${evaluation.evaluator_id})`
-                                : `User #${evaluation.evaluator_id}`}
+                              {evaluatorName ?? "Unnamed User"}
                               {evaluation.evaluator_id ===
                               selectedCycle.evaluatee_id
                                 ? " (Self)"
@@ -1611,9 +1623,7 @@ export function PerformanceEvaluationsClient({
                         <div>
                           Evaluatee:{" "}
                           <span className="text-foreground">
-                            {evaluateeName
-                              ? `${evaluateeName} (#${selectedCycle.evaluatee_id})`
-                              : `User #${selectedCycle.evaluatee_id}`}
+                            {evaluateeName ?? "Unnamed User"}
                           </span>
                         </div>
                         <div>
@@ -1758,27 +1768,17 @@ export function PerformanceEvaluationsClient({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="questionnaire">Questionnaire</Label>
-              <Select
-                value={createCycleForm.questionnaireId || "__none__"}
-                disabled
-              >
-                <SelectTrigger id="questionnaire" className="h-10 w-full">
-                  <SelectValue placeholder="Select questionnaire" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Select questionnaire</SelectItem>
-                  {questionnaires.map((questionnaire) => (
-                    <SelectItem
-                      key={questionnaire.id}
-                      value={String(questionnaire.id)}
-                    >
-                      {questionnaire.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Questionnaire</Label>
+              <div className="flex min-h-10 items-center rounded-md border border-border bg-muted/40 px-3 text-sm text-foreground">
+                {selectedCreateCycleQuestionnaire?.title ??
+                  "No questionnaire available for this user's role."}
+              </div>
             </div>
+            {!effectiveCreateCycleQuestionnaireId ? (
+              <p className="text-sm text-destructive">
+                No questionnaire is configured for the selected user's role.
+              </p>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="quarter">Quarter</Label>
               <Select
@@ -1908,9 +1908,7 @@ export function PerformanceEvaluationsClient({
                 <div>
                   Evaluatee:{" "}
                   <span className="text-foreground">
-                    {evaluateeName
-                      ? `${evaluateeName} (#${selectedCycle.evaluatee_id})`
-                      : `User #${selectedCycle.evaluatee_id}`}
+                    {evaluateeName ?? "Unnamed User"}
                   </span>
                 </div>
                 <div>
@@ -1989,10 +1987,7 @@ export function PerformanceEvaluationsClient({
                         className="flex items-center justify-between rounded-md border border-border/70 p-3"
                       >
                         <div className="text-sm">
-                          Evaluator:{" "}
-                          {evaluatorName
-                            ? `${evaluatorName} (#${evaluation.evaluator_id})`
-                            : `User #${evaluation.evaluator_id}`}
+                          Evaluator: {evaluatorName ?? "Unnamed User"}
                           {evaluation.evaluator_id ===
                           selectedCycle.evaluatee_id
                             ? " (Self)"

@@ -4,6 +4,7 @@ import { OvertimeManagementClient } from "@/app/hr/overtime-management/_componen
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type {
+  OvertimeApprover,
   OvertimeRequestRecord,
   OvertimeRequestScope,
 } from "@/lib/attendance";
@@ -102,31 +103,42 @@ export default async function OvertimeManagementPage({
   }
 
   let overtimeRequests: OvertimeRequestRecord[] = [];
+  let overtimeApprovers: OvertimeApprover[] = [];
   let departments: DepartmentOption[] = [];
   let approvers: { id: string; name: string }[] = [];
   let loadError: string | null = null;
 
   try {
-    const [overtimeResponse, departmentResponse, userResponse] =
-      await Promise.all([
-        fetchBackendJsonWithAuth<OvertimeRequestRecord[]>({
-          token: session.token,
-          pathname: `/attendance/overtime?${overtimeSearch.toString()}`,
-          fallbackMessage: "Unable to load overtime data.",
-        }),
-        fetchBackendJsonWithAuth<DepartmentOption[]>({
-          token: session.token,
-          pathname: "/departments",
-          fallbackMessage: "Unable to load overtime data.",
-        }),
-        fetchBackendJsonWithAuth<AuthUser[]>({
-          token: session.token,
-          pathname: "/users?active_only=true&include_superusers=true",
-          fallbackMessage: "Unable to load overtime data.",
-        }),
-      ]);
+    const [
+      overtimeResponse,
+      overtimeApproverResponse,
+      departmentResponse,
+      userResponse,
+    ] = await Promise.all([
+      fetchBackendJsonWithAuth<OvertimeRequestRecord[]>({
+        token: session.token,
+        pathname: `/attendance/overtime?${overtimeSearch.toString()}`,
+        fallbackMessage: "Unable to load overtime data.",
+      }),
+      fetchBackendJsonWithAuth<OvertimeApprover[]>({
+        token: session.token,
+        pathname: "/attendance/overtime-approvers",
+        fallbackMessage: "Unable to load overtime data.",
+      }),
+      fetchBackendJsonWithAuth<DepartmentOption[]>({
+        token: session.token,
+        pathname: "/departments",
+        fallbackMessage: "Unable to load overtime data.",
+      }),
+      fetchBackendJsonWithAuth<AuthUser[]>({
+        token: session.token,
+        pathname: "/users?active_only=true&include_superusers=true",
+        fallbackMessage: "Unable to load overtime data.",
+      }),
+    ]);
 
     overtimeRequests = overtimeResponse;
+    overtimeApprovers = overtimeApproverResponse;
     departments = departmentResponse;
     approvers = userResponse
       .filter((user) => user.is_active)
@@ -171,6 +183,7 @@ export default async function OvertimeManagementPage({
         ) : (
           <OvertimeManagementClient
             initialRequests={overtimeRequests}
+            overtimeApprovers={overtimeApprovers}
             departments={departments}
             approvers={approvers}
             currentUserId={session.user.id}

@@ -5,9 +5,7 @@ import {
   CalendarRange,
   ClipboardCheck,
   FileBarChart,
-  FileCog,
   FileSearch,
-  FileSpreadsheet,
   Files,
   Megaphone,
   ReceiptText,
@@ -124,24 +122,6 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         href: "/hr/payslips",
         keywords: ["payslip", "release", "payroll records"],
         requiredCapabilities: ["manage_payslips"],
-      },
-      {
-        label: "Payroll Run Inputs",
-        description:
-          "Encode variable earnings and deductions, then validate and approve payroll runs.",
-        icon: FileSpreadsheet,
-        href: "/hr/payroll-run-inputs",
-        keywords: ["variable pay", "deduction", "payroll run", "adjustments"],
-        requiredCapabilities: ["manage_payslips"],
-      },
-      {
-        label: "Payroll Item Types",
-        description:
-          "Manage the earning and deduction definitions used by payroll runs.",
-        icon: FileCog,
-        href: "/hr/payroll-item-types",
-        keywords: ["payroll items", "earnings", "deductions", "catalog"],
-        requiredCapabilities: ["manage_payroll_settings"],
       },
       {
         label: "Payroll Rules And Deductions",

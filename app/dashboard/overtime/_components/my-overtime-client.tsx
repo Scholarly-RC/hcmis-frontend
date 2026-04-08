@@ -37,11 +37,11 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import type {
+  OvertimeApproverAssignment,
   OvertimeRequestRecord,
   OvertimeRequestStatus,
 } from "@/lib/attendance";
 import { toast } from "@/lib/toast";
-import type { AuthUser } from "@/types/auth";
 import { cn } from "@/utils/cn";
 
 type RequestError = {
@@ -56,14 +56,11 @@ type FilterState = {
 
 type MyOvertimeClientProps = {
   currentUserId: string;
-  currentUserDepartmentId: number | null;
-  currentUserRole: string | null;
   canManageOvertime: boolean;
 };
 
 const createOvertimeRequestSchema = z.object({
   date: z.string().min(1, "Date is required."),
-  approver_id: z.string().min(1, "Approver is required."),
   info: z.string().trim().min(1, "Info is required."),
 });
 
@@ -73,7 +70,6 @@ type CreateOvertimeRequestFormValues = z.infer<
 
 type OvertimeCreatePayload = {
   user_id: string;
-  approver_id: string;
   date: string;
   info: string;
 };
@@ -210,15 +206,12 @@ function parseFilterStatus(value: string | null) {
 
 export function MyOvertimeClient({
   currentUserId,
-  currentUserDepartmentId,
-  currentUserRole,
   canManageOvertime,
 }: MyOvertimeClientProps) {
   const searchParams = useSearchParams();
   const [requests, setRequests] = useState<OvertimeRequestRecord[]>([]);
-  const [approvers, setApprovers] = useState<
-    Array<{ id: string; name: string }>
-  >([]);
+  const [assignedApprover, setAssignedApprover] =
+    useState<OvertimeApproverAssignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
@@ -226,13 +219,6 @@ export function MyOvertimeClient({
     month: "all",
     status: "all",
   });
-  const [approverPolicyLabel, setApproverPolicyLabel] = useState<
-    | "employee_to_dh"
-    | "dh_to_pres"
-    | "hr_to_dh_or_pres"
-    | "pres_to_dh"
-    | "unavailable"
-  >("unavailable");
 
   useEffect(() => {
     const month = parseFilterMonth(searchParams.get("month"));
@@ -263,14 +249,12 @@ export function MyOvertimeClient({
     register,
     handleSubmit,
     reset,
-    setValue,
     watch,
     formState: { errors, isSubmitting },
   } = useForm<CreateOvertimeRequestFormValues>({
     resolver: zodResolver(createOvertimeRequestSchema),
     defaultValues: {
       date: "",
-      approver_id: "",
       info: "",
     },
   });
@@ -280,12 +264,12 @@ export function MyOvertimeClient({
 
     async function load() {
       try {
-        const [requestsResponse, usersResponse] = await Promise.all([
+        const [requestsResponse, approverResponse] = await Promise.all([
           requestJson<OvertimeRequestRecord[]>(
             "/api/attendance/overtime?scope=mine",
           ),
-          requestJson<AuthUser[]>(
-            "/api/users?active_only=true&include_superusers=true",
+          requestJson<OvertimeApproverAssignment>(
+            "/api/attendance/overtime-approvers/me",
           ),
         ]);
 
@@ -293,65 +277,8 @@ export function MyOvertimeClient({
           return;
         }
 
-        const normalizedRole = (value: string | null | undefined) =>
-          (value ?? "").trim().toUpperCase();
-        const currentRole = normalizedRole(currentUserRole);
-
-        const eligibleUsers = usersResponse.filter(
-          (user) => user.is_active && user.id !== currentUserId,
-        );
-
-        const sameDepartmentHeads = eligibleUsers.filter(
-          (user) =>
-            normalizedRole(user.role) === "DH" &&
-            currentUserDepartmentId !== null &&
-            user.department_id === currentUserDepartmentId,
-        );
-
-        const presidents = eligibleUsers.filter(
-          (user) => normalizedRole(user.role) === "PRES",
-        );
-
-        let selectedApprovers: AuthUser[] = [];
-        let nextPolicyLabel:
-          | "employee_to_dh"
-          | "dh_to_pres"
-          | "hr_to_dh_or_pres"
-          | "pres_to_dh"
-          | "unavailable" = "unavailable";
-
-        if (currentRole === "DH") {
-          selectedApprovers = presidents;
-          nextPolicyLabel = "dh_to_pres";
-        } else if (currentRole === "HR") {
-          selectedApprovers =
-            sameDepartmentHeads.length > 0 ? sameDepartmentHeads : presidents;
-          nextPolicyLabel = "hr_to_dh_or_pres";
-        } else if (currentRole === "PRES") {
-          selectedApprovers = sameDepartmentHeads;
-          nextPolicyLabel = "pres_to_dh";
-        } else {
-          selectedApprovers = sameDepartmentHeads;
-          nextPolicyLabel = "employee_to_dh";
-        }
-
-        const approverOptions = selectedApprovers
-          .map((user) => {
-            const fullName = [user.first_name, user.last_name]
-              .filter(Boolean)
-              .join(" ")
-              .trim();
-
-            return {
-              id: user.id,
-              name: fullName || user.email,
-            };
-          })
-          .sort((a, b) => a.name.localeCompare(b.name));
-
         setRequests(requestsResponse);
-        setApprovers(approverOptions);
-        setApproverPolicyLabel(nextPolicyLabel);
+        setAssignedApprover(approverResponse);
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -370,14 +297,16 @@ export function MyOvertimeClient({
     return () => {
       mounted = false;
     };
-  }, [currentUserDepartmentId, currentUserId, currentUserRole]);
+  }, []);
 
-  const selectedApproverId = watch("approver_id");
   const selectedDate = watch("date");
   const infoValue = watch("info");
 
   const isSubmitDisabled =
-    !selectedApproverId || !selectedDate || !infoValue?.trim() || isSubmitting;
+    !assignedApprover?.approver_id ||
+    !selectedDate ||
+    !infoValue?.trim() ||
+    isSubmitting;
 
   const yearOptions = useMemo(() => {
     const values = new Set<number>();
@@ -406,15 +335,13 @@ export function MyOvertimeClient({
 
   async function handleCreateRequest(values: CreateOvertimeRequestFormValues) {
     try {
-      const approverId = values.approver_id.trim();
-      if (!approverId) {
-        toast.error("Approver is required.");
+      if (!assignedApprover?.approver_id) {
+        toast.error("No overtime approver is configured for your account.");
         return;
       }
 
       const payload: OvertimeCreatePayload = {
         user_id: currentUserId,
-        approver_id: approverId,
         date: values.date,
         info: values.info.trim(),
       };
@@ -430,7 +357,6 @@ export function MyOvertimeClient({
       setRequests((prev) => [created, ...prev]);
       reset({
         date: "",
-        approver_id: "",
         info: "",
       });
       setIsCreateDialogOpen(false);
@@ -511,14 +437,13 @@ export function MyOvertimeClient({
                 if (!open) {
                   reset({
                     date: "",
-                    approver_id: "",
                     info: "",
                   });
                 }
               }}
             >
               <DialogTrigger asChild>
-                <Button type="button" disabled={approvers.length === 0}>
+                <Button type="button" disabled={!assignedApprover?.approver_id}>
                   <Plus className="size-4" />
                   New Request
                 </Button>
@@ -527,23 +452,8 @@ export function MyOvertimeClient({
                 <DialogHeader>
                   <DialogTitle>Submit Overtime Request</DialogTitle>
                   <DialogDescription>
-                    Select a date, assign an approver, and add context for your
-                    overtime request.{" "}
-                    {approverPolicyLabel === "employee_to_dh"
-                      ? "Approver list is limited to your department head."
-                      : null}
-                    {approverPolicyLabel === "dh_to_pres"
-                      ? "Approver list is limited to the President role."
-                      : null}
-                    {approverPolicyLabel === "hr_to_dh_or_pres"
-                      ? "Approver list uses your department head first, then President when no department head is available."
-                      : null}
-                    {approverPolicyLabel === "pres_to_dh"
-                      ? "Approver list is limited to your department head."
-                      : null}
-                    {approverPolicyLabel === "unavailable"
-                      ? "No valid approver is currently configured for your role and department."
-                      : null}
+                    Select a date and add context. The approver is assigned
+                    automatically using HR-configured overtime routing.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -568,27 +478,25 @@ export function MyOvertimeClient({
                     </div>
 
                     <div className="space-y-2">
-                      <SelectField
+                      <Label htmlFor="overtime-approver">
+                        Assigned Approver
+                      </Label>
+                      <Input
                         id="overtime-approver"
-                        label="Approver"
-                        value={selectedApproverId}
-                        onChange={(_, value) =>
-                          setValue("approver_id", value, {
-                            shouldValidate: true,
-                            shouldDirty: true,
-                          })
+                        className="h-10"
+                        value={
+                          assignedApprover?.approver
+                            ? [
+                                assignedApprover.approver.first_name,
+                                assignedApprover.approver.last_name,
+                              ]
+                                .filter(Boolean)
+                                .join(" ")
+                                .trim() || assignedApprover.approver.email
+                            : "No approver configured"
                         }
-                        options={approvers.map((approver) => ({
-                          value: approver.id.toString(),
-                          label: approver.name,
-                        }))}
-                        placeholder="Select approver"
+                        readOnly
                       />
-                      {errors.approver_id ? (
-                        <p className="text-xs text-destructive">
-                          {errors.approver_id.message}
-                        </p>
-                      ) : null}
                     </div>
                   </div>
 
@@ -628,10 +536,10 @@ export function MyOvertimeClient({
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {approvers.length === 0 ? (
+          {!assignedApprover?.approver_id ? (
             <p className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
-              No valid approver is configured for your current role and
-              department. Please contact HR.
+              No overtime approver is configured for your role and department.
+              Please contact HR.
             </p>
           ) : null}
 

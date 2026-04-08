@@ -21,6 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { PayrollPosition } from "@/lib/payroll";
 import { toast } from "@/lib/toast";
 import type { AuthDepartment, AuthUser } from "@/types/auth";
 
@@ -103,6 +104,7 @@ export function BiometricSyncClient() {
   const [syncSiteCode, setSyncSiteCode] = useState("MAIN");
   const [syncDeviceId, setSyncDeviceId] = useState("zk-main-1");
   const [departments, setDepartments] = useState<DepartmentsResponse>([]);
+  const [positions, setPositions] = useState<PayrollPosition[]>([]);
   const [isScanningUsers, setIsScanningUsers] = useState(false);
   const [isPollingScanCommand, setIsPollingScanCommand] = useState(false);
   const [isLoadingSyncStatus, setIsLoadingSyncStatus] = useState(false);
@@ -176,10 +178,13 @@ export function BiometricSyncClient() {
     let cancelled = false;
     void (async () => {
       try {
-        const loadedDepartments =
-          await requestJson<DepartmentsResponse>("/api/departments");
+        const [loadedDepartments, loadedPositions] = await Promise.all([
+          requestJson<DepartmentsResponse>("/api/departments"),
+          requestJson<PayrollPosition[]>("/api/payroll/positions"),
+        ]);
         if (!cancelled) {
           setDepartments(loadedDepartments);
+          setPositions(loadedPositions);
         }
       } catch (err) {
         if (cancelled) {
@@ -505,6 +510,7 @@ export function BiometricSyncClient() {
         user={null}
         initialValues={createUserInitialValues ?? undefined}
         departments={departments}
+        positions={positions}
         onOpenChange={(open) => {
           setIsCreateUserDialogOpen(open);
           if (!open) {

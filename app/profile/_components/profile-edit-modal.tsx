@@ -1,11 +1,18 @@
 "use client";
 
-import { PencilLine, X } from "lucide-react";
+import { PencilLine } from "lucide-react";
 import { useState } from "react";
 
 import { ProfileEditForm } from "@/app/profile/_components/profile-edit-form";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import type { AuthUser } from "@/types/auth";
 
 type ProfileEditModalProps = {
@@ -24,37 +31,21 @@ export function ProfileEditModal({ user }: ProfileEditModalProps) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent
-        className="h-[min(90vh,56rem)] w-[min(96vw,72rem)] max-w-none overflow-hidden rounded-3xl border border-border/70 bg-background p-0 shadow-2xl"
-        showCloseButton={false}
-      >
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-border/70 px-5 py-4 sm:px-6">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                Profile editor
-              </p>
-              <h2
-                id="profile-edit-title"
-                className="font-heading text-2xl font-semibold tracking-tight text-foreground"
-              >
-                Edit Profile
-              </h2>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setOpen(false)}
-              aria-label="Close profile editor"
-            >
-              <X className="size-4" />
-            </Button>
-          </div>
+      <DialogContent className="!max-w-5xl flex h-[min(90vh,56rem)] w-[min(96vw,64rem)] flex-col gap-1 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b bg-background px-6 py-4">
+          <DialogTitle>Edit Profile</DialogTitle>
+          <DialogDescription>
+            Update your personal, contact, and employment details without
+            leaving the profile page.
+          </DialogDescription>
+        </DialogHeader>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-0 sm:px-6 sm:pt-6 sm:pb-0">
-            <ProfileEditForm user={user} onSaved={() => setOpen(false)} />
-          </div>
+        <div className="flex min-h-0 flex-1">
+          <ProfileEditForm
+            user={user}
+            onCancel={() => setOpen(false)}
+            onSaved={() => setOpen(false)}
+          />
         </div>
       </DialogContent>
     </Dialog>

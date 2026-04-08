@@ -169,9 +169,7 @@ export function LeaveManagementClient({
           yearsResponse,
         ] = await Promise.all([
           requestJson<AuthDepartment[]>("/api/departments"),
-          requestJson<AuthUser[]>(
-            "/api/users?active_only=true&include_superusers=true",
-          ),
+          requestJson<AuthUser[]>("/api/users?include_superusers=true"),
           requestJson<LeaveRequestRecord[]>("/api/leave/requests"),
           requestJson<LeaveApprover[]>("/api/leave/approvers"),
           requestJson<LeaveCredit[]>("/api/leave/credits"),
@@ -268,6 +266,42 @@ export function LeaveManagementClient({
       approver: existingByDepartment.get(department.id) ?? null,
     }));
   }, [departments, approvers]);
+
+  const creditRows = useMemo(() => {
+    const creditsByUserId = new Map<string, LeaveCredit>();
+    for (const credit of credits) {
+      creditsByUserId.set(credit.user_id, credit);
+    }
+
+    const rows = users.map((user) => {
+      const existingCredit = creditsByUserId.get(user.id);
+      return (
+        existingCredit ?? {
+          user_id: user.id,
+          credits: 0,
+          used_credits: 0,
+          remaining_credits: 0,
+          user,
+          created_at: "",
+          updated_at: "",
+        }
+      );
+    });
+
+    for (const credit of credits) {
+      if (!usersById.has(credit.user_id)) {
+        rows.push(credit);
+      }
+    }
+
+    return rows.sort((a, b) => {
+      const userA = a.user ?? usersById.get(a.user_id) ?? null;
+      const userB = b.user ?? usersById.get(b.user_id) ?? null;
+      return displayUser(userA, a.user_id).localeCompare(
+        displayUser(userB, b.user_id),
+      );
+    });
+  }, [credits, users, usersById]);
 
   const reloadRequests = useCallback(async () => {
     const query = new URLSearchParams();
@@ -721,8 +755,7 @@ export function LeaveManagementClient({
                         onChange={(_, value) => {
                           const nextPayload: LeaveApproverUpsertPayload = {
                             ...currentValue,
-                            [field.key]:
-                              value === "none" ? null : Number(value),
+                            [field.key]: value === "none" ? null : value,
                           };
                           void saveApprover(department.id, nextPayload);
                         }}
@@ -773,17 +806,17 @@ export function LeaveManagementClient({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {credits.length === 0 ? (
+                  {creditRows.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={6}
                         className="py-8 text-center text-muted-foreground"
                       >
-                        No leave credit records found.
+                        No users found.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    credits.map((credit) => {
+                    creditRows.map((credit) => {
                       const user =
                         credit.user ?? usersById.get(credit.user_id) ?? null;
 
