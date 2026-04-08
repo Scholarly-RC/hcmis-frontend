@@ -388,7 +388,7 @@ export default async function DashboardPage() {
         ),
         tryFetch<Array<{ id: number }>>(
           session.token,
-          "/attendance/overtime?scope=approvals&status=PEND",
+          "/attendance/overtime?scope=approvals&status=PENDING",
           "Unable to load overtime queue.",
         ),
         tryFetch<Array<{ id: number }>>(

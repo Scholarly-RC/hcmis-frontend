@@ -612,6 +612,7 @@ export function LeaveManagementClient({
                   { value: "PENDING", label: "Pending" },
                   { value: "APPROVED", label: "Approved" },
                   { value: "REJECTED", label: "Rejected" },
+                  { value: "CANCELLED", label: "Cancelled" },
                 ]}
                 placeholder="Status"
               />
@@ -675,47 +676,47 @@ export function LeaveManagementClient({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredRequests.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>
-                          {displayUser(item.user, item.user_id)}
-                        </TableCell>
-                        <TableCell>
-                          {item.user?.department?.name ?? "-"}
-                        </TableCell>
-                        <TableCell>{formatDate(item.leave_date)}</TableCell>
-                        <TableCell>{leaveTypeLabel(item.leave_type)}</TableCell>
-                        <TableCell>
-                          <Badge
-                            className={cn(
-                              "border-0 font-medium",
-                              leaveStatusClass(item.status),
-                            )}
-                          >
-                            {item.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <p className="text-xs text-muted-foreground">
-                            1st:{" "}
-                            {displayUser(
-                              item.first_approver,
-                              item.first_approver_id,
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            2nd:{" "}
-                            {displayUser(
-                              item.second_approver,
-                              item.second_approver_id,
-                            )}
-                          </p>
-                        </TableCell>
-                        <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
-                          {item.info || "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    filteredRequests.map((item) => {
+                      const actedAssignment = item.approver_pool.find(
+                        (assignment) => assignment.acted_at !== null,
+                      );
+                      const actedByLabel = actedAssignment?.approver
+                        ? displayUser(actedAssignment.approver)
+                        : "Pending";
+
+                      return (
+                        <TableRow key={item.id}>
+                          <TableCell>
+                            {displayUser(item.user, item.user_id)}
+                          </TableCell>
+                          <TableCell>
+                            {item.user?.department?.name ?? "-"}
+                          </TableCell>
+                          <TableCell>{formatDate(item.leave_date)}</TableCell>
+                          <TableCell>
+                            {leaveTypeLabel(item.leave_type)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={cn(
+                                "border-0 font-medium",
+                                leaveStatusClass(item.status),
+                              )}
+                            >
+                              {item.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-xs text-muted-foreground">
+                              Acted: {actedByLabel}
+                            </p>
+                          </TableCell>
+                          <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
+                            {item.info || "-"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>

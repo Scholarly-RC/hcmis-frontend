@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Check,
-  ClipboardCheck,
-  Eraser,
-  Layers3,
-  Loader2,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Check, ClipboardCheck, Layers3, Loader2, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SelectField } from "@/components/form-select-field";
@@ -20,8 +12,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -34,39 +24,27 @@ import type {
   OvertimeApprover,
   OvertimeApproverUpsertPayload,
   OvertimeRequestRecord,
-  OvertimeRequestScope,
   OvertimeRequestStatus,
 } from "@/lib/attendance";
 import { toast } from "@/lib/toast";
+import type { AuthDepartment, AuthUser } from "@/types/auth";
 import { cn } from "@/utils/cn";
 import { debounce } from "@/utils/debounce";
 
 type OvertimeFilterState = {
-  scope: OvertimeRequestScope;
-  query: string;
+  userId: string;
   status: string;
   month: string;
   year: string;
   departmentId: string;
-  approverId: string;
-};
-
-type DepartmentOption = {
-  id: number;
-  name: string;
-};
-
-type ApproverOption = {
-  id: string;
-  name: string;
 };
 
 type OvertimeManagementClientProps = {
   initialTab: "requests" | "approvers";
   initialRequests: OvertimeRequestRecord[];
   overtimeApprovers: OvertimeApprover[];
-  departments: DepartmentOption[];
-  approvers: ApproverOption[];
+  departments: AuthDepartment[];
+  approvers: AuthUser[];
   currentUserId: string;
   isStaff: boolean;
   filters: OvertimeFilterState;
@@ -80,13 +58,11 @@ type DebouncedReplace = {
 
 function isSameFilterState(a: OvertimeFilterState, b: OvertimeFilterState) {
   return (
-    a.scope === b.scope &&
-    a.query === b.query &&
+    a.userId === b.userId &&
     a.status === b.status &&
     a.month === b.month &&
     a.year === b.year &&
-    a.departmentId === b.departmentId &&
-    a.approverId === b.approverId
+    a.departmentId === b.departmentId
   );
 }
 
@@ -96,13 +72,12 @@ function buildUrl(
   currentSearch: string,
 ) {
   const search = new URLSearchParams(currentSearch);
+  search.set("tab", "requests");
 
-  search.set("scope", state.scope);
-
-  if (state.query.trim().length > 0) {
-    search.set("q", state.query.trim());
+  if (state.userId !== "all") {
+    search.set("user_id", state.userId);
   } else {
-    search.delete("q");
+    search.delete("user_id");
   }
   if (state.status !== "all") {
     search.set("status", state.status);
@@ -124,32 +99,33 @@ function buildUrl(
   } else {
     search.delete("department_id");
   }
-  if (state.approverId !== "all") {
-    search.set("approver_id", state.approverId);
-  } else {
-    search.delete("approver_id");
-  }
 
   const query = search.toString();
   return query.length > 0 ? `${pathname}?${query}` : pathname;
 }
 
 function statusLabel(status: OvertimeRequestStatus) {
-  if (status === "APP") {
+  if (status === "APPROVED") {
     return "Approved";
   }
-  if (status === "REJ") {
+  if (status === "REJECTED") {
     return "Rejected";
+  }
+  if (status === "CANCELLED") {
+    return "Cancelled";
   }
   return "Pending";
 }
 
 function statusClass(status: OvertimeRequestStatus) {
-  if (status === "APP") {
+  if (status === "APPROVED") {
     return "bg-emerald-100 text-emerald-700";
   }
-  if (status === "REJ") {
+  if (status === "REJECTED") {
     return "bg-rose-100 text-rose-700";
+  }
+  if (status === "CANCELLED") {
+    return "bg-slate-200 text-slate-700";
   }
   return "bg-amber-100 text-amber-700";
 }
@@ -162,14 +138,36 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
+function displayUser(user: AuthUser) {
+  const fullName = [user.first_name, user.last_name]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  return fullName || user.email;
+}
+
+function roleLabel(role: string | null | undefined) {
+  const normalized = role?.trim().toUpperCase();
+  if (!normalized || normalized === "EMP") {
+    return "Employee";
+  }
+  if (normalized === "DH") {
+    return "Department Head";
+  }
+  if (normalized === "DIR") {
+    return "Director";
+  }
+  if (normalized === "PRES") {
+    return "President";
+  }
+  if (normalized === "HR") {
+    return "HR";
+  }
+  return normalized;
+}
+
+function normalizeRole(role: string | null | undefined) {
+  return role?.trim().toUpperCase() || "EMP";
 }
 
 export function OvertimeManagementClient({
@@ -242,19 +240,6 @@ export function OvertimeManagementClient({
     debouncedReplaceRef.current?.(formState);
   }, [formState]);
 
-  const stats = useMemo(() => {
-    const pending = requests.filter((item) => item.status === "PEND").length;
-    const approved = requests.filter((item) => item.status === "APP").length;
-    const rejected = requests.filter((item) => item.status === "REJ").length;
-
-    return {
-      pending,
-      approved,
-      rejected,
-      total: requests.length,
-    };
-  }, [requests]);
-
   const approverRows = useMemo(() => {
     const existingByDepartment = new Map(
       approverSettings.map((item) => [item.department_id, item]),
@@ -264,6 +249,35 @@ export function OvertimeManagementClient({
       approver: existingByDepartment.get(department.id) ?? null,
     }));
   }, [approverSettings, departments]);
+
+  const approverEligibleUsers = useMemo(() => {
+    return approvers
+      .filter((user) => user.is_active && normalizeRole(user.role) !== "EMP")
+      .sort((a, b) => displayUser(a).localeCompare(displayUser(b)));
+  }, [approvers]);
+
+  const approverEligibleUsersByField = (
+    fieldKey:
+      | "department_approver_id"
+      | "director_approver_id"
+      | "president_approver_id"
+      | "hr_approver_id",
+    departmentId: number,
+  ) => {
+    return approverEligibleUsers.filter((user) => {
+      const role = normalizeRole(user.role);
+      if (fieldKey === "department_approver_id") {
+        return role === "DH" && user.department_id === departmentId;
+      }
+      if (fieldKey === "director_approver_id") {
+        return role === "DIR";
+      }
+      if (fieldKey === "president_approver_id") {
+        return role === "PRES";
+      }
+      return role === "HR";
+    });
+  };
 
   async function saveApprover(
     departmentId: number,
@@ -359,34 +373,6 @@ export function OvertimeManagementClient({
     }
   }
 
-  async function remove(request: OvertimeRequestRecord) {
-    setActionMap((prev) => ({ ...prev, [request.id]: "delete" }));
-
-    try {
-      const httpResponse = await fetch(
-        `/api/attendance/overtime/${request.id}`,
-        {
-          method: "DELETE",
-        },
-      );
-      const payload = (await httpResponse.json().catch(() => null)) as {
-        detail?: string;
-      } | null;
-
-      if (!httpResponse.ok) {
-        toast.error(payload?.detail ?? "Unable to delete overtime request.");
-        return;
-      }
-
-      setRequests((prev) => prev.filter((item) => item.id !== request.id));
-      toast.success("Overtime request deleted.");
-    } catch {
-      toast.error("Unable to delete overtime request.");
-    } finally {
-      setActionMap((prev) => ({ ...prev, [request.id]: undefined }));
-    }
-  }
-
   function setTabWithUrl(nextTab: "requests" | "approvers") {
     setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams.toString());
@@ -404,8 +390,8 @@ export function OvertimeManagementClient({
           Overtime Management
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Review pending overtime requests, respond inline, and quickly narrow
-          results using compact filters.
+          Review overtime requests across teams and manage department approver
+          settings from one workspace.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -415,7 +401,7 @@ export function OvertimeManagementClient({
             onClick={() => setTabWithUrl("requests")}
           >
             <ClipboardCheck className="size-4" />
-            Requests
+            Request Monitor
           </Button>
           {isStaff ? (
             <Button
@@ -431,173 +417,217 @@ export function OvertimeManagementClient({
       </section>
 
       {tab === "requests" ? (
-        <>
-          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-            <CardHeader>
-              <CardTitle>Filters</CardTitle>
-              <CardDescription>
-                Search and refine overtime requests without leaving this page.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-4">
-                <div className="space-y-2 lg:col-span-2">
-                  <Label htmlFor="q" className="text-sm font-medium">
-                    Search
-                  </Label>
-                  <Input
-                    id="q"
-                    value={formState.query}
-                    onChange={(event) =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        query: event.target.value,
-                      }))
-                    }
-                    placeholder="Requestor name or email"
-                  />
-                </div>
+        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+          <CardHeader>
+            <CardTitle>Request Monitor</CardTitle>
+            <CardDescription>
+              Filter all overtime requests across teams.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-5">
+              <SelectField
+                id="user"
+                label="User"
+                value={formState.userId}
+                onChange={(_, value) =>
+                  setFormState((prev) => ({ ...prev, userId: value }))
+                }
+                options={[
+                  { value: "all", label: "All users" },
+                  ...approvers.map((user) => ({
+                    value: user.id.toString(),
+                    label: `${displayUser(user)} (${roleLabel(user.role)})`,
+                  })),
+                ]}
+                placeholder="User"
+              />
 
-                <SelectField
-                  id="status"
-                  label="Status"
-                  value={formState.status}
-                  onChange={(_, value) =>
-                    setFormState((prev) => ({ ...prev, status: value }))
-                  }
-                  options={[
-                    { value: "all", label: "All statuses" },
-                    { value: "PEND", label: "Pending" },
-                    { value: "APP", label: "Approved" },
-                    { value: "REJ", label: "Rejected" },
-                  ]}
-                  placeholder="Status"
-                />
+              <SelectField
+                id="department"
+                label="Department"
+                value={formState.departmentId}
+                onChange={(_, value) =>
+                  setFormState((prev) => ({ ...prev, departmentId: value }))
+                }
+                options={[
+                  { value: "all", label: "All departments" },
+                  ...departments.map((department) => ({
+                    value: department.id.toString(),
+                    label: `${department.name} (${department.code})`,
+                  })),
+                ]}
+                placeholder="Department"
+              />
 
-                <SelectField
-                  id="month"
-                  label="Month"
-                  value={formState.month}
-                  onChange={(_, value) =>
-                    setFormState((prev) => ({ ...prev, month: value }))
-                  }
-                  options={[
-                    { value: "all", label: "All months" },
-                    ...Array.from({ length: 12 }, (_, index) => ({
-                      value: (index + 1).toString(),
-                      label: new Date(2000, index, 1).toLocaleString("en-US", {
-                        month: "long",
-                      }),
-                    })),
-                  ]}
-                  placeholder="Month"
-                />
-              </div>
+              <SelectField
+                id="status"
+                label="Status"
+                value={formState.status}
+                onChange={(_, value) =>
+                  setFormState((prev) => ({ ...prev, status: value }))
+                }
+                options={[
+                  { value: "all", label: "All statuses" },
+                  { value: "PENDING", label: "Pending" },
+                  { value: "APPROVED", label: "Approved" },
+                  { value: "REJECTED", label: "Rejected" },
+                  { value: "CANCELLED", label: "Cancelled" },
+                ]}
+                placeholder="Status"
+              />
 
-              <div className="grid gap-4 lg:grid-cols-4">
-                <SelectField
-                  id="year"
-                  label="Year"
-                  value={formState.year}
-                  onChange={(_, value) =>
-                    setFormState((prev) => ({ ...prev, year: value }))
-                  }
-                  options={[
-                    { value: "all", label: "All years" },
-                    ...yearOptions.map((yearOption) => ({
-                      value: yearOption.toString(),
-                      label: yearOption.toString(),
-                    })),
-                  ]}
-                  placeholder="Year"
-                />
+              <SelectField
+                id="year"
+                label="Year"
+                value={formState.year}
+                onChange={(_, value) =>
+                  setFormState((prev) => ({ ...prev, year: value }))
+                }
+                options={[
+                  { value: "all", label: "All years" },
+                  ...yearOptions.map((yearOption) => ({
+                    value: yearOption.toString(),
+                    label: yearOption.toString(),
+                  })),
+                ]}
+                placeholder="Year"
+              />
 
-                <SelectField
-                  id="department"
-                  label="Department"
-                  value={formState.departmentId}
-                  onChange={(_, value) =>
-                    setFormState((prev) => ({ ...prev, departmentId: value }))
-                  }
-                  options={[
-                    { value: "all", label: "All departments" },
-                    ...departments.map((department) => ({
-                      value: department.id.toString(),
-                      label: department.name,
-                    })),
-                  ]}
-                  placeholder="Department"
-                />
+              <SelectField
+                id="month"
+                label="Month"
+                value={formState.month}
+                onChange={(_, value) =>
+                  setFormState((prev) => ({ ...prev, month: value }))
+                }
+                options={[
+                  { value: "all", label: "All months" },
+                  ...Array.from({ length: 12 }, (_, index) => ({
+                    value: (index + 1).toString(),
+                    label: new Date(2000, index, 1).toLocaleString("en-US", {
+                      month: "long",
+                    }),
+                  })),
+                ]}
+                placeholder="Month"
+              />
+            </div>
 
-                <SelectField
-                  id="approver"
-                  label="Approver"
-                  value={formState.approverId}
-                  onChange={(_, value) =>
-                    setFormState((prev) => ({ ...prev, approverId: value }))
-                  }
-                  options={[
-                    { value: "all", label: "All approvers" },
-                    ...approvers.map((approver) => ({
-                      value: approver.id.toString(),
-                      label: approver.name,
-                    })),
-                  ]}
-                  placeholder="Approver"
-                />
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Approvers</TableHead>
+                    <TableHead>Info</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {requests.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="py-8 text-center text-muted-foreground"
+                      >
+                        No overtime requests found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    requests.map((request) => {
+                      const actionInProgress = actionMap[request.id];
+                      const currentAssignee = request.approver_pool.find(
+                        (item) => item.approver_id === currentUserId,
+                      );
+                      const canRespond =
+                        request.status === "PENDING" &&
+                        currentAssignee?.status === "PENDING";
+                      const actedByAssignment = request.approver_pool.find(
+                        (item) => item.acted_at !== null,
+                      );
+                      const actedBy = actedByAssignment?.approver
+                        ? `${actedByAssignment.approver.first_name} ${actedByAssignment.approver.last_name}`.trim() ||
+                          actedByAssignment.approver.email
+                        : (request.approver_name ??
+                          `User #${request.approver_id}`);
 
-                <div className="flex items-end gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-10"
-                    onClick={() =>
-                      setFormState((prev) => ({
-                        ...prev,
-                        query: "",
-                        status: "all",
-                        month: "all",
-                        year: "all",
-                        departmentId: "all",
-                        approverId: "all",
-                      }))
-                    }
-                  >
-                    <Eraser className="size-4" />
-                    Clear
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Pending</p>
-                <p className="text-2xl font-semibold">{stats.pending}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Approved</p>
-                <p className="text-2xl font-semibold">{stats.approved}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Rejected</p>
-                <p className="text-2xl font-semibold">{stats.rejected}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Total</p>
-                <p className="text-2xl font-semibold">{stats.total}</p>
-              </CardContent>
-            </Card>
-          </div>
-        </>
+                      return (
+                        <TableRow key={request.id}>
+                          <TableCell>
+                            {request.user_name ?? `User #${request.user_id}`}
+                          </TableCell>
+                          <TableCell>
+                            {request.user_department_name ?? "-"}
+                          </TableCell>
+                          <TableCell>{formatDate(request.date)}</TableCell>
+                          <TableCell>
+                            <span
+                              className={cn(
+                                "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
+                                statusClass(request.status),
+                              )}
+                            >
+                              {statusLabel(request.status)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-xs text-muted-foreground">
+                              Acted: {actedBy}
+                            </p>
+                          </TableCell>
+                          <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
+                            {request.info?.trim() || "-"}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end gap-2">
+                              {canRespond ? (
+                                <>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-8"
+                                    onClick={() => respond(request, "APPROVE")}
+                                    disabled={actionInProgress !== undefined}
+                                  >
+                                    {actionInProgress === "approve" ? (
+                                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                                    ) : (
+                                      <Check className="mr-1.5 size-3.5" />
+                                    )}
+                                    Approve
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8"
+                                    onClick={() => respond(request, "REJECT")}
+                                    disabled={actionInProgress !== undefined}
+                                  >
+                                    {actionInProgress === "reject" ? (
+                                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                                    ) : (
+                                      <X className="mr-1.5 size-3.5" />
+                                    )}
+                                    Reject
+                                  </Button>
+                                </>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
       {tab === "approvers" ? (
@@ -605,9 +635,7 @@ export function OvertimeManagementClient({
           <CardHeader>
             <CardTitle>Approver Settings</CardTitle>
             <CardDescription>
-              Set department overtime approvers using the same role slots as the
-              leave workflow. The system assigns the request approver
-              automatically.
+              Set department overtime approvers for each role in the chain.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -628,6 +656,9 @@ export function OvertimeManagementClient({
                   <div className="mb-3">
                     <p className="font-medium text-foreground">
                       {department.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {department.code}
                     </p>
                   </div>
 
@@ -672,9 +703,12 @@ export function OvertimeManagementClient({
                         }}
                         options={[
                           { value: "none", label: "Not set" },
-                          ...approvers.map((user) => ({
+                          ...approverEligibleUsersByField(
+                            field.key,
+                            department.id,
+                          ).map((user) => ({
                             value: user.id.toString(),
-                            label: user.name,
+                            label: `${displayUser(user)} (${roleLabel(user.role)})`,
                           })),
                         ]}
                         placeholder={field.label}
@@ -691,154 +725,6 @@ export function OvertimeManagementClient({
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {tab === "requests" ? (
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Requestor</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Approver</TableHead>
-                    <TableHead>Info</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Updated</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {requests.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={7}
-                        className="py-10 text-center text-sm text-muted-foreground"
-                      >
-                        No overtime requests match the current filters.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    requests.map((request) => {
-                      const actionInProgress = actionMap[request.id];
-                      const currentAssignee = request.approver_pool.find(
-                        (item) => item.approver_id === currentUserId,
-                      );
-                      const canRespond =
-                        request.status === "PEND" &&
-                        currentAssignee?.status === "PEND";
-                      const actedByAssignment = request.approver_pool.find(
-                        (item) => item.acted_at !== null,
-                      );
-                      const actedBy = actedByAssignment?.approver
-                        ? `${actedByAssignment.approver.first_name} ${actedByAssignment.approver.last_name}`.trim() ||
-                          actedByAssignment.approver.email
-                        : (request.approver_name ??
-                          `User #${request.approver_id}`);
-
-                      return (
-                        <TableRow key={request.id}>
-                          <TableCell>
-                            <p className="font-medium text-foreground">
-                              {request.user_name ?? `User #${request.user_id}`}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {request.user_department_name ?? "No department"}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {request.user_email ?? ""}
-                            </p>
-                          </TableCell>
-                          <TableCell>{formatDate(request.date)}</TableCell>
-                          <TableCell>
-                            <p>{actedBy}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Pool: {request.approver_pool.length}
-                            </p>
-                          </TableCell>
-                          <TableCell className="max-w-[280px]">
-                            <p className="line-clamp-2 text-sm text-muted-foreground">
-                              {request.info?.trim() || "No details provided."}
-                            </p>
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={cn(
-                                "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-                                statusClass(request.status),
-                              )}
-                            >
-                              {statusLabel(request.status)}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {formatDateTime(request.updated_at)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex justify-end gap-2">
-                              {canRespond ? (
-                                <>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    className="h-8"
-                                    onClick={() => respond(request, "APPROVE")}
-                                    disabled={actionInProgress !== undefined}
-                                  >
-                                    {actionInProgress === "approve" ? (
-                                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                                    ) : (
-                                      <Check className="mr-1.5 size-3.5" />
-                                    )}
-                                    Approve
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8"
-                                    onClick={() => respond(request, "REJECT")}
-                                    disabled={actionInProgress !== undefined}
-                                  >
-                                    {actionInProgress === "reject" ? (
-                                      <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                                    ) : (
-                                      <X className="mr-1.5 size-3.5" />
-                                    )}
-                                    Reject
-                                  </Button>
-                                </>
-                              ) : null}
-
-                              {isStaff ? (
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 text-destructive hover:text-destructive"
-                                  onClick={() => remove(request)}
-                                  disabled={actionInProgress !== undefined}
-                                >
-                                  {actionInProgress === "delete" ? (
-                                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="mr-1.5 size-3.5" />
-                                  )}
-                                  Delete
-                                </Button>
-                              ) : null}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </div>
           </CardContent>
         </Card>
       ) : null}

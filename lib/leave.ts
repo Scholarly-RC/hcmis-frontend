@@ -31,7 +31,11 @@ export type LeaveCredit = {
   updated_at: string;
 };
 
-export type LeaveRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type LeaveRequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELLED";
 
 export type LeaveRequestApproverRecord = {
   id: number;
@@ -103,6 +107,9 @@ export function leaveStatusClass(status: LeaveRequestStatus) {
   }
   if (status === "REJECTED") {
     return "bg-rose-100 text-rose-700";
+  }
+  if (status === "CANCELLED") {
+    return "bg-slate-200 text-slate-700";
   }
   return "bg-amber-100 text-amber-700";
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ClipboardList, Loader2, Plus, Trash2 } from "lucide-react";
+import { Ban, ClipboardList, Loader2, Plus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -60,6 +60,19 @@ type FilterState = {
   month: string;
   status: string;
 };
+
+function getLeaveCreateErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Unable to submit leave request.";
+  }
+  if (error.message.includes("active leave request already exists")) {
+    return "You already have a pending or approved leave request for that date.";
+  }
+  if (error.message.includes("active overtime request already exists")) {
+    return "You already have a pending or approved overtime request for that date.";
+  }
+  return error.message;
+}
 
 const createLeaveRequestSchema = z.object({
   leave_date: z.string().min(1, "Date is required."),
@@ -298,35 +311,40 @@ export function MyLeaveClient() {
       setIsCreateDialogOpen(false);
       toast.success("Leave request submitted.");
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Unable to submit leave request.",
-      );
+      toast.error(getLeaveCreateErrorMessage(error));
     }
   }
 
-  async function handleDeleteRequest(leaveId: number) {
+  async function handleCancelRequest(leaveId: number) {
     setDeletingId(leaveId);
     try {
-      await requestJson<void>(`/api/leave/requests/${leaveId}`, {
-        method: "DELETE",
-      });
-      setRequests((prev) => prev.filter((item) => item.id !== leaveId));
+      const cancelled = await requestJson<LeaveRequestRecord>(
+        `/api/leave/requests/${leaveId}/cancel`,
+        {
+          method: "PATCH",
+        },
+      );
+      setRequests((prev) =>
+        prev.map((item) => (item.id === leaveId ? cancelled : item)),
+      );
       const refreshedCredit = await requestJson<LeaveCredit>(
         "/api/leave/credits/me",
       );
       setCredit(refreshedCredit);
-      toast.success("Leave request deleted.");
+      toast.success("Leave request cancelled.");
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Unable to delete leave request.",
+          : "Unable to cancel leave request.",
       );
     } finally {
       setDeletingId(null);
     }
+  }
+
+  function canCancelRequest(item: LeaveRequestRecord) {
+    return item.status === "PENDING";
   }
 
   return (
@@ -542,6 +560,7 @@ export function MyLeaveClient() {
                 { value: "PENDING", label: "Pending" },
                 { value: "APPROVED", label: "Approved" },
                 { value: "REJECTED", label: "Rejected" },
+                { value: "CANCELLED", label: "Cancelled" },
               ]}
               placeholder="Status"
             />
@@ -608,9 +627,6 @@ export function MyLeaveClient() {
                           </TableCell>
                           <TableCell>
                             <p className="text-xs text-muted-foreground">
-                              Eligible: {item.approver_pool.length}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
                               Acted: {actedByLabel}
                             </p>
                           </TableCell>
@@ -618,20 +634,26 @@ export function MyLeaveClient() {
                             {item.info || "-"}
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={deletingId === item.id}
-                              onClick={() => handleDeleteRequest(item.id)}
-                            >
-                              {deletingId === item.id ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="mr-2 h-4 w-4" />
-                              )}
-                              Delete
-                            </Button>
+                            {canCancelRequest(item) ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={deletingId === item.id}
+                                onClick={() => handleCancelRequest(item.id)}
+                              >
+                                {deletingId === item.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Ban className="mr-2 h-4 w-4" />
+                                )}
+                                Cancel
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                No actions
+                              </span>
+                            )}
                           </TableCell>
                         </TableRow>
                       );

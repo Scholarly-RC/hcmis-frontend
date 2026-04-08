@@ -3,13 +3,9 @@ import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-
 import { OvertimeManagementClient } from "@/app/hr/overtime-management/_components/overtime-management-client";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type {
-  OvertimeApprover,
-  OvertimeRequestRecord,
-  OvertimeRequestScope,
-} from "@/lib/attendance";
+import type { OvertimeApprover, OvertimeRequestRecord } from "@/lib/attendance";
 import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
-import type { AuthUser } from "@/types/auth";
+import type { AuthDepartment, AuthUser } from "@/types/auth";
 
 export const metadata = {
   title: "Overtime Management",
@@ -22,23 +18,11 @@ type SearchParams =
   | Record<string, string | string[] | undefined>
   | Promise<Record<string, string | string[] | undefined>>;
 
-type DepartmentOption = {
-  id: number;
-  name: string;
-};
-
 function firstValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
     return value[0] ?? "";
   }
   return value ?? "";
-}
-
-function parseScope(value: string): OvertimeRequestScope {
-  if (value === "all" || value === "mine") {
-    return value;
-  }
-  return "approvals";
 }
 
 function parseTab(value: string): OvertimeManagementTab {
@@ -80,23 +64,26 @@ export default async function OvertimeManagementPage({
   const isStaff = session.isHr;
   const params = (await searchParams) ?? {};
 
-  const scope = parseScope(firstValue(params.scope));
   const tab = parseTab(firstValue(params.tab));
-  const query = firstValue(params.q).trim();
   const status = firstValue(params.status).toUpperCase();
   const month = parseMonth(firstValue(params.month));
   const year = parsePositiveInteger(firstValue(params.year));
+  const userId = firstValue(params.user_id).trim();
   const departmentId = parsePositiveInteger(firstValue(params.department_id));
-  const approverId = firstValue(params.approver_id).trim();
 
   const overtimeSearch = new URLSearchParams({
-    scope,
+    scope: "all",
   });
 
-  if (query.length > 0) {
-    overtimeSearch.set("q", query);
+  if (userId.length > 0) {
+    overtimeSearch.set("user_id", userId);
   }
-  if (status === "PEND" || status === "APP" || status === "REJ") {
+  if (
+    status === "PENDING" ||
+    status === "APPROVED" ||
+    status === "REJECTED" ||
+    status === "CANCELLED"
+  ) {
     overtimeSearch.set("status", status);
   }
   if (month !== null) {
@@ -108,14 +95,11 @@ export default async function OvertimeManagementPage({
   if (departmentId !== null) {
     overtimeSearch.set("department_id", departmentId.toString());
   }
-  if (approverId.length > 0) {
-    overtimeSearch.set("approver_id", approverId);
-  }
 
   let overtimeRequests: OvertimeRequestRecord[] = [];
   let overtimeApprovers: OvertimeApprover[] = [];
-  let departments: DepartmentOption[] = [];
-  let approvers: { id: string; name: string }[] = [];
+  let departments: AuthDepartment[] = [];
+  let approvers: AuthUser[] = [];
   let loadError: string | null = null;
 
   try {
@@ -135,7 +119,7 @@ export default async function OvertimeManagementPage({
         pathname: "/attendance/overtime-approvers",
         fallbackMessage: "Unable to load overtime data.",
       }),
-      fetchBackendJsonWithAuth<DepartmentOption[]>({
+      fetchBackendJsonWithAuth<AuthDepartment[]>({
         token: session.token,
         pathname: "/departments",
         fallbackMessage: "Unable to load overtime data.",
@@ -152,11 +136,7 @@ export default async function OvertimeManagementPage({
     departments = departmentResponse;
     approvers = userResponse
       .filter((user) => user.is_active)
-      .map((user) => ({
-        id: user.id,
-        name: buildDisplayName(user),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => buildDisplayName(a).localeCompare(buildDisplayName(b)));
   } catch (error) {
     loadError =
       error instanceof Error ? error.message : "Unable to load overtime data.";
@@ -200,17 +180,18 @@ export default async function OvertimeManagementPage({
             currentUserId={session.user.id}
             isStaff={isStaff}
             filters={{
-              scope,
-              query,
+              userId: userId || "all",
               status:
-                status === "PEND" || status === "APP" || status === "REJ"
+                status === "PENDING" ||
+                status === "APPROVED" ||
+                status === "REJECTED" ||
+                status === "CANCELLED"
                   ? status
                   : "all",
               month: month !== null ? month.toString() : "all",
               year: year !== null ? year.toString() : "all",
               departmentId:
                 departmentId !== null ? departmentId.toString() : "all",
-              approverId: approverId || "all",
             }}
             yearOptions={yearOptions}
           />

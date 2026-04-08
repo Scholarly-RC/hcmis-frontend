@@ -9,14 +9,7 @@ export const metadata = {
 export default function OvertimePage() {
   return (
     <DashboardPageFrame>
-      {(user) => (
-        <MyOvertimeClient
-          currentUserId={user.id}
-          canManageOvertime={Boolean(
-            user.capabilities?.includes("manage_overtime_requests"),
-          )}
-        />
-      )}
+      {(user) => <MyOvertimeClient currentUserId={user.id} />}
     </DashboardPageFrame>
   );
 }

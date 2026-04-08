@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   BadgeDollarSign,
   CalendarClock,
+  CalendarDays,
   CalendarRange,
   ClipboardCheck,
   FileBarChart,
@@ -81,6 +82,15 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         icon: ClipboardCheck,
         href: "/hr/user-attendance-management",
         keywords: ["attendance records", "employee attendance", "assignments"],
+        requiredCapabilities: ["manage_attendance_records"],
+      },
+      {
+        label: "Holiday Management",
+        description:
+          "Register recurring and one-off holidays used by attendance workflows.",
+        icon: CalendarDays,
+        href: "/hr/holiday-management",
+        keywords: ["holiday", "holidays", "calendar dates"],
         requiredCapabilities: ["manage_attendance_records"],
       },
       {

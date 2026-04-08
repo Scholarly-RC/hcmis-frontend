@@ -50,9 +50,22 @@ export type AttendanceHoliday = {
   day: number;
   month: number;
   year: number | null;
-  is_regular: boolean;
   created_at: string;
   updated_at: string;
+};
+
+export type AttendanceHolidayPayload = {
+  name: string;
+  day: number;
+  month: number;
+  year: number | null;
+};
+
+export type AttendanceApprovedLeave = {
+  id: number;
+  leave_date: string;
+  leave_type: "PA" | "UN" | "WR";
+  info: string | null;
 };
 
 export type AttendanceSummaryDay = {
@@ -62,6 +75,7 @@ export type AttendanceSummaryDay = {
   attendance_records: AttendanceRecord[];
   holidays: AttendanceHoliday[];
   overtime_approved: boolean;
+  approved_leave: AttendanceApprovedLeave | null;
 };
 
 export type AttendanceSummary = {
@@ -70,7 +84,11 @@ export type AttendanceSummary = {
   days: AttendanceSummaryDay[];
 };
 
-export type OvertimeRequestStatus = "PEND" | "APP" | "REJ";
+export type OvertimeRequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CANCELLED";
 
 export type OvertimeRequestScope = "mine" | "approvals" | "all";
 

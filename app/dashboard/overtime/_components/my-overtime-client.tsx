@@ -1,8 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eraser, Loader2, Plus, Send, ShieldCheck } from "lucide-react";
-import Link from "next/link";
+import { Ban, Loader2, Plus, Send } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -56,7 +55,6 @@ type FilterState = {
 
 type MyOvertimeClientProps = {
   currentUserId: string;
-  canManageOvertime: boolean;
 };
 
 const createOvertimeRequestSchema = z.object({
@@ -73,6 +71,19 @@ type OvertimeCreatePayload = {
   date: string;
   info: string;
 };
+
+function getOvertimeCreateErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Unable to submit overtime request.";
+  }
+  if (error.message.includes("active overtime request already exists")) {
+    return "You already have a pending or approved overtime request for that date.";
+  }
+  if (error.message.includes("active leave request already exists")) {
+    return "You already have a pending or approved leave request for that date.";
+  }
+  return error.message;
+}
 
 async function requestJson<T>(
   pathname: string,
@@ -111,16 +122,6 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
 function parseYearValue(value: string) {
   if (value === "all") {
     return null;
@@ -138,21 +139,27 @@ function parseMonthValue(value: string) {
 }
 
 function statusLabel(status: OvertimeRequestStatus) {
-  if (status === "APP") {
+  if (status === "APPROVED") {
     return "Approved";
   }
-  if (status === "REJ") {
+  if (status === "REJECTED") {
     return "Rejected";
+  }
+  if (status === "CANCELLED") {
+    return "Cancelled";
   }
   return "Pending";
 }
 
 function statusClass(status: OvertimeRequestStatus) {
-  if (status === "APP") {
+  if (status === "APPROVED") {
     return "bg-emerald-100 text-emerald-700";
   }
-  if (status === "REJ") {
+  if (status === "REJECTED") {
     return "bg-rose-100 text-rose-700";
+  }
+  if (status === "CANCELLED") {
+    return "bg-slate-200 text-slate-700";
   }
   return "bg-amber-100 text-amber-700";
 }
@@ -198,22 +205,25 @@ function parseFilterYear(value: string | null) {
 }
 
 function parseFilterStatus(value: string | null) {
-  if (value === "PEND" || value === "APP" || value === "REJ") {
+  if (
+    value === "PENDING" ||
+    value === "APPROVED" ||
+    value === "REJECTED" ||
+    value === "CANCELLED"
+  ) {
     return value;
   }
   return null;
 }
 
-export function MyOvertimeClient({
-  currentUserId,
-  canManageOvertime,
-}: MyOvertimeClientProps) {
+export function MyOvertimeClient({ currentUserId }: MyOvertimeClientProps) {
   const searchParams = useSearchParams();
   const [requests, setRequests] = useState<OvertimeRequestRecord[]>([]);
   const [assignedApprover, setAssignedApprover] =
     useState<OvertimeApproverAssignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     year: "all",
     month: "all",
@@ -324,15 +334,6 @@ export function MyOvertimeClient({
     [requests, filters],
   );
 
-  const stats = useMemo(() => {
-    return {
-      pending: requests.filter((item) => item.status === "PEND").length,
-      approved: requests.filter((item) => item.status === "APP").length,
-      rejected: requests.filter((item) => item.status === "REJ").length,
-      total: requests.length,
-    };
-  }, [requests]);
-
   async function handleCreateRequest(values: CreateOvertimeRequestFormValues) {
     try {
       if ((assignedApprover?.approver_ids.length ?? 0) === 0) {
@@ -362,12 +363,36 @@ export function MyOvertimeClient({
       setIsCreateDialogOpen(false);
       toast.success("Overtime request submitted.");
     } catch (error) {
+      toast.error(getOvertimeCreateErrorMessage(error));
+    }
+  }
+
+  async function handleCancelRequest(overtimeId: number) {
+    setDeletingId(overtimeId);
+    try {
+      const cancelled = await requestJson<OvertimeRequestRecord>(
+        `/api/attendance/overtime/${overtimeId}/cancel`,
+        {
+          method: "PATCH",
+        },
+      );
+      setRequests((prev) =>
+        prev.map((item) => (item.id === overtimeId ? cancelled : item)),
+      );
+      toast.success("Overtime request cancelled.");
+    } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Unable to submit overtime request.",
+          : "Unable to cancel overtime request.",
       );
+    } finally {
+      setDeletingId(null);
     }
+  }
+
+  function canCancelRequest(request: OvertimeRequestRecord) {
+    return request.status === "PENDING";
   }
 
   return (
@@ -382,43 +407,8 @@ export function MyOvertimeClient({
               Submit overtime requests and track decision status in one place.
             </p>
           </div>
-          {canManageOvertime ? (
-            <Button asChild variant="outline">
-              <Link href="/hr/overtime-management">
-                <ShieldCheck className="size-4" />
-                HR Queue
-              </Link>
-            </Button>
-          ) : null}
         </div>
       </section>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Pending</p>
-            <p className="text-2xl font-semibold">{stats.pending}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Approved</p>
-            <p className="text-2xl font-semibold">{stats.approved}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Rejected</p>
-            <p className="text-2xl font-semibold">{stats.rejected}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total</p>
-            <p className="text-2xl font-semibold">{stats.total}</p>
-          </CardContent>
-        </Card>
-      </div>
 
       <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
         <CardHeader>
@@ -448,7 +438,7 @@ export function MyOvertimeClient({
                   disabled={(assignedApprover?.approver_ids.length ?? 0) === 0}
                 >
                   <Plus className="size-4" />
-                  New Request
+                  Create Overtime Request
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-2xl">
@@ -464,46 +454,19 @@ export function MyOvertimeClient({
                   onSubmit={handleSubmit(handleCreateRequest)}
                   className="grid gap-4"
                 >
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="overtime-date">Date</Label>
-                      <Input
-                        id="overtime-date"
-                        type="date"
-                        className="h-10"
-                        {...register("date")}
-                      />
-                      {errors.date ? (
-                        <p className="text-xs text-destructive">
-                          {errors.date.message}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="overtime-approver">
-                        Eligible Approvers
-                      </Label>
-                      <Input
-                        id="overtime-approver"
-                        className="h-10"
-                        value={
-                          assignedApprover &&
-                          assignedApprover.approvers.length > 0
-                            ? `${assignedApprover.approvers
-                                .map(
-                                  (item) =>
-                                    [item.first_name, item.last_name]
-                                      .filter(Boolean)
-                                      .join(" ")
-                                      .trim() || item.email,
-                                )
-                                .join(", ")}`
-                            : "No approver configured"
-                        }
-                        readOnly
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="overtime-date">Date</Label>
+                    <Input
+                      id="overtime-date"
+                      type="date"
+                      className="h-10"
+                      {...register("date")}
+                    />
+                    {errors.date ? (
+                      <p className="text-xs text-destructive">
+                        {errors.date.message}
+                      </p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -551,21 +514,21 @@ export function MyOvertimeClient({
 
           <div className="grid gap-4 lg:grid-cols-4">
             <SelectField
-              id="status"
-              label="Status"
-              value={filters.status}
+              id="year"
+              label="Year"
+              value={filters.year}
               onChange={(_, value) =>
-                setFilters((prev) => ({ ...prev, status: value }))
+                setFilters((prev) => ({ ...prev, year: value }))
               }
               options={[
-                { value: "all", label: "All statuses" },
-                { value: "PEND", label: "Pending" },
-                { value: "APP", label: "Approved" },
-                { value: "REJ", label: "Rejected" },
+                { value: "all", label: "All years" },
+                ...yearOptions.map((yearOption) => ({
+                  value: yearOption.toString(),
+                  label: yearOption.toString(),
+                })),
               ]}
-              placeholder="Status"
+              placeholder="Year"
             />
-
             <SelectField
               id="month"
               label="Month"
@@ -584,109 +547,111 @@ export function MyOvertimeClient({
               ]}
               placeholder="Month"
             />
-
             <SelectField
-              id="year"
-              label="Year"
-              value={filters.year}
+              id="status"
+              label="Status"
+              value={filters.status}
               onChange={(_, value) =>
-                setFilters((prev) => ({ ...prev, year: value }))
+                setFilters((prev) => ({ ...prev, status: value }))
               }
               options={[
-                { value: "all", label: "All years" },
-                ...yearOptions.map((yearOption) => ({
-                  value: yearOption.toString(),
-                  label: yearOption.toString(),
-                })),
+                { value: "all", label: "All statuses" },
+                { value: "PENDING", label: "Pending" },
+                { value: "APPROVED", label: "Approved" },
+                { value: "REJECTED", label: "Rejected" },
+                { value: "CANCELLED", label: "Cancelled" },
               ]}
-              placeholder="Year"
+              placeholder="Status"
             />
-
-            <div className="flex items-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10"
-                onClick={() =>
-                  setFilters({
-                    year: "all",
-                    month: "all",
-                    status: "all",
-                  })
-                }
-              >
-                <Eraser className="size-4" />
-                Clear
-              </Button>
-            </div>
           </div>
 
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Approver</TableHead>
-                  <TableHead>Info</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Updated</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
+          {loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading overtime requests...
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="py-10 text-center text-sm text-muted-foreground"
-                    >
-                      Loading overtime requests...
-                    </TableCell>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Approvals</TableHead>
+                    <TableHead>Info</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
-                ) : filteredRequests.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="py-10 text-center text-sm text-muted-foreground"
-                    >
-                      No overtime requests match the current filters.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell>{formatDate(request.date)}</TableCell>
-                      <TableCell>
-                        {request.approver_name ??
-                          `User #${request.approver_id}`}
-                        <p className="text-xs text-muted-foreground">
-                          Pool: {request.approver_pool.length}
-                        </p>
-                      </TableCell>
-                      <TableCell className="max-w-[320px]">
-                        <p className="line-clamp-2 text-sm text-muted-foreground">
-                          {request.info?.trim() || "No details provided."}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "border-transparent",
-                            statusClass(request.status),
-                          )}
-                        >
-                          {statusLabel(request.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDateTime(request.updated_at)}
+                </TableHeader>
+                <TableBody>
+                  {filteredRequests.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="py-8 text-center text-muted-foreground"
+                      >
+                        No overtime requests found.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ) : (
+                    filteredRequests.map((request) => {
+                      const actedAssignment = request.approver_pool.find(
+                        (assignment) => assignment.acted_at !== null,
+                      );
+                      const actedByLabel = actedAssignment?.approver
+                        ? `${actedAssignment.approver.first_name} ${actedAssignment.approver.last_name}`.trim()
+                        : "Pending";
+
+                      return (
+                        <TableRow key={request.id}>
+                          <TableCell>{formatDate(request.date)}</TableCell>
+                          <TableCell>
+                            <Badge
+                              className={cn(
+                                "border-0 font-medium",
+                                statusClass(request.status),
+                              )}
+                            >
+                              {statusLabel(request.status)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-xs text-muted-foreground">
+                              Acted: {actedByLabel}
+                            </p>
+                          </TableCell>
+                          <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
+                            {request.info?.trim() || "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {canCancelRequest(request) ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={deletingId === request.id}
+                                onClick={() => handleCancelRequest(request.id)}
+                              >
+                                {deletingId === request.id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Ban className="mr-2 h-4 w-4" />
+                                )}
+                                Cancel
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                No actions
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

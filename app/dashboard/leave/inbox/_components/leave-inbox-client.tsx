@@ -326,6 +326,7 @@ export function LeaveInboxClient() {
               { value: "PENDING", label: "Pending" },
               { value: "APPROVED", label: "Approved" },
               { value: "REJECTED", label: "Rejected" },
+              { value: "CANCELLED", label: "Cancelled" },
             ]}
             placeholder="Status"
           />
@@ -411,9 +412,6 @@ export function LeaveInboxClient() {
                           </TableCell>
                           <TableCell>
                             <p className="text-xs text-muted-foreground">
-                              Eligible: {item.approver_pool.length}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
                               Acted: {actedByLabel}
                             </p>
                           </TableCell>
@@ -421,35 +419,41 @@ export function LeaveInboxClient() {
                             {item.info || "-"}
                           </TableCell>
                           <TableCell className="text-right">
-                            <div className="inline-flex gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={!canRespond || approving || rejecting}
-                                onClick={() => respond(item.id, "APPROVE")}
-                              >
-                                {approving ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Check className="mr-2 h-4 w-4" />
-                                )}
-                                Approve
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                disabled={!canRespond || approving || rejecting}
-                                onClick={() => respond(item.id, "REJECT")}
-                              >
-                                {rejecting ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <X className="mr-2 h-4 w-4" />
-                                )}
-                                Reject
-                              </Button>
-                            </div>
+                            {canRespond ? (
+                              <div className="inline-flex gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={approving || rejecting}
+                                  onClick={() => respond(item.id, "APPROVE")}
+                                >
+                                  {approving ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Check className="mr-2 h-4 w-4" />
+                                  )}
+                                  Approve
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  disabled={approving || rejecting}
+                                  onClick={() => respond(item.id, "REJECT")}
+                                >
+                                  {rejecting ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <X className="mr-2 h-4 w-4" />
+                                  )}
+                                  Reject
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">
+                                -
+                              </span>
+                            )}
                           </TableCell>
                         </TableRow>
                       );

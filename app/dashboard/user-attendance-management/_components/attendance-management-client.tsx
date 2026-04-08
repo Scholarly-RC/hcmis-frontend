@@ -50,10 +50,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type {
+  AttendanceApprovedLeave,
   AttendanceRecord,
   AttendanceSummary,
   AttendanceSummaryDay,
 } from "@/lib/attendance";
+import { leaveTypeLabel } from "@/lib/leave";
 import { toast } from "@/lib/toast";
 import type { AuthUser } from "@/types/auth";
 import { cn } from "@/utils/cn";
@@ -178,10 +180,18 @@ function getPunchSummary(records: AttendanceRecord[]) {
   };
 }
 
+function getApprovedLeaveLabel(leave: AttendanceApprovedLeave | null) {
+  if (!leave) {
+    return null;
+  }
+  return `${leaveTypeLabel(leave.leave_type)} Leave`;
+}
+
 function getSummaryStats(summary: AttendanceSummary) {
   let daysWithShifts = 0;
   let daysWithPunches = 0;
   let holidayDays = 0;
+  let leaveDays = 0;
   let overtimeDays = 0;
   let totalPunches = 0;
 
@@ -196,6 +206,9 @@ function getSummaryStats(summary: AttendanceSummary) {
     if (day.holidays.length > 0) {
       holidayDays += 1;
     }
+    if (day.approved_leave) {
+      leaveDays += 1;
+    }
     if (day.overtime_approved) {
       overtimeDays += 1;
     }
@@ -205,6 +218,7 @@ function getSummaryStats(summary: AttendanceSummary) {
     daysWithShifts,
     daysWithPunches,
     holidayDays,
+    leaveDays,
     overtimeDays,
     totalPunches,
     missingPunchDays: Math.max(daysWithShifts - daysWithPunches, 0),
@@ -267,6 +281,10 @@ function getDayStatus(
 } {
   if (day.holidays.length > 0) {
     return { label: "Holiday", variant: "secondary" };
+  }
+
+  if (day.approved_leave) {
+    return { label: "On Leave", variant: "secondary" };
   }
 
   const records = [...day.attendance_records].sort((a, b) =>
@@ -646,6 +664,12 @@ export function AttendanceManagementClient({
           icon={CheckCircle2}
         />
         <StatCard
+          label="Leave days"
+          value={stats.leaveDays.toString()}
+          helper="Approved leave dates in this period"
+          icon={CheckCircle2}
+        />
+        <StatCard
           label="Approved overtime"
           value={stats.overtimeDays.toString()}
           helper="Days with approved overtime"
@@ -764,9 +788,14 @@ export function AttendanceManagementClient({
                               </div>
                             </TableCell>
                             <TableCell className="px-4 py-4 align-top">
-                              <MiniBadge variant={status.variant}>
-                                {status.label}
-                              </MiniBadge>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <MiniBadge variant={status.variant}>
+                                  {status.label}
+                                </MiniBadge>
+                                {day.overtime_approved ? (
+                                  <MiniBadge>Overtime approved</MiniBadge>
+                                ) : null}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -809,10 +838,29 @@ export function AttendanceManagementClient({
                   {selectedDay.holidays.length > 0 ? (
                     <MiniBadge variant="secondary">Holiday</MiniBadge>
                   ) : null}
+                  {selectedDay.approved_leave ? (
+                    <MiniBadge variant="secondary">On Leave</MiniBadge>
+                  ) : null}
                   {selectedDay.overtime_approved ? (
                     <MiniBadge>Overtime approved</MiniBadge>
                   ) : null}
                 </div>
+
+                {selectedDay.approved_leave ? (
+                  <div className="rounded-2xl border border-border/70 bg-background p-4">
+                    <p className="text-sm text-muted-foreground">
+                      Approved leave
+                    </p>
+                    <p className="mt-1 font-medium text-foreground">
+                      {getApprovedLeaveLabel(selectedDay.approved_leave)}
+                    </p>
+                    {selectedDay.approved_leave.info ? (
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        {selectedDay.approved_leave.info}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="rounded-2xl border border-border/70 bg-background p-4">
                   <p className="text-sm text-muted-foreground">Shift</p>
