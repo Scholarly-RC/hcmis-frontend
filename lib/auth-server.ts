@@ -8,6 +8,48 @@ import type {
   AuthUserProfileUpdate,
 } from "@/types/auth";
 
+const LOGIN_BACKEND_TIMEOUT_MS = 10_000;
+const LOGIN_BACKEND_RETRY_DELAY_MS = 300;
+const LOGIN_BACKEND_MAX_ATTEMPTS = 2;
+
+export class BackendLoginError extends Error {
+  kind: "upstream_timeout" | "upstream_network" | "upstream_http" | "unknown";
+
+  constructor(kind: BackendLoginError["kind"], message: string) {
+    super(message);
+    this.kind = kind;
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function fetchLoginWithTimeout(
+  email: string,
+  password: string,
+  requestId?: string,
+) {
+  const timeoutSignal = AbortSignal.timeout(LOGIN_BACKEND_TIMEOUT_MS);
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (requestId) {
+    headers["X-Request-Id"] = requestId;
+  }
+
+  return fetch(buildBackendUrl("/auth/login"), {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ email, password }),
+    cache: "no-store",
+    signal: timeoutSignal,
+  });
+}
+
 function getTokenExpiryDate(token: string) {
   const [, payload] = token.split(".");
 
@@ -33,26 +75,69 @@ function getTokenExpiryDate(token: string) {
 export async function loginWithBackend(
   email: string,
   password: string,
+  requestId?: string,
 ): Promise<AuthLoginResponse> {
-  const response = await fetch(buildBackendUrl("/auth/login"), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ email, password }),
-    cache: "no-store",
-  });
+  let response: Response | null = null;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= LOGIN_BACKEND_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      response = await fetchLoginWithTimeout(email, password, requestId);
+      break;
+    } catch (error) {
+      lastError = error;
+      const timedOut =
+        error instanceof DOMException && error.name === "TimeoutError";
+      const aborted =
+        error instanceof DOMException && error.name === "AbortError";
+      const isNetworkError = error instanceof TypeError;
+      const shouldRetry =
+        attempt < LOGIN_BACKEND_MAX_ATTEMPTS &&
+        (timedOut || aborted || isNetworkError);
+
+      if (shouldRetry) {
+        await sleep(LOGIN_BACKEND_RETRY_DELAY_MS);
+        continue;
+      }
+
+      if (timedOut || aborted) {
+        throw new BackendLoginError(
+          "upstream_timeout",
+          "Authentication service timed out.",
+        );
+      }
+
+      if (isNetworkError) {
+        throw new BackendLoginError(
+          "upstream_network",
+          "Authentication service is unreachable.",
+        );
+      }
+
+      throw new BackendLoginError("unknown", "Unable to sign in.");
+    }
+  }
+
+  if (!response) {
+    if (lastError instanceof BackendLoginError) {
+      throw lastError;
+    }
+    throw new BackendLoginError("unknown", "Unable to sign in.");
+  }
 
   const payload = await readBackendJson<
     Partial<AuthLoginResponse> & { detail?: string }
   >(response);
 
   if (!response.ok) {
-    throw new Error(payload?.detail ?? "Unable to sign in.");
+    throw new BackendLoginError(
+      "upstream_http",
+      payload?.detail ?? "Unable to sign in.",
+    );
   }
 
   if (!payload?.access_token || !payload?.user) {
-    throw new Error("Unable to sign in.");
+    throw new BackendLoginError("unknown", "Unable to sign in.");
   }
 
   return payload as AuthLoginResponse;
