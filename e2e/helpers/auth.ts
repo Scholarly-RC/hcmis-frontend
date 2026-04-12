@@ -12,7 +12,9 @@ export type TestUserRole = keyof typeof TEST_USERS;
 
 export async function loginAs(page: Page, role: TestUserRole) {
   await page.goto("/login");
-  await page.getByLabel("Email", { exact: true }).fill(TEST_USERS[role]);
+  await page
+    .getByLabel("Email or Username", { exact: true })
+    .fill(TEST_USERS[role]);
   await page.getByLabel("Password", { exact: true }).fill(TEST_PASSWORD);
   await page.getByRole("button", { name: /^sign in$/i }).click();
 

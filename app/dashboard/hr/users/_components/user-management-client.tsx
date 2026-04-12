@@ -56,6 +56,7 @@ export type UserEditorMode = "create" | "edit";
 
 type UserFormState = {
   email: string;
+  username: string;
   password: string;
   confirmPassword: string;
   first_name: string;
@@ -87,6 +88,7 @@ function buildUserEditorSchema(mode: UserEditorMode) {
         .trim()
         .min(1, "Email is required.")
         .email("Enter a valid email address."),
+      username: z.string(),
       password: z.string(),
       confirmPassword: z.string(),
       first_name: z.string().trim().min(1, "First name is required."),
@@ -211,6 +213,7 @@ function buildUserEditorSchema(mode: UserEditorMode) {
 
 export type UserEditorPayload = {
   email: string;
+  username: string | null;
   password?: string;
   first_name: string;
   middle_name: string | null;
@@ -245,6 +248,7 @@ const ROLE_OPTIONS = [
 
 const emptyFormState = (): UserFormState => ({
   email: "",
+  username: "",
   password: "",
   confirmPassword: "",
   first_name: "",
@@ -351,6 +355,7 @@ function buildFormState(
     ? emptyFormState()
     : {
         email: user.email,
+        username: user.username ?? "",
         password: "",
         confirmPassword: "",
         first_name: user.first_name,
@@ -633,6 +638,7 @@ export function UserEditorDialog({
     try {
       const payload: UserEditorPayload = {
         email: values.email.trim(),
+        username: normalizeText(values.username),
         first_name: values.first_name.trim(),
         middle_name: normalizeText(values.middle_name),
         last_name: values.last_name.trim(),
@@ -732,6 +738,21 @@ export function UserEditorDialog({
                     className={controlHeightClass}
                     aria-invalid={errors.email ? "true" : "false"}
                     {...register("email")}
+                  />
+                </FormField>
+
+                <FormField
+                  label="Username"
+                  htmlFor="user-username"
+                  hint="Optional. Can be used together with email for login."
+                  error={errors.username?.message}
+                >
+                  <Input
+                    id="user-username"
+                    autoComplete="username"
+                    className={controlHeightClass}
+                    aria-invalid={errors.username ? "true" : "false"}
+                    {...register("username")}
                   />
                 </FormField>
 
@@ -1167,6 +1188,7 @@ export function UserManagementClient({
       return (
         buildDisplayName(user).toLowerCase().includes(normalized) ||
         user.email.toLowerCase().includes(normalized) ||
+        (user.username?.toLowerCase().includes(normalized) ?? false) ||
         (user.employee_number?.toLowerCase().includes(normalized) ?? false) ||
         (user.rank?.toLowerCase().includes(normalized) ?? false) ||
         departmentText.toLowerCase().includes(normalized)

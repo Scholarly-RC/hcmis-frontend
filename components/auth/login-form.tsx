@@ -20,11 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const loginSchema = z.object({
-  email: z
-    .string()
-    .trim()
-    .min(1, "Enter your email.")
-    .email("Enter a valid email address."),
+  identifier: z.string().trim().min(1, "Enter your email or username."),
   password: z.string().min(1, "Enter your password."),
 });
 
@@ -41,7 +37,7 @@ export function LoginForm() {
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      identifier: "",
       password: "",
     },
   });
@@ -88,22 +84,22 @@ export function LoginForm() {
       <CardContent className="space-y-6 pt-5">
         <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">
-              Email
+            <Label htmlFor="identifier" className="text-sm font-medium">
+              Email or Username
             </Label>
             <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              placeholder="name@hcmis.org"
+              id="identifier"
+              type="text"
+              autoComplete="username"
+              placeholder="name@hcmis.org or username"
               className="h-10 rounded-xl border-border/80 bg-muted/30 text-base transition-all duration-200 focus-visible:border-primary/30 focus-visible:ring-primary/20 dark:bg-background/40 dark:hover:bg-background/55 md:text-sm"
               disabled={isSubmitting}
-              aria-invalid={errors.email ? "true" : "false"}
-              {...register("email")}
+              aria-invalid={errors.identifier ? "true" : "false"}
+              {...register("identifier")}
             />
-            {errors.email ? (
+            {errors.identifier ? (
               <p className="text-xs text-destructive" role="alert">
-                {errors.email.message}
+                {errors.identifier.message}
               </p>
             ) : null}
           </div>

@@ -6,7 +6,9 @@ test("redirects unauthenticated dashboard access to login", async ({
 }) => {
   await page.goto("/dashboard");
   await page.waitForURL("**/login");
-  await expect(page.getByLabel("Email", { exact: true })).toBeVisible();
+  await expect(
+    page.getByLabel("Email or Username", { exact: true }),
+  ).toBeVisible();
 });
 
 test("allows HR user to sign in and open dashboard", async ({ page }) => {

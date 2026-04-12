@@ -7,6 +7,7 @@ export type AuthDepartment = {
 export type AuthUser = {
   id: string;
   email: string;
+  username?: string | null;
   first_name: string;
   last_name: string;
   middle_name: string | null;

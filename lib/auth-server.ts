@@ -28,7 +28,7 @@ function sleep(ms: number) {
 }
 
 async function fetchLoginWithTimeout(
-  email: string,
+  identifier: string,
   password: string,
   requestId?: string,
 ) {
@@ -44,7 +44,7 @@ async function fetchLoginWithTimeout(
   return fetch(buildBackendUrl("/auth/login"), {
     method: "POST",
     headers,
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ identifier, password }),
     cache: "no-store",
     signal: timeoutSignal,
   });
@@ -73,7 +73,7 @@ function getTokenExpiryDate(token: string) {
 }
 
 export async function loginWithBackend(
-  email: string,
+  identifier: string,
   password: string,
   requestId?: string,
 ): Promise<AuthLoginResponse> {
@@ -82,7 +82,7 @@ export async function loginWithBackend(
 
   for (let attempt = 1; attempt <= LOGIN_BACKEND_MAX_ATTEMPTS; attempt += 1) {
     try {
-      response = await fetchLoginWithTimeout(email, password, requestId);
+      response = await fetchLoginWithTimeout(identifier, password, requestId);
       break;
     } catch (error) {
       lastError = error;

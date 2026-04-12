@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth-server";
 
 type LoginRequestBody = {
+  identifier?: unknown;
   email?: unknown;
   password?: unknown;
 };
@@ -27,16 +28,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (typeof body.email !== "string" || typeof body.password !== "string") {
+  const identifier =
+    typeof body.identifier === "string"
+      ? body.identifier
+      : typeof body.email === "string"
+        ? body.email
+        : null;
+
+  if (typeof body.password !== "string" || identifier === null) {
     console.warn("[auth-login] invalid-payload", { requestId });
     return NextResponse.json(
-      { detail: "Email and password are required." },
+      { detail: "Email/Username and password are required." },
       { status: 400 },
     );
   }
 
   try {
-    const auth = await loginWithBackend(body.email, body.password, requestId);
+    const auth = await loginWithBackend(identifier, body.password, requestId);
     const response = NextResponse.json({
       user: auth.user,
       must_change_password: auth.user.must_change_password,
@@ -72,7 +80,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (
-        message === "Incorrect email or password." ||
+        message === "Incorrect email/username or password." ||
         message ===
           "Temporary password has expired. Please contact HR for reset."
       ) {
