@@ -3,7 +3,7 @@ import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-
 import { OvertimeManagementClient } from "@/app/hr/overtime-management/_components/overtime-management-client";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { OvertimeApprover, OvertimeRequestRecord } from "@/lib/attendance";
+import type { OvertimeRequestRecord } from "@/lib/attendance";
 import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
 import type { AuthDepartment, AuthUser } from "@/types/auth";
 
@@ -12,7 +12,7 @@ export const metadata = {
   description: "Review, approve, and track overtime requests",
 };
 
-type OvertimeManagementTab = "requests" | "approvers";
+type OvertimeManagementTab = "requests";
 
 type SearchParams =
   | Record<string, string | string[] | undefined>
@@ -25,10 +25,7 @@ function firstValue(value: string | string[] | undefined) {
   return value ?? "";
 }
 
-function parseTab(value: string): OvertimeManagementTab {
-  if (value === "approvers") {
-    return value;
-  }
+function parseTab(): OvertimeManagementTab {
   return "requests";
 }
 
@@ -64,7 +61,7 @@ export default async function OvertimeManagementPage({
   const isStaff = session.isHr;
   const params = (await searchParams) ?? {};
 
-  const tab = parseTab(firstValue(params.tab));
+  const tab = parseTab();
   const status = firstValue(params.status).toUpperCase();
   const month = parseMonth(firstValue(params.month));
   const year = parsePositiveInteger(firstValue(params.year));
@@ -97,42 +94,31 @@ export default async function OvertimeManagementPage({
   }
 
   let overtimeRequests: OvertimeRequestRecord[] = [];
-  let overtimeApprovers: OvertimeApprover[] = [];
   let departments: AuthDepartment[] = [];
   let approvers: AuthUser[] = [];
   let loadError: string | null = null;
 
   try {
-    const [
-      overtimeResponse,
-      overtimeApproverResponse,
-      departmentResponse,
-      userResponse,
-    ] = await Promise.all([
-      fetchBackendJsonWithAuth<OvertimeRequestRecord[]>({
-        token: session.token,
-        pathname: `/attendance/overtime?${overtimeSearch.toString()}`,
-        fallbackMessage: "Unable to load overtime data.",
-      }),
-      fetchBackendJsonWithAuth<OvertimeApprover[]>({
-        token: session.token,
-        pathname: "/attendance/overtime-approvers",
-        fallbackMessage: "Unable to load overtime data.",
-      }),
-      fetchBackendJsonWithAuth<AuthDepartment[]>({
-        token: session.token,
-        pathname: "/departments",
-        fallbackMessage: "Unable to load overtime data.",
-      }),
-      fetchBackendJsonWithAuth<AuthUser[]>({
-        token: session.token,
-        pathname: "/users?active_only=true&include_superusers=true",
-        fallbackMessage: "Unable to load overtime data.",
-      }),
-    ]);
+    const [overtimeResponse, departmentResponse, userResponse] =
+      await Promise.all([
+        fetchBackendJsonWithAuth<OvertimeRequestRecord[]>({
+          token: session.token,
+          pathname: `/attendance/overtime?${overtimeSearch.toString()}`,
+          fallbackMessage: "Unable to load overtime data.",
+        }),
+        fetchBackendJsonWithAuth<AuthDepartment[]>({
+          token: session.token,
+          pathname: "/departments",
+          fallbackMessage: "Unable to load overtime data.",
+        }),
+        fetchBackendJsonWithAuth<AuthUser[]>({
+          token: session.token,
+          pathname: "/users?active_only=true&include_superusers=true",
+          fallbackMessage: "Unable to load overtime data.",
+        }),
+      ]);
 
     overtimeRequests = overtimeResponse;
-    overtimeApprovers = overtimeApproverResponse;
     departments = departmentResponse;
     approvers = userResponse
       .filter((user) => user.is_active)
@@ -174,7 +160,6 @@ export default async function OvertimeManagementPage({
           <OvertimeManagementClient
             initialTab={tab}
             initialRequests={overtimeRequests}
-            overtimeApprovers={overtimeApprovers}
             departments={departments}
             approvers={approvers}
             currentUserId={session.user.id}

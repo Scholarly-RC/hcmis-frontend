@@ -1,6 +1,13 @@
 "use client";
 
-import { ClipboardList, Loader2, RotateCcw, Users, Wallet } from "lucide-react";
+import {
+  ArrowUpCircle,
+  ClipboardList,
+  Loader2,
+  RotateCcw,
+  Users,
+  Wallet,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -24,8 +31,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type {
-  LeaveApprover,
-  LeaveApproverUpsertPayload,
   LeaveCredit,
   LeaveCreditUpsertPayload,
   LeaveRequestRecord,
@@ -39,7 +44,7 @@ type RequestError = {
   detail?: string;
 };
 
-type ManagementTab = "requests" | "approvers" | "credits";
+type ManagementTab = "requests" | "credits";
 
 type RequestFilters = {
   userId: string;
@@ -117,10 +122,6 @@ function roleLabel(role: string | null | undefined) {
   return normalized;
 }
 
-function normalizeRole(role: string | null | undefined) {
-  return role?.trim().toUpperCase() || "EMP";
-}
-
 type LeaveManagementClientProps = {
   initialTab?: ManagementTab;
 };
@@ -137,7 +138,6 @@ export function LeaveManagementClient({
   const [departments, setDepartments] = useState<AuthDepartment[]>([]);
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [requests, setRequests] = useState<LeaveRequestRecord[]>([]);
-  const [approvers, setApprovers] = useState<LeaveApprover[]>([]);
   const [credits, setCredits] = useState<LeaveCredit[]>([]);
   const [years, setYears] = useState<number[]>([]);
 
@@ -149,15 +149,15 @@ export function LeaveManagementClient({
     month: "all",
   });
 
-  const [approverSavingDepartmentId, setApproverSavingDepartmentId] = useState<
-    number | null
-  >(null);
   const [creditSavingUserId, setCreditSavingUserId] = useState<string | null>(
     null,
   );
   const [creditResettingUserId, setCreditResettingUserId] = useState<
     string | null
   >(null);
+  const [escalatingLeaveId, setEscalatingLeaveId] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -168,14 +168,12 @@ export function LeaveManagementClient({
           departmentsResponse,
           usersResponse,
           requestsResponse,
-          approversResponse,
           creditsResponse,
           yearsResponse,
         ] = await Promise.all([
           requestJson<AuthDepartment[]>("/api/departments"),
           requestJson<AuthUser[]>("/api/users?include_superusers=true"),
           requestJson<LeaveRequestRecord[]>("/api/leave/requests"),
-          requestJson<LeaveApprover[]>("/api/leave/approvers"),
           requestJson<LeaveCredit[]>("/api/leave/credits"),
           requestJson<number[]>("/api/leave/years").catch(() => []),
         ]);
@@ -187,7 +185,6 @@ export function LeaveManagementClient({
         setDepartments(departmentsResponse);
         setUsers(usersResponse);
         setRequests(requestsResponse);
-        setApprovers(approversResponse);
         setCredits(creditsResponse);
         setYears(yearsResponse);
       } catch (error) {
@@ -258,18 +255,6 @@ export function LeaveManagementClient({
       return true;
     });
   }, [requests, requestFilters]);
-
-  const approverRows = useMemo(() => {
-    const existingByDepartment = new Map<number, LeaveApprover>();
-    for (const item of approvers) {
-      existingByDepartment.set(item.department_id, item);
-    }
-
-    return departments.map((department) => ({
-      department,
-      approver: existingByDepartment.get(department.id) ?? null,
-    }));
-  }, [departments, approvers]);
 
   const creditRows = useMemo(() => {
     const creditsByUserId = new Map<string, LeaveCredit>();
@@ -348,35 +333,6 @@ export function LeaveManagementClient({
     });
   }, [loading, reloadRequests]);
 
-  async function saveApprover(
-    departmentId: number,
-    payload: LeaveApproverUpsertPayload,
-  ) {
-    setApproverSavingDepartmentId(departmentId);
-    try {
-      const updated = await requestJson<LeaveApprover>(
-        `/api/leave/approvers/${departmentId}`,
-        {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        },
-      );
-      setApprovers((prev) => {
-        const next = prev.filter((item) => item.department_id !== departmentId);
-        return [...next, updated].sort(
-          (a, b) => a.department_id - b.department_id,
-        );
-      });
-      toast.success("Approver settings updated.");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to update approvers.",
-      );
-    } finally {
-      setApproverSavingDepartmentId(null);
-    }
-  }
-
   async function saveCredit(userId: string, creditsValue: number) {
     if (!Number.isFinite(creditsValue) || creditsValue < 0) {
       toast.error("Credits must be zero or greater.");
@@ -434,37 +390,27 @@ export function LeaveManagementClient({
     }
   }
 
-  const approverEligibleUsers = useMemo(() => {
-    return users
-      .filter((user) => user.is_active && normalizeRole(user.role) !== "EMP")
-      .sort((a, b) => displayUser(a).localeCompare(displayUser(b)));
-  }, [users]);
-
-  const approverEligibleUsersByField = useCallback(
-    (
-      fieldKey:
-        | "department_approver_id"
-        | "director_approver_id"
-        | "president_approver_id"
-        | "hr_approver_id",
-      departmentId: number,
-    ) => {
-      return approverEligibleUsers.filter((user) => {
-        const role = normalizeRole(user.role);
-        if (fieldKey === "department_approver_id") {
-          return role === "DH" && user.department_id === departmentId;
-        }
-        if (fieldKey === "director_approver_id") {
-          return role === "DIR";
-        }
-        if (fieldKey === "president_approver_id") {
-          return role === "PRES";
-        }
-        return role === "HR";
-      });
-    },
-    [approverEligibleUsers],
-  );
+  async function escalateToBackup(leaveId: number) {
+    setEscalatingLeaveId(leaveId);
+    try {
+      const updated = await requestJson<LeaveRequestRecord>(
+        `/api/leave/requests/${leaveId}/escalate`,
+        { method: "POST" },
+      );
+      setRequests((prev) =>
+        prev.map((item) => (item.id === leaveId ? updated : item)),
+      );
+      toast.success("Leave request escalated to backup approver.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to escalate leave request.",
+      );
+    } finally {
+      setEscalatingLeaveId(null);
+    }
+  }
 
   const setTabWithUrl = useCallback(
     (nextTab: ManagementTab) => {
@@ -481,11 +427,7 @@ export function LeaveManagementClient({
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (
-      tabParam === "requests" ||
-      tabParam === "approvers" ||
-      tabParam === "credits"
-    ) {
+    if (tabParam === "requests" || tabParam === "credits") {
       if (tab !== tabParam) {
         setTab(tabParam);
       }
@@ -506,8 +448,8 @@ export function LeaveManagementClient({
               Leave Management
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Configure approval routing, manage user leave credits, and monitor
-              organization-wide leave requests.
+              Manage user leave credits and monitor organization-wide leave
+              requests.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -526,14 +468,6 @@ export function LeaveManagementClient({
           >
             <ClipboardList className="size-4" />
             Request Monitor
-          </Button>
-          <Button
-            type="button"
-            variant={tab === "approvers" ? "default" : "outline"}
-            onClick={() => setTabWithUrl("approvers")}
-          >
-            <Users className="size-4" />
-            Approver Settings
           </Button>
           <Button
             type="button"
@@ -663,13 +597,14 @@ export function LeaveManagementClient({
                     <TableHead>Status</TableHead>
                     <TableHead>Approvers</TableHead>
                     <TableHead>Info</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredRequests.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={8}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No leave requests found.
@@ -683,6 +618,10 @@ export function LeaveManagementClient({
                       const actedByLabel = actedAssignment?.approver
                         ? displayUser(actedAssignment.approver)
                         : "Pending";
+                      const canEscalate =
+                        item.status === "PENDING" &&
+                        item.second_approver_id !== null &&
+                        item.escalated_to_backup_at === null;
 
                       return (
                         <TableRow key={item.id}>
@@ -714,6 +653,30 @@ export function LeaveManagementClient({
                           <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
                             {item.info || "-"}
                           </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end">
+                              {canEscalate ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={escalatingLeaveId === item.id}
+                                  onClick={() => escalateToBackup(item.id)}
+                                >
+                                  {escalatingLeaveId === item.id ? (
+                                    <Loader2 className="size-4 animate-spin" />
+                                  ) : (
+                                    <ArrowUpCircle className="size-4" />
+                                  )}
+                                  Escalate To Backup
+                                </Button>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  -
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
                         </TableRow>
                       );
                     })
@@ -721,105 +684,6 @@ export function LeaveManagementClient({
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {!loading && tab === "approvers" ? (
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardHeader>
-            <CardTitle>Approver Settings</CardTitle>
-            <CardDescription>
-              Set department leave approvers for each role in the chain.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {approverRows.map(({ department, approver }) => {
-              const currentValue: LeaveApproverUpsertPayload = {
-                department_approver_id:
-                  approver?.department_approver_id ?? null,
-                director_approver_id: approver?.director_approver_id ?? null,
-                president_approver_id: approver?.president_approver_id ?? null,
-                hr_approver_id: approver?.hr_approver_id ?? null,
-              };
-
-              return (
-                <div
-                  key={department.id}
-                  className="rounded-xl border border-border/70 bg-background/70 p-4"
-                >
-                  <div className="mb-3">
-                    <p className="font-medium text-foreground">
-                      {department.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {department.code}
-                    </p>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    {[
-                      {
-                        id: "department_approver",
-                        label: "Department Approver",
-                        key: "department_approver_id" as const,
-                      },
-                      {
-                        id: "director_approver",
-                        label: "Director Approver",
-                        key: "director_approver_id" as const,
-                      },
-                      {
-                        id: "president_approver",
-                        label: "President Approver",
-                        key: "president_approver_id" as const,
-                      },
-                      {
-                        id: "hr_approver",
-                        label: "HR Approver",
-                        key: "hr_approver_id" as const,
-                      },
-                    ].map((field) => (
-                      <SelectField
-                        key={`${department.id}-${field.id}`}
-                        id={`${department.id}-${field.id}`}
-                        label={field.label}
-                        value={
-                          currentValue[field.key] === null
-                            ? "none"
-                            : String(currentValue[field.key])
-                        }
-                        onChange={(_, value) => {
-                          const nextPayload: LeaveApproverUpsertPayload = {
-                            ...currentValue,
-                            [field.key]: value === "none" ? null : value,
-                          };
-                          void saveApprover(department.id, nextPayload);
-                        }}
-                        options={[
-                          { value: "none", label: "Not set" },
-                          ...approverEligibleUsersByField(
-                            field.key,
-                            department.id,
-                          ).map((user) => ({
-                            value: user.id.toString(),
-                            label: `${displayUser(user)} (${roleLabel(user.role)})`,
-                          })),
-                        ]}
-                        placeholder={field.label}
-                      />
-                    ))}
-                  </div>
-
-                  {approverSavingDepartmentId === department.id ? (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Saving approver settings...
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
           </CardContent>
         </Card>
       ) : null}

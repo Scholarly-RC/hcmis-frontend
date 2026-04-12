@@ -514,6 +514,7 @@ export function BiometricSyncClient() {
         initialValues={createUserInitialValues ?? undefined}
         departments={departments}
         positions={positions}
+        users={[]}
         onOpenChange={(open) => {
           setIsCreateUserDialogOpen(open);
           if (!open) {

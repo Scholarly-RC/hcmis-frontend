@@ -1,24 +1,8 @@
-import type { AuthDepartment, AuthUser } from "@/types/auth";
+import type { AuthUser } from "@/types/auth";
 
 export type LeaveTypeOption = {
   value: "PA" | "UN" | "WR";
   label: string;
-};
-
-export type LeaveApprover = {
-  id: number;
-  department_id: number;
-  department: AuthDepartment | null;
-  department_approver_id: string | null;
-  director_approver_id: string | null;
-  president_approver_id: string | null;
-  hr_approver_id: string | null;
-  department_approver: AuthUser | null;
-  director_approver: AuthUser | null;
-  president_approver: AuthUser | null;
-  hr_approver: AuthUser | null;
-  created_at: string;
-  updated_at: string;
 };
 
 export type LeaveCredit = {
@@ -58,6 +42,8 @@ export type LeaveRequestRecord = {
   second_approver_id: string | null;
   second_approver_status: LeaveRequestStatus | null;
   second_approver_at: string | null;
+  escalated_to_backup_at: string | null;
+  escalated_to_backup_by_id: string | null;
   status: LeaveRequestStatus;
   user: AuthUser | null;
   first_approver: AuthUser | null;
@@ -75,13 +61,6 @@ export type LeaveRequestCreatePayload = {
 
 export type LeaveReviewPayload = {
   response: "APPROVE" | "REJECT";
-};
-
-export type LeaveApproverUpsertPayload = {
-  department_approver_id: string | null;
-  director_approver_id: string | null;
-  president_approver_id: string | null;
-  hr_approver_id: string | null;
 };
 
 export type LeaveCreditUpsertPayload = {

@@ -5,14 +5,14 @@ import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
   title: "Leave Management",
-  description: "Manage leave approvers, credits, and requests",
+  description: "Manage leave credits and requests",
 };
 
 type SearchParams =
   | Record<string, string | string[] | undefined>
   | Promise<Record<string, string | string[] | undefined>>;
 
-type LeaveManagementTab = "requests" | "approvers" | "credits";
+type LeaveManagementTab = "requests" | "credits";
 
 function firstValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
@@ -22,7 +22,7 @@ function firstValue(value: string | string[] | undefined) {
 }
 
 function parseLeaveManagementTab(value: string): LeaveManagementTab {
-  if (value === "approvers" || value === "credits") {
+  if (value === "credits") {
     return value;
   }
   return "requests";

@@ -65,6 +65,8 @@ type UserFormState = {
   biometric_uid: string;
   role: (typeof userRoles)[number];
   department_id: string;
+  level_1_approver_id: string;
+  level_2_approver_id: string;
   position_id: string;
   rank_level: string;
   step_number: string;
@@ -94,6 +96,8 @@ function buildUserEditorSchema(mode: UserEditorMode) {
       biometric_uid: z.string(),
       role: z.enum(userRoles),
       department_id: z.string(),
+      level_1_approver_id: z.string(),
+      level_2_approver_id: z.string(),
       position_id: z.string(),
       rank_level: z.string(),
       step_number: z.string(),
@@ -190,6 +194,18 @@ function buildUserEditorSchema(mode: UserEditorMode) {
           message: "Position and rank level are required together.",
         });
       }
+
+      if (
+        values.level_1_approver_id.trim() !== "none" &&
+        values.level_1_approver_id.trim().length > 0 &&
+        values.level_1_approver_id.trim() === values.level_2_approver_id.trim()
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["level_2_approver_id"],
+          message: "Level 2 approver must be different from Level 1 approver.",
+        });
+      }
     });
 }
 
@@ -203,6 +219,8 @@ export type UserEditorPayload = {
   biometric_uid: number | null;
   role: string | null;
   department_id: number | null;
+  level_1_approver_id: string | null;
+  level_2_approver_id: string | null;
   position_id: number | null;
   rank_level: number | null;
   step_number: number | null;
@@ -236,6 +254,8 @@ const emptyFormState = (): UserFormState => ({
   biometric_uid: "",
   role: "EMP",
   department_id: "none",
+  level_1_approver_id: "none",
+  level_2_approver_id: "none",
   position_id: "none",
   rank_level: "",
   step_number: "",
@@ -340,6 +360,8 @@ function buildFormState(
         biometric_uid: user.biometric_uid?.toString() ?? "",
         role: normalizeUserRole(user.role),
         department_id: user.department_id?.toString() ?? "none",
+        level_1_approver_id: user.level_1_approver_id ?? "none",
+        level_2_approver_id: user.level_2_approver_id ?? "none",
         position_id: user.position_id?.toString() ?? "none",
         rank_level: user.rank_level?.toString() ?? "",
         step_number: user.step_number?.toString() ?? "",
@@ -553,6 +575,7 @@ export function UserEditorDialog({
   initialValues,
   departments,
   positions,
+  users,
   onOpenChange,
   onSubmit,
 }: {
@@ -562,6 +585,7 @@ export function UserEditorDialog({
   initialValues?: UserEditorInitialValues;
   departments: AuthDepartment[];
   positions: PayrollPosition[];
+  users: AuthUser[];
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: UserEditorPayload) => Promise<void>;
 }) {
@@ -593,6 +617,15 @@ export function UserEditorDialog({
         label: `${position.code} (${position.title})`,
       })),
   ];
+  const approverOptions = [
+    { value: "none", label: "Not set" },
+    ...users
+      .filter((item) => item.is_active && item.id !== user?.id)
+      .map((item) => ({
+        value: item.id,
+        label: `${buildDisplayName(item) || item.email} (${getRoleLabel(item.role)})`,
+      })),
+  ];
 
   async function handleFormSubmit(values: UserFormState) {
     setSubmitError(null);
@@ -615,6 +648,16 @@ export function UserEditorDialog({
           values.department_id.trim().length === 0
             ? null
             : Number(values.department_id.trim()),
+        level_1_approver_id:
+          values.level_1_approver_id.trim() === "none" ||
+          values.level_1_approver_id.trim().length === 0
+            ? null
+            : values.level_1_approver_id.trim(),
+        level_2_approver_id:
+          values.level_2_approver_id.trim() === "none" ||
+          values.level_2_approver_id.trim().length === 0
+            ? null
+            : values.level_2_approver_id.trim(),
         position_id:
           values.position_id.trim() === "none" ||
           values.position_id.trim().length === 0
@@ -736,6 +779,40 @@ export function UserEditorDialog({
                       placeholder="Select a department"
                       triggerClassName={controlHeightClass}
                       error={errors.department_id?.message}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="level_1_approver_id"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-level-1-approver"
+                      label="Level 1 Approver"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={approverOptions}
+                      placeholder="Select approver"
+                      triggerClassName={controlHeightClass}
+                      error={errors.level_1_approver_id?.message}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="level_2_approver_id"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-level-2-approver"
+                      label="Level 2 Approver (Backup)"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={approverOptions}
+                      placeholder="Select backup approver"
+                      triggerClassName={controlHeightClass}
+                      error={errors.level_2_approver_id?.message}
                     />
                   )}
                 />
@@ -1497,6 +1574,7 @@ export function UserManagementClient({
         user={editingUser}
         departments={departments}
         positions={positions}
+        users={visibleUsers}
         onOpenChange={closeEditor}
         onSubmit={handleSaveUser}
       />

@@ -22,6 +22,8 @@ export type AuthUser = {
   biometric_uid: number | null;
   role: string | null;
   department_id: number | null;
+  level_1_approver_id: string | null;
+  level_2_approver_id: string | null;
   department: AuthDepartment | null;
   phone_number: string | null;
   address: string | null;

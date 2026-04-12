@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, ClipboardCheck, Layers3, Loader2, X } from "lucide-react";
+import { ArrowUpCircle, Check, ClipboardCheck, Loader2, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SelectField } from "@/components/form-select-field";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +21,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type {
-  OvertimeApprover,
-  OvertimeApproverUpsertPayload,
   OvertimeRequestRecord,
   OvertimeRequestStatus,
 } from "@/lib/attendance";
@@ -40,9 +38,8 @@ type OvertimeFilterState = {
 };
 
 type OvertimeManagementClientProps = {
-  initialTab: "requests" | "approvers";
+  initialTab: "requests";
   initialRequests: OvertimeRequestRecord[];
-  overtimeApprovers: OvertimeApprover[];
   departments: AuthDepartment[];
   approvers: AuthUser[];
   currentUserId: string;
@@ -166,14 +163,9 @@ function roleLabel(role: string | null | undefined) {
   return normalized;
 }
 
-function normalizeRole(role: string | null | undefined) {
-  return role?.trim().toUpperCase() || "EMP";
-}
-
 export function OvertimeManagementClient({
   initialTab,
   initialRequests,
-  overtimeApprovers,
   departments,
   approvers,
   currentUserId,
@@ -184,26 +176,18 @@ export function OvertimeManagementClient({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<"requests" | "approvers">(initialTab);
+  const [tab, setTab] = useState<"requests">(initialTab);
   const [requests, setRequests] = useState(initialRequests);
-  const [approverSettings, setApproverSettings] = useState(overtimeApprovers);
   const [formState, setFormState] = useState<OvertimeFilterState>(filters);
   const [actionMap, setActionMap] = useState<
-    Record<number, "approve" | "reject" | "delete" | undefined>
+    Record<number, "approve" | "reject" | "delete" | "escalate" | undefined>
   >({});
-  const [approverSavingDepartmentId, setApproverSavingDepartmentId] = useState<
-    number | null
-  >(null);
   const debouncedReplaceRef = useRef<DebouncedReplace | null>(null);
   const mountedRef = useRef(false);
 
   useEffect(() => {
     setRequests(initialRequests);
   }, [initialRequests]);
-
-  useEffect(() => {
-    setApproverSettings(overtimeApprovers);
-  }, [overtimeApprovers]);
 
   useEffect(() => {
     setFormState((prev) => (isSameFilterState(prev, filters) ? prev : filters));
@@ -239,92 +223,6 @@ export function OvertimeManagementClient({
 
     debouncedReplaceRef.current?.(formState);
   }, [formState]);
-
-  const approverRows = useMemo(() => {
-    const existingByDepartment = new Map(
-      approverSettings.map((item) => [item.department_id, item]),
-    );
-    return departments.map((department) => ({
-      department,
-      approver: existingByDepartment.get(department.id) ?? null,
-    }));
-  }, [approverSettings, departments]);
-
-  const approverEligibleUsers = useMemo(() => {
-    return approvers
-      .filter((user) => user.is_active && normalizeRole(user.role) !== "EMP")
-      .sort((a, b) => displayUser(a).localeCompare(displayUser(b)));
-  }, [approvers]);
-
-  const approverEligibleUsersByField = (
-    fieldKey:
-      | "department_approver_id"
-      | "director_approver_id"
-      | "president_approver_id"
-      | "hr_approver_id",
-    departmentId: number,
-  ) => {
-    return approverEligibleUsers.filter((user) => {
-      const role = normalizeRole(user.role);
-      if (fieldKey === "department_approver_id") {
-        return role === "DH" && user.department_id === departmentId;
-      }
-      if (fieldKey === "director_approver_id") {
-        return role === "DIR";
-      }
-      if (fieldKey === "president_approver_id") {
-        return role === "PRES";
-      }
-      return role === "HR";
-    });
-  };
-
-  async function saveApprover(
-    departmentId: number,
-    payload: OvertimeApproverUpsertPayload,
-  ) {
-    setApproverSavingDepartmentId(departmentId);
-
-    try {
-      const response = await fetch(
-        `/api/attendance/overtime-approvers/${departmentId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-      const result = (await response.json().catch(() => null)) as
-        | OvertimeApprover
-        | { detail?: string }
-        | null;
-
-      if (!response.ok) {
-        const detail = result && "detail" in result ? result.detail : null;
-        toast.error(detail ?? "Unable to update overtime approvers.");
-        return;
-      }
-
-      const nextApprover = result as OvertimeApprover;
-      setApproverSettings((prev) => {
-        const next = prev.filter((item) => item.department_id !== departmentId);
-        next.push(nextApprover);
-        next.sort((a, b) => {
-          const aName = a.department?.name ?? "";
-          const bName = b.department?.name ?? "";
-          return aName.localeCompare(bName);
-        });
-        return next;
-      });
-      toast.success("Overtime approver settings updated.");
-    } catch {
-      toast.error("Unable to update overtime approvers.");
-    } finally {
-      setApproverSavingDepartmentId(null);
-    }
-  }
 
   async function respond(
     request: OvertimeRequestRecord,
@@ -373,7 +271,42 @@ export function OvertimeManagementClient({
     }
   }
 
-  function setTabWithUrl(nextTab: "requests" | "approvers") {
+  async function escalate(request: OvertimeRequestRecord) {
+    setActionMap((prev) => ({ ...prev, [request.id]: "escalate" }));
+
+    try {
+      const httpResponse = await fetch(
+        `/api/attendance/overtime/${request.id}/escalate`,
+        {
+          method: "POST",
+        },
+      );
+      const payload = (await httpResponse.json().catch(() => null)) as
+        | OvertimeRequestRecord
+        | { detail?: string }
+        | null;
+
+      if (!httpResponse.ok) {
+        const detail = payload && "detail" in payload ? payload.detail : null;
+        toast.error(detail ?? "Unable to escalate overtime request.");
+        return;
+      }
+
+      const nextRequest = payload as OvertimeRequestRecord;
+      setRequests((prev) =>
+        prev.map((item) =>
+          item.id === request.id ? { ...item, ...nextRequest } : item,
+        ),
+      );
+      toast.success("Overtime request escalated to backup approver.");
+    } catch {
+      toast.error("Unable to escalate overtime request.");
+    } finally {
+      setActionMap((prev) => ({ ...prev, [request.id]: undefined }));
+    }
+  }
+
+  function setTabWithUrl(nextTab: "requests") {
     setTab(nextTab);
     const nextParams = new URLSearchParams(searchParams.toString());
     nextParams.set("tab", nextTab);
@@ -390,8 +323,7 @@ export function OvertimeManagementClient({
           Overtime Management
         </h1>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-          Review overtime requests across teams and manage department approver
-          settings from one workspace.
+          Review overtime requests across teams from one workspace.
         </p>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -403,16 +335,6 @@ export function OvertimeManagementClient({
             <ClipboardCheck className="size-4" />
             Request Monitor
           </Button>
-          {isStaff ? (
-            <Button
-              type="button"
-              variant={tab === "approvers" ? "default" : "outline"}
-              onClick={() => setTabWithUrl("approvers")}
-            >
-              <Layers3 className="size-4" />
-              Approver Settings
-            </Button>
-          ) : null}
         </div>
       </section>
 
@@ -546,6 +468,10 @@ export function OvertimeManagementClient({
                       const canRespond =
                         request.status === "PENDING" &&
                         currentAssignee?.status === "PENDING";
+                      const canEscalate =
+                        isStaff &&
+                        request.status === "PENDING" &&
+                        request.escalated_to_backup_at === null;
                       const actedByAssignment = request.approver_pool.find(
                         (item) => item.acted_at !== null,
                       );
@@ -617,6 +543,23 @@ export function OvertimeManagementClient({
                                   </Button>
                                 </>
                               ) : null}
+                              {canEscalate ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8"
+                                  onClick={() => escalate(request)}
+                                  disabled={actionInProgress !== undefined}
+                                >
+                                  {actionInProgress === "escalate" ? (
+                                    <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                                  ) : (
+                                    <ArrowUpCircle className="mr-1.5 size-3.5" />
+                                  )}
+                                  Escalate To Backup
+                                </Button>
+                              ) : null}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -626,105 +569,6 @@ export function OvertimeManagementClient({
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {tab === "approvers" ? (
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardHeader>
-            <CardTitle>Approver Settings</CardTitle>
-            <CardDescription>
-              Set department overtime approvers for each role in the chain.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {approverRows.map(({ department, approver }) => {
-              const currentValue: OvertimeApproverUpsertPayload = {
-                department_approver_id:
-                  approver?.department_approver_id ?? null,
-                director_approver_id: approver?.director_approver_id ?? null,
-                president_approver_id: approver?.president_approver_id ?? null,
-                hr_approver_id: approver?.hr_approver_id ?? null,
-              };
-
-              return (
-                <div
-                  key={department.id}
-                  className="rounded-xl border border-border/70 bg-background/70 p-4"
-                >
-                  <div className="mb-3">
-                    <p className="font-medium text-foreground">
-                      {department.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {department.code}
-                    </p>
-                  </div>
-
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    {[
-                      {
-                        id: "department_approver",
-                        label: "Department Approver",
-                        key: "department_approver_id" as const,
-                      },
-                      {
-                        id: "director_approver",
-                        label: "Director Approver",
-                        key: "director_approver_id" as const,
-                      },
-                      {
-                        id: "president_approver",
-                        label: "President Approver",
-                        key: "president_approver_id" as const,
-                      },
-                      {
-                        id: "hr_approver",
-                        label: "HR Approver",
-                        key: "hr_approver_id" as const,
-                      },
-                    ].map((field) => (
-                      <SelectField
-                        key={`${department.id}-${field.id}`}
-                        id={`${department.id}-${field.id}`}
-                        label={field.label}
-                        value={
-                          currentValue[field.key] === null
-                            ? "none"
-                            : String(currentValue[field.key])
-                        }
-                        onChange={(_, value) => {
-                          const nextPayload: OvertimeApproverUpsertPayload = {
-                            ...currentValue,
-                            [field.key]: value === "none" ? null : value,
-                          };
-                          void saveApprover(department.id, nextPayload);
-                        }}
-                        options={[
-                          { value: "none", label: "Not set" },
-                          ...approverEligibleUsersByField(
-                            field.key,
-                            department.id,
-                          ).map((user) => ({
-                            value: user.id.toString(),
-                            label: `${displayUser(user)} (${roleLabel(user.role)})`,
-                          })),
-                        ]}
-                        placeholder={field.label}
-                      />
-                    ))}
-                  </div>
-
-                  {approverSavingDepartmentId === department.id ? (
-                    <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Saving approver settings...
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
           </CardContent>
         </Card>
       ) : null}
