@@ -49,32 +49,29 @@ function formatMonthDayLabel(summary: AttendanceSummary, dayNumber: number) {
   return `${day.day_name} ${day.day}`;
 }
 
+function isWeekendDay(summary: AttendanceSummary, dayNumber: number) {
+  const day = summary.days.find((entry) => entry.day === dayNumber);
+  return day?.day_name === "Saturday" || day?.day_name === "Sunday";
+}
+
 type RowStatus = "idle" | "saving" | "error";
 
 function AssignmentRow({
   summary,
   dayNumber,
-  currentAssignment,
   selectedTemplateId,
   rowStatus,
   isMutating,
-  isFocused,
   templates,
-  onFocusRow,
   onTemplateSelect,
-  onRemove,
 }: {
   summary: AttendanceSummary;
   dayNumber: number;
-  currentAssignment: AttendanceSummary["days"][number]["shift"];
   selectedTemplateId: string;
   rowStatus: RowStatus;
   isMutating: boolean;
-  isFocused: boolean;
   templates: ShiftTemplateRecord[];
-  onFocusRow: (dayNumber: number) => void;
   onTemplateSelect: (dayNumber: number, templateId: string) => void;
-  onRemove: (dayNumber: number) => void;
 }) {
   function statusPill() {
     if (rowStatus === "saving") {
@@ -101,7 +98,7 @@ function AssignmentRow({
   return (
     <div
       data-day-row={dayNumber}
-      className={`grid gap-3 rounded-2xl border border-border/70 bg-background/70 p-3 lg:grid-cols-[14rem_1fr_10rem] lg:items-center ${isFocused ? "ring-1 ring-ring/70" : ""}`}
+      className="grid gap-3 rounded-2xl border border-border/70 bg-background/70 p-3 lg:grid-cols-[14rem_1fr] lg:items-center"
     >
       <div className="space-y-1">
         <div className="flex items-center gap-2">
@@ -131,7 +128,6 @@ function AssignmentRow({
                   onClick={() =>
                     onTemplateSelect(dayNumber, shift.id.toString())
                   }
-                  onFocus={() => onFocusRow(dayNumber)}
                   disabled={isMutating}
                 >
                   {shift.description}
@@ -144,18 +140,6 @@ function AssignmentRow({
             No shift templates available.
           </p>
         )}
-      </div>
-
-      <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => onRemove(dayNumber)}
-          disabled={isMutating || !currentAssignment?.id}
-        >
-          <Trash2 className="size-4" />
-          Remove
-        </Button>
       </div>
     </div>
   );
@@ -174,6 +158,7 @@ export function ShiftAssignmentManager({
   const [isCopyingPreviousMonth, setIsCopyingPreviousMonth] = useState(false);
   const [isGeneratingMonth, setIsGeneratingMonth] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
+  const [includeWeekends, setIncludeWeekends] = useState(false);
   const [defaultShiftTemplateId, setDefaultShiftTemplateId] = useState<string>(
     shiftTemplates[0]?.id.toString() ?? "",
   );
@@ -183,7 +168,6 @@ export function ShiftAssignmentManager({
   const [rowStatusByDay, setRowStatusByDay] = useState<
     Record<number, RowStatus>
   >({});
-  const [focusedDay, setFocusedDay] = useState<number | null>(null);
 
   const allowedTemplates = shiftTemplates;
 
@@ -196,9 +180,8 @@ export function ShiftAssignmentManager({
   }
 
   function getSelectedTemplateForDay(dayNumber: number) {
-    const pending = pendingTemplateByDay[dayNumber];
-    if (pending) {
-      return pending;
+    if (Object.hasOwn(pendingTemplateByDay, dayNumber)) {
+      return pendingTemplateByDay[dayNumber] ?? "";
     }
     return getCurrentAssignment(dayNumber)?.shift_id?.toString() ?? "";
   }
@@ -214,18 +197,26 @@ export function ShiftAssignmentManager({
       });
   }
 
-  function focusDayRow(dayNumber: number) {
-    setFocusedDay(dayNumber);
-    const chip = document.querySelector<HTMLElement>(
-      `[data-day-row="${dayNumber}"] [data-shift-chip="true"]`,
-    );
-    chip?.focus();
-  }
-
   function handleTemplateSelect(dayNumber: number, templateId: string) {
     const current = getCurrentAssignment(dayNumber)?.shift_id?.toString() ?? "";
 
     setPendingTemplateByDay((previous) => {
+      const hasPending = Object.hasOwn(previous, dayNumber);
+      const selected = hasPending ? (previous[dayNumber] ?? "") : current;
+
+      if (templateId === selected) {
+        if (!current) {
+          const next = { ...previous };
+          delete next[dayNumber];
+          return next;
+        }
+
+        return {
+          ...previous,
+          [dayNumber]: "",
+        };
+      }
+
       if (templateId === current) {
         const next = { ...previous };
         delete next[dayNumber];
@@ -244,6 +235,79 @@ export function ShiftAssignmentManager({
     }));
   }
 
+  function handleToggleIncludeWeekends() {
+    const nextIncludeWeekends = !includeWeekends;
+    const weekendDays = summary.days.filter((day) =>
+      isWeekendDay(summary, day.day),
+    );
+
+    if (nextIncludeWeekends) {
+      const needsDefaultTemplate = weekendDays.some((day) => {
+        const current =
+          getCurrentAssignment(day.day)?.shift_id?.toString() ?? "";
+        const pending = pendingTemplateByDay[day.day];
+        if (pending && pending.length > 0) {
+          return false;
+        }
+        return !current;
+      });
+      if (needsDefaultTemplate && !defaultShiftTemplateId) {
+        toast.error("Select a default template first.");
+        return;
+      }
+    }
+
+    setIncludeWeekends(nextIncludeWeekends);
+
+    setPendingTemplateByDay((previous) => {
+      const next = { ...previous };
+
+      if (!nextIncludeWeekends) {
+        for (const day of weekendDays) {
+          const current = getCurrentAssignment(day.day);
+          const pending = next[day.day];
+          if (current) {
+            next[day.day] = "";
+          } else if (pending) {
+            delete next[day.day];
+          }
+        }
+        return next;
+      }
+
+      for (const day of weekendDays) {
+        const current =
+          getCurrentAssignment(day.day)?.shift_id?.toString() ?? "";
+        const pending = next[day.day];
+
+        if (pending === "") {
+          if (current) {
+            delete next[day.day];
+          } else if (defaultShiftTemplateId) {
+            next[day.day] = defaultShiftTemplateId;
+          }
+          continue;
+        }
+
+        if (!pending && !current && defaultShiftTemplateId) {
+          next[day.day] = defaultShiftTemplateId;
+        }
+      }
+
+      return next;
+    });
+
+    setRowStatusByDay((previous) => {
+      const next = { ...previous };
+      for (const day of summary.days) {
+        if (isWeekendDay(summary, day.day)) {
+          next[day.day] = "idle";
+        }
+      }
+      return next;
+    });
+  }
+
   async function persistDayAssignment(dayNumber: number, templateId: string) {
     const currentAssignment = getCurrentAssignment(dayNumber);
 
@@ -253,6 +317,54 @@ export function ShiftAssignmentManager({
     }));
 
     try {
+      if (templateId.length === 0) {
+        if (!currentAssignment?.id) {
+          setPendingTemplateByDay((previous) => {
+            const next = { ...previous };
+            delete next[dayNumber];
+            return next;
+          });
+          setRowStatusByDay((previous) => ({
+            ...previous,
+            [dayNumber]: "idle",
+          }));
+          return true;
+        }
+
+        const response = await fetch(
+          `/api/attendance/shift-assignments/${currentAssignment.id}`,
+          {
+            method: "DELETE",
+          },
+        );
+
+        const payload = (await response.json().catch(() => null)) as {
+          detail?: string;
+        } | null;
+
+        if (!response.ok) {
+          toast.error(
+            payload?.detail ?? `Unable to remove shift for day ${dayNumber}.`,
+          );
+          setRowStatusByDay((previous) => ({
+            ...previous,
+            [dayNumber]: "error",
+          }));
+          return false;
+        }
+
+        setPendingTemplateByDay((previous) => {
+          const next = { ...previous };
+          delete next[dayNumber];
+          return next;
+        });
+        setRowStatusByDay((previous) => ({
+          ...previous,
+          [dayNumber]: "idle",
+        }));
+        return true;
+      }
+
       if (currentAssignment?.id) {
         if (currentAssignment.shift_id.toString() === templateId) {
           setRowStatusByDay((previous) => ({
@@ -352,10 +464,7 @@ export function ShiftAssignmentManager({
     let failureCount = 0;
 
     for (const dayNumber of changedDays) {
-      const templateId = pendingTemplateByDay[dayNumber];
-      if (!templateId) {
-        continue;
-      }
+      const templateId = pendingTemplateByDay[dayNumber] ?? "";
       const ok = await persistDayAssignment(dayNumber, templateId);
       if (ok) {
         successCount += 1;
@@ -386,94 +495,10 @@ export function ShiftAssignmentManager({
     setRowStatusByDay({});
   }
 
-  async function handleRemoveAssignment(dayNumber: number) {
-    const currentAssignment = getCurrentAssignment(dayNumber);
-    if (!currentAssignment?.id) {
-      return;
-    }
-
-    setRowStatusByDay((previous) => ({
-      ...previous,
-      [dayNumber]: "saving",
-    }));
-
-    try {
-      const response = await fetch(
-        `/api/attendance/shift-assignments/${currentAssignment.id}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      const payload = (await response.json().catch(() => null)) as {
-        detail?: string;
-      } | null;
-
-      if (!response.ok) {
-        toast.error(payload?.detail ?? "Unable to remove shift assignment.");
-        setRowStatusByDay((previous) => ({
-          ...previous,
-          [dayNumber]: "error",
-        }));
-        return;
-      }
-
-      setPendingTemplateByDay((previous) => {
-        const next = { ...previous };
-        delete next[dayNumber];
-        return next;
-      });
-      setRowStatusByDay((previous) => ({
-        ...previous,
-        [dayNumber]: "idle",
-      }));
-
-      toast.success("Shift assignment removed.");
-      router.refresh();
-    } catch {
-      toast.error("Unable to remove shift assignment.");
-      setRowStatusByDay((previous) => ({
-        ...previous,
-        [dayNumber]: "error",
-      }));
-    }
-  }
-
   function handleRowsKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();
       void handleSaveAllChanges();
-      return;
-    }
-
-    if (event.altKey || event.metaKey || event.ctrlKey) {
-      return;
-    }
-
-    if (!focusedDay) {
-      return;
-    }
-
-    const dayNumbers = summary.days.map((day) => day.day);
-    const focusedIndex = dayNumbers.indexOf(focusedDay);
-
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      const next =
-        dayNumbers[Math.min(dayNumbers.length - 1, focusedIndex + 1)];
-      if (next) {
-        focusDayRow(next);
-      }
-      return;
-    }
-
-    if (event.key === "ArrowUp") {
-      event.preventDefault();
-      const next = dayNumbers[Math.max(0, focusedIndex - 1)];
-      if (next) {
-        focusDayRow(next);
-      }
-      return;
     }
   }
 
@@ -521,46 +546,61 @@ export function ShiftAssignmentManager({
     if (shiftTemplates.length === 0) {
       return;
     }
+    if (!defaultShiftTemplateId) {
+      toast.error("Select a default template first.");
+      return;
+    }
 
     setIsGeneratingMonth(true);
 
     try {
-      const response = await fetch(
-        "/api/attendance/shift-assignments/generate-month",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_id: user.id,
-            year: summary.year,
-            month: summary.month,
-            ...(defaultShiftTemplateId
-              ? { shift_id: Number(defaultShiftTemplateId) }
-              : {}),
-          }),
-        },
-      );
+      const templateId = Number(defaultShiftTemplateId);
+      let generatedCount = 0;
+      let skippedCount = 0;
+      let failureCount = 0;
 
-      const payload = (await response.json().catch(() => null)) as {
-        detail?: string;
-        generated_count?: number;
-        skipped_count?: number;
-      } | null;
+      for (const day of summary.days) {
+        if (!includeWeekends && isWeekendDay(summary, day.day)) {
+          skippedCount += 1;
+          continue;
+        }
 
-      if (!response.ok) {
-        toast.error(payload?.detail ?? "Unable to generate month.");
-        setIsGeneratingMonth(false);
+        if (getCurrentAssignment(day.day)) {
+          skippedCount += 1;
+          continue;
+        }
+
+        const ok = await persistDayAssignment(day.day, templateId.toString());
+        if (ok) {
+          generatedCount += 1;
+        } else {
+          failureCount += 1;
+        }
+      }
+
+      if (generatedCount > 0) {
+        toast.success(
+          `Generated ${generatedCount} assignment${generatedCount > 1 ? "s" : ""}${skippedCount ? `, skipped ${skippedCount}` : ""}${failureCount ? `, ${failureCount} failed` : ""}.`,
+        );
+        router.refresh();
         return;
       }
 
-      toast.success(
-        `Generated ${payload?.generated_count ?? 0} assignments and skipped ${payload?.skipped_count ?? 0}.`,
+      if (failureCount > 0) {
+        toast.error(
+          `Unable to generate ${failureCount} assignment${failureCount > 1 ? "s" : ""}.`,
+        );
+        return;
+      }
+
+      toast(
+        includeWeekends
+          ? "No empty days were available to generate."
+          : "No empty weekdays were available to generate.",
       );
-      router.refresh();
     } catch {
       toast.error("Unable to generate month.");
+    } finally {
       setIsGeneratingMonth(false);
     }
   }
@@ -611,6 +651,16 @@ export function ShiftAssignmentManager({
             </div>
             <Button
               type="button"
+              variant={includeWeekends ? "default" : "outline"}
+              className="h-10"
+              onClick={handleToggleIncludeWeekends}
+              aria-pressed={includeWeekends}
+            >
+              <CalendarDays className="size-4" />
+              {includeWeekends ? "Exclude Weekends" : "Include Weekends"}
+            </Button>
+            <Button
+              type="button"
               variant="outline"
               className="h-10"
               onClick={() => void handleCopyPreviousMonth()}
@@ -641,8 +691,7 @@ export function ShiftAssignmentManager({
               {summary.year}-{pad(summary.month)}
             </span>
             <span>
-              Shortcuts:{" "}
-              <span className="font-medium text-foreground">↑/↓</span> move row,{" "}
+              Shortcut:{" "}
               <span className="font-medium text-foreground">Ctrl/Cmd+S</span>{" "}
               save all.
             </span>
@@ -683,15 +732,11 @@ export function ShiftAssignmentManager({
               key={day.day}
               summary={summary}
               dayNumber={day.day}
-              currentAssignment={day.shift}
               selectedTemplateId={getSelectedTemplateForDay(day.day)}
               rowStatus={rowStatusByDay[day.day] ?? "idle"}
               isMutating={isSavingAll}
-              isFocused={focusedDay === day.day}
               templates={allowedTemplates}
-              onFocusRow={setFocusedDay}
               onTemplateSelect={handleTemplateSelect}
-              onRemove={(dayNumber) => void handleRemoveAssignment(dayNumber)}
             />
           ))}
         </div>
