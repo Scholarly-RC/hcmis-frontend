@@ -628,6 +628,8 @@ export function UserEditorDialog({
     control,
     register,
     handleSubmit,
+    setError,
+    clearErrors,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<UserFormState>({
     resolver: zodResolver(buildUserEditorSchema(mode)),
@@ -725,6 +727,27 @@ export function UserEditorDialog({
         can_modify_shift: values.can_modify_shift,
         ...(mode === "create" ? { password: values.password } : {}),
       };
+
+      if (mode === "edit" && user) {
+        const hasEmploymentValueChange =
+          payload.department_id !== user.department_id ||
+          payload.position_id !== user.position_id ||
+          payload.rank_level !== user.rank_level ||
+          payload.step_number !== user.step_number ||
+          payload.employee_type !== user.employee_type ||
+          payload.employment_status !== user.employment_status ||
+          payload.date_of_hiring !== formatDateInput(user.date_of_hiring);
+
+        if (hasEmploymentValueChange && !payload.assignment_effective_from) {
+          setError("assignment_effective_from", {
+            type: "custom",
+            message:
+              "Assignment effective date is required when changing employment details.",
+          });
+          return;
+        }
+      }
+      clearErrors("assignment_effective_from");
 
       await onSubmit(payload);
       onOpenChange(false);

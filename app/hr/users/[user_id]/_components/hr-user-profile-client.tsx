@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   CalendarDays,
+  History,
   KeyRound,
   Loader2,
   PencilLine,
@@ -28,6 +29,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  formatEmploymentMovementActor,
+  formatEmploymentMovementFieldLabel,
+  formatEmploymentMovementValue,
+} from "@/lib/employment-movements";
 import type { PayrollPosition } from "@/lib/payroll";
 import { toast } from "@/lib/toast";
 import type { AuthDepartment, AuthUser } from "@/types/auth";
@@ -40,6 +54,17 @@ type ResetPasswordResponse = {
 type UserShiftPolicyResponse = {
   id: string;
   shifts: ShiftTemplateRecord[];
+};
+type UserEmploymentMovementRecord = {
+  id: number;
+  user_id: string;
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  change_batch_id: string;
+  changed_by: string | null;
+  effective_date: string | null;
+  changed_at: string;
 };
 
 function formatTime(value: string | null) {
@@ -84,6 +109,20 @@ function buildInitials(user: AuthUser) {
   return `${firstInitial}${lastInitial}`.trim().toUpperCase() || "U";
 }
 
+function formatEmploymentMovementTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
 type HrUserProfileClientProps = {
   currentUser: AuthUser;
   userId: string;
@@ -111,6 +150,14 @@ export function HrUserProfileClient({
   const [isLoadingShiftPolicy, setIsLoadingShiftPolicy] = useState(false);
   const [isSavingShiftPolicy, setIsSavingShiftPolicy] = useState(false);
   const [shiftPolicyError, setShiftPolicyError] = useState<string | null>(null);
+  const [employmentMovements, setEmploymentMovements] = useState<
+    UserEmploymentMovementRecord[]
+  >([]);
+  const [isLoadingEmploymentMovements, setIsLoadingEmploymentMovements] =
+    useState(false);
+  const [employmentMovementsError, setEmploymentMovementsError] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,6 +265,52 @@ export function HrUserProfileClient({
     }
 
     void loadShiftPolicyData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      setEmploymentMovements([]);
+      setEmploymentMovementsError(null);
+      setIsLoadingEmploymentMovements(false);
+      return;
+    }
+
+    let cancelled = false;
+    const targetUserId = user.id;
+
+    async function loadEmploymentMovements() {
+      setIsLoadingEmploymentMovements(true);
+      setEmploymentMovementsError(null);
+
+      try {
+        const response = await requestJson<UserEmploymentMovementRecord[]>(
+          `/api/users/${targetUserId}/employment-movements`,
+        );
+        if (cancelled) {
+          return;
+        }
+        setEmploymentMovements(response);
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Unable to load employment movements.";
+        setEmploymentMovementsError(message);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingEmploymentMovements(false);
+        }
+      }
+    }
+
+    void loadEmploymentMovements();
 
     return () => {
       cancelled = true;
@@ -531,6 +624,98 @@ export function HrUserProfileClient({
               <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
                 No shift templates available. Create templates in Shift
                 Management first.
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="space-y-3">
+        <div>
+          <h2 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+            Employment Movement History
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            Read-only audit trail of employment detail changes.
+          </p>
+        </div>
+        <Card className="border-border/70 bg-card/95">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <History className="size-4" />
+              Employment Movements
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isLoadingEmploymentMovements ? (
+              <div className="flex min-h-[120px] items-center justify-center rounded-2xl border border-border/70 bg-muted/20">
+                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : employmentMovementsError ? (
+              <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                {employmentMovementsError}
+              </div>
+            ) : employmentMovements.length > 0 ? (
+              <div className="overflow-x-auto rounded-xl border border-border/70">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>When</TableHead>
+                      <TableHead>Field</TableHead>
+                      <TableHead>From</TableHead>
+                      <TableHead>To</TableHead>
+                      <TableHead>Effective Date</TableHead>
+                      <TableHead>Changed By</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {employmentMovements.map((movement) => (
+                      <TableRow key={movement.id}>
+                        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                          {formatEmploymentMovementTime(movement.changed_at)}
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          {formatEmploymentMovementFieldLabel(
+                            movement.field_name,
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {formatEmploymentMovementValue(
+                            movement.field_name,
+                            movement.old_value,
+                            {
+                              departments,
+                              positions,
+                            },
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {formatEmploymentMovementValue(
+                            movement.field_name,
+                            movement.new_value,
+                            {
+                              departments,
+                              positions,
+                            },
+                          )}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {movement.effective_date ?? "N/A"}
+                        </TableCell>
+                        <TableCell>
+                          {formatEmploymentMovementActor(
+                            movement.changed_by,
+                            users,
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
+                No employment movement records yet.
               </div>
             )}
           </CardContent>
