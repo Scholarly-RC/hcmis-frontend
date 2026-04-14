@@ -19,11 +19,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import type { AttendanceSummary } from "@/lib/attendance";
+import type {
+  AttendanceSummary,
+  OvertimeRequestRecord,
+} from "@/lib/attendance";
 import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
 import type { LeaveCredit, LeaveRequestRecord } from "@/lib/leave";
 import type { PayrollPayslip } from "@/lib/payroll";
 import type { FeedItemRecord } from "@/lib/performance-updates";
+import type {
+  CertificateAttendanceRequestRecord,
+  OfficialBusinessRequestRecord,
+} from "@/lib/special-requests";
 
 export const metadata = {
   title: "Dashboard",
@@ -63,6 +70,9 @@ function DashboardMetricCard({ metric }: { metric: DashboardMetric }) {
       <div className="mt-4 flex-1">
         <p className="max-w-[10ch] text-[2rem] font-semibold leading-none tracking-tight text-foreground sm:text-[2.25rem]">
           {metric.value}
+        </p>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          {metric.detail}
         </p>
       </div>
     </div>
@@ -104,15 +114,36 @@ function summarizeEmployeeDay(summary: AttendanceSummary | null, day: number) {
   const punches = today.attendance_records.length;
   if (punches === 0) {
     return {
-      value: "No punch yet",
+      value: "0",
       detail: "No attendance record submitted today.",
     };
   }
 
+  const orderedPunches = [...today.attendance_records].sort((a, b) =>
+    a.timestamp.localeCompare(b.timestamp),
+  );
+  const punchTrail = orderedPunches.map((record) => record.punch).join(" / ");
+  const punchWithTimes = orderedPunches
+    .map((record) => {
+      const localTime = new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(record.timestamp));
+      return `${record.punch} ${localTime}`;
+    })
+    .join(" • ");
+
   return {
-    value: `${punches} punch${punches === 1 ? "" : "es"}`,
-    detail: "Attendance logs recorded today.",
+    value: punchTrail,
+    detail: punchWithTimes,
   };
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+  }).format(new Date(value));
 }
 
 function buildFeedSummary(item: FeedItemRecord) {
@@ -156,6 +187,9 @@ function buildEmployeeDashboard(input: {
   leaveCredit: LeaveCredit | null;
   leaveRequests: LeaveRequestRecord[] | null;
   attendanceSummary: AttendanceSummary | null;
+  overtimeRequests: OvertimeRequestRecord[] | null;
+  officialBusinessRequests: OfficialBusinessRequestRecord[] | null;
+  certificateAttendanceRequests: CertificateAttendanceRequestRecord[] | null;
   payslips: PayrollPayslip[] | null;
   currentDay: number;
 }): {
@@ -167,9 +201,43 @@ function buildEmployeeDashboard(input: {
   const pendingLeaves = requests.filter(
     (request) => request.status === "PENDING",
   ).length;
-  const approvedLeaves = requests.filter(
-    (request) => request.status === "APPROVED",
-  ).length;
+  const pendingOvertime = (input.overtimeRequests ?? []).filter(
+    (request) => request.status === "PENDING",
+  );
+  const pendingOfficialBusiness = (input.officialBusinessRequests ?? []).filter(
+    (request) => request.status === "PENDING",
+  );
+  const pendingCertificateAttendance = (
+    input.certificateAttendanceRequests ?? []
+  ).filter((request) => request.status === "PENDING");
+  const pendingRequestItems = [
+    ...requests
+      .filter((request) => request.status === "PENDING")
+      .map((request) => ({
+        createdAt: request.created_at,
+        label: `Leave - ${formatShortDate(request.leave_date)}`,
+      })),
+    ...pendingOvertime.map((request) => ({
+      createdAt: request.created_at,
+      label: `Overtime - ${formatShortDate(request.date)}`,
+    })),
+    ...pendingOfficialBusiness.map((request) => ({
+      createdAt: request.created_at,
+      label: `Official Business - ${formatShortDate(request.date)}`,
+    })),
+    ...pendingCertificateAttendance.map((request) => ({
+      createdAt: request.created_at,
+      label: `Certificate Attendance - ${formatShortDate(request.date)}`,
+    })),
+  ].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const pendingRequestsTotal = pendingRequestItems.length;
+  const pendingRequestsPreview =
+    pendingRequestItems.length > 0
+      ? pendingRequestItems
+          .slice(0, 3)
+          .map((item) => item.label)
+          .join(" | ")
+      : "No pending requests.";
   const attendanceToday = summarizeEmployeeDay(
     input.attendanceSummary,
     input.currentDay,
@@ -188,29 +256,19 @@ function buildEmployeeDashboard(input: {
       icon: Wallet,
     },
     {
-      title: "Pending Leave",
-      value: pendingLeaves.toString(),
-      detail: `${approvedLeaves} approved in current selection`,
+      title: "Pending Requests",
+      value: pendingRequestsTotal.toString(),
+      detail:
+        pendingRequestsTotal > 3
+          ? `${pendingRequestsPreview} | +${pendingRequestsTotal - 3} more`
+          : pendingRequestsPreview,
       icon: ClipboardList,
     },
     {
       title: "Today's Attendance",
-      value:
-        attendanceToday.value === "No punch yet"
-          ? "Missing"
-          : attendanceToday.value === "No schedule"
-            ? "Free Day"
-            : "Logged",
+      value: attendanceToday.value,
       detail: attendanceToday.detail,
       icon: Activity,
-    },
-    {
-      title: "Latest Payslip",
-      value: latestPayslip?.released ? "Released" : "Pending",
-      detail: latestPayslip
-        ? `${toMonthLabel(latestPayslip.month, latestPayslip.year)} ${latestPayslip.period ?? ""}`.trim()
-        : "No payslip record available",
-      icon: BarChart3,
     },
   ];
 
@@ -372,6 +430,21 @@ export default async function DashboardPage() {
           `/attendance/me/${currentYear}/${currentMonth}`,
           "Unable to load attendance summary.",
         ),
+        tryFetch<OvertimeRequestRecord[]>(
+          session.token,
+          "/attendance/overtime?scope=mine&status=PENDING",
+          "Unable to load overtime requests.",
+        ),
+        tryFetch<OfficialBusinessRequestRecord[]>(
+          session.token,
+          "/special-requests/official-business?scope=mine&status=PENDING",
+          "Unable to load official business requests.",
+        ),
+        tryFetch<CertificateAttendanceRequestRecord[]>(
+          session.token,
+          "/special-requests/certificate-attendance?scope=mine&status=PENDING",
+          "Unable to load certificate attendance requests.",
+        ),
         tryFetch<PayrollPayslip[]>(
           session.token,
           `/payroll/payslips?user_id=${session.user.id}&released=true`,
@@ -415,7 +488,10 @@ export default async function DashboardPage() {
         leaveCredit: employeeData?.[0] ?? null,
         leaveRequests: employeeData?.[1] ?? null,
         attendanceSummary: employeeData?.[2] ?? null,
-        payslips: employeeData?.[3] ?? null,
+        overtimeRequests: employeeData?.[3] ?? null,
+        officialBusinessRequests: employeeData?.[4] ?? null,
+        certificateAttendanceRequests: employeeData?.[5] ?? null,
+        payslips: employeeData?.[6] ?? null,
         currentDay,
       });
 
@@ -597,7 +673,7 @@ export default async function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-px overflow-hidden rounded-3xl border border-border/70 bg-border/60 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-px overflow-hidden rounded-3xl border border-border/70 bg-border/60 sm:grid-cols-2 xl:grid-cols-3">
                   {dashboard.metrics.map((metric) => (
                     <div key={metric.title} className="h-full">
                       <DashboardMetricCard metric={metric} />
