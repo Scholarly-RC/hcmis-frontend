@@ -6,6 +6,7 @@ import {
   BookOpenText,
   Building2,
   ClipboardCheck,
+  GraduationCap,
   LayoutDashboard,
   ListTodo,
   NotebookTabs,
@@ -159,6 +160,7 @@ const hrWorkspaceSidebarIcons: Record<HrWorkspaceKey, LucideIcon> = {
   payroll: ReceiptText,
   performance: User,
   leave: BookOpenText,
+  trainings: GraduationCap,
   reports: BarChart3,
 };
 
@@ -167,6 +169,7 @@ const hrWorkspaceSidebarOrder: HrWorkspaceKey[] = [
   "payroll",
   "performance",
   "leave",
+  "trainings",
   "reports",
 ];
 

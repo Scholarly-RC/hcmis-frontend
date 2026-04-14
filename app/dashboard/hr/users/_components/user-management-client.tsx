@@ -303,6 +303,41 @@ export class ApiError extends Error {
   }
 }
 
+function getApiErrorMessage(payload: unknown): string {
+  if (typeof payload === "string" && payload.trim().length > 0) {
+    return payload;
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return "Request failed.";
+  }
+
+  const detail = (payload as { detail?: unknown }).detail;
+  if (typeof detail === "string" && detail.trim().length > 0) {
+    return detail;
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    const firstIssue = detail[0];
+    if (firstIssue && typeof firstIssue === "object") {
+      const message = (firstIssue as { msg?: unknown }).msg;
+      if (typeof message === "string" && message.trim().length > 0) {
+        return message;
+      }
+    }
+    return "Request validation failed.";
+  }
+
+  if (detail && typeof detail === "object") {
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim().length > 0) {
+      return message;
+    }
+  }
+
+  return "Request failed.";
+}
+
 export async function requestJson<T>(
   pathname: string,
   init: RequestInit = {},
@@ -321,10 +356,7 @@ export async function requestJson<T>(
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new ApiError(
-      (payload as { detail?: string } | null)?.detail ?? "Request failed.",
-      response.status,
-    );
+    throw new ApiError(getApiErrorMessage(payload), response.status);
   }
 
   return payload as T;

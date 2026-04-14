@@ -3,6 +3,7 @@ import { ProfileDetailsSections } from "@/app/profile/_components/profile-detail
 import { ProfileEditModal } from "@/app/profile/_components/profile-edit-modal";
 import { ProfileHeader } from "@/app/profile/_components/profile-header";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
+import { UserCompletedTrainingsSection } from "@/components/trainings/user-completed-trainings-section";
 import type { AuthUser } from "@/types/auth";
 
 export const metadata = {
@@ -56,6 +57,8 @@ export default function ProfilePage() {
 
               <ProfileDetailsSections user={user} />
             </section>
+
+            <UserCompletedTrainingsSection userId={user.id} scope="me" />
 
             <section className="space-y-3">
               <div>

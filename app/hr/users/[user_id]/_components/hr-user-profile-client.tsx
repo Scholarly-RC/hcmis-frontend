@@ -25,6 +25,7 @@ import type { ShiftTemplateRecord } from "@/app/hr/shift-management/_components/
 import { ProfileDetailsSections } from "@/app/profile/_components/profile-details-sections";
 import { ProfileHeader } from "@/app/profile/_components/profile-header";
 import { ConfirmationModal } from "@/components/confirmation-modal";
+import { UserCompletedTrainingsSection } from "@/components/trainings/user-completed-trainings-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -547,6 +548,8 @@ export function HrUserProfileClient({
         </div>
         <ProfileDetailsSections user={user} />
       </section>
+
+      <UserCompletedTrainingsSection userId={user.id} scope="user" />
 
       <section className="space-y-3">
         <div>

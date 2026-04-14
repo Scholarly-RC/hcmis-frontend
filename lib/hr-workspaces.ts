@@ -8,6 +8,7 @@ import {
   FileBarChart,
   FileSearch,
   Files,
+  GraduationCap,
   Megaphone,
   ReceiptText,
   Scale,
@@ -45,6 +46,7 @@ export type HrWorkspaceKey =
   | "payroll"
   | "performance"
   | "leave"
+  | "trainings"
   | "reports";
 
 export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
@@ -213,6 +215,28 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         href: "/hr/leave-management",
         keywords: ["leave balances", "leave approvals", "leave approvers"],
         requiredCapabilities: ["manage_leave_requests"],
+      },
+    ],
+  },
+  trainings: {
+    title: "Trainings",
+    description: "Manage employee training programs and completion records.",
+    sidebar: {
+      label: "Trainings",
+      href: "/hr/trainings",
+      keywords: ["training", "seminar", "workshop", "learning"],
+      requiredCapabilities: ["access_hr_workspace"],
+      status: "active",
+    },
+    items: [
+      {
+        label: "Trainings Management",
+        description:
+          "Create trainings, assign participants, and track completion status.",
+        icon: GraduationCap,
+        href: "/hr/trainings-management",
+        keywords: ["training management", "participants", "completion"],
+        requiredCapabilities: ["access_hr_workspace"],
       },
     ],
   },
