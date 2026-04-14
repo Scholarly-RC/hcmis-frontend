@@ -1,18 +1,37 @@
 import type { AuthUser } from "@/types/auth";
 
 export type LeaveTypeOption = {
-  value: "PA" | "UN" | "WR";
+  value: string;
   label: string;
+};
+
+export type LeaveTypePolicyMode = "incremental" | "fixed";
+
+export type LeaveTypePolicy = {
+  id: string;
+  code: string;
+  name: string;
+  max_credits: number;
+  credit_mode: LeaveTypePolicyMode;
+  created_at: string;
+  updated_at: string;
+};
+
+export type LeaveTypePolicyUpsertPayload = {
+  name: string;
+  max_credits: number;
+  credit_mode: LeaveTypePolicyMode;
 };
 
 export type LeaveCredit = {
   user_id: string;
+  leave_type?: string | null;
   credits: number;
   used_credits: number;
   remaining_credits: number;
   user: AuthUser | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type LeaveRequestStatus =
@@ -34,7 +53,8 @@ export type LeaveRequestRecord = {
   id: number;
   user_id: string;
   leave_date: string;
-  leave_type: "PA" | "UN" | "WR";
+  leave_type: string;
+  approval_type?: "PAID" | "NON_PAID" | null;
   info: string | null;
   first_approver_id: string | null;
   first_approver_status: LeaveRequestStatus;
@@ -55,12 +75,13 @@ export type LeaveRequestRecord = {
 
 export type LeaveRequestCreatePayload = {
   leave_date: string;
-  leave_type: "PA" | "UN" | "WR";
+  leave_type: string;
   info: string | null;
 };
 
 export type LeaveReviewPayload = {
   response: "APPROVE" | "REJECT";
+  approval_type?: "PAID" | "NON_PAID";
 };
 
 export type LeaveCreditUpsertPayload = {
@@ -68,15 +89,6 @@ export type LeaveCreditUpsertPayload = {
 };
 
 export function leaveTypeLabel(type: string) {
-  if (type === "PA") {
-    return "Paid";
-  }
-  if (type === "UN") {
-    return "Unpaid";
-  }
-  if (type === "WR") {
-    return "Work-Related Trip";
-  }
   return type;
 }
 

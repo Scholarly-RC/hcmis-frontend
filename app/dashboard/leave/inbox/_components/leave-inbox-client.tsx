@@ -15,6 +15,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -24,6 +32,7 @@ import {
 } from "@/components/ui/table";
 import {
   type LeaveRequestRecord,
+  type LeaveReviewPayload,
   leaveStatusClass,
   leaveStatusLabel,
   leaveTypeLabel,
@@ -106,6 +115,9 @@ export function LeaveInboxClient() {
   const [actionState, setActionState] = useState<
     Record<number, "approve" | "reject" | undefined>
   >({});
+  const [pendingApprovalLeaveId, setPendingApprovalLeaveId] = useState<
+    number | null
+  >(null);
   const [highlightedLeaveId, setHighlightedLeaveId] = useState<number | null>(
     null,
   );
@@ -225,11 +237,12 @@ export function LeaveInboxClient() {
     }));
 
     try {
+      const payload: LeaveReviewPayload = { response };
       const updated = await requestJson<LeaveRequestRecord>(
         `/api/leave/requests/${leaveId}/review`,
         {
           method: "PATCH",
-          body: JSON.stringify({ response }),
+          body: JSON.stringify(payload),
         },
       );
 
@@ -252,8 +265,84 @@ export function LeaveInboxClient() {
     }
   }
 
+  async function approveWithType(
+    leaveId: number,
+    approvalType: "PAID" | "NON_PAID",
+  ) {
+    setPendingApprovalLeaveId(null);
+    const key = leaveId;
+    setActionState((prev) => ({ ...prev, [key]: "approve" }));
+
+    try {
+      const payload: LeaveReviewPayload = {
+        response: "APPROVE",
+        approval_type: approvalType,
+      };
+      const updated = await requestJson<LeaveRequestRecord>(
+        `/api/leave/requests/${leaveId}/review`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        },
+      );
+      setRequests((prev) =>
+        prev.map((item) =>
+          item.id === leaveId ? { ...item, ...updated } : item,
+        ),
+      );
+      toast.success("Leave request approved.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to submit review.",
+      );
+    } finally {
+      setActionState((prev) => ({ ...prev, [key]: undefined }));
+    }
+  }
+
   return (
     <div className="space-y-6">
+      <Dialog
+        open={pendingApprovalLeaveId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingApprovalLeaveId(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Leave As</DialogTitle>
+            <DialogDescription>
+              Select whether this leave should be approved as paid or non-paid.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (pendingApprovalLeaveId !== null) {
+                  void approveWithType(pendingApprovalLeaveId, "NON_PAID");
+                }
+              }}
+            >
+              Approve As Non-Paid
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (pendingApprovalLeaveId !== null) {
+                  void approveWithType(pendingApprovalLeaveId, "PAID");
+                }
+              }}
+            >
+              Approve As Paid
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <section className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-lg shadow-black/5 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-2">
@@ -426,7 +515,9 @@ export function LeaveInboxClient() {
                                   type="button"
                                   size="sm"
                                   disabled={approving || rejecting}
-                                  onClick={() => respond(item.id, "APPROVE")}
+                                  onClick={() =>
+                                    setPendingApprovalLeaveId(item.id)
+                                  }
                                 >
                                   {approving ? (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

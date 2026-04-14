@@ -214,15 +214,6 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         keywords: ["leave balances", "leave approvals", "leave approvers"],
         requiredCapabilities: ["manage_leave_requests"],
       },
-      {
-        label: "Request Inbox",
-        description:
-          "Review leave and overtime requests assigned to your account.",
-        icon: ClipboardCheck,
-        href: "/requests/inbox",
-        keywords: ["request inbox", "leave inbox", "overtime inbox"],
-        requiredCapabilities: ["manage_leave_requests"],
-      },
     ],
   },
   reports: {

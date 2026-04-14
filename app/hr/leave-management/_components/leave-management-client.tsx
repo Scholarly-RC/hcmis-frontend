@@ -4,7 +4,7 @@ import {
   ArrowUpCircle,
   ClipboardList,
   Loader2,
-  RotateCcw,
+  Plus,
   Users,
   Wallet,
 } from "lucide-react";
@@ -21,7 +21,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -32,8 +41,10 @@ import {
 } from "@/components/ui/table";
 import type {
   LeaveCredit,
-  LeaveCreditUpsertPayload,
   LeaveRequestRecord,
+  LeaveTypePolicy,
+  LeaveTypePolicyMode,
+  LeaveTypePolicyUpsertPayload,
 } from "@/lib/leave";
 import {
   leaveStatusClass,
@@ -48,7 +59,7 @@ type RequestError = {
   detail?: string;
 };
 
-type ManagementTab = "requests" | "credits";
+type ManagementTab = "requests" | "credits" | "leave-types";
 
 type RequestFilters = {
   userId: string;
@@ -85,6 +96,30 @@ async function requestJson<T>(
   }
 
   return payload as T;
+}
+
+async function requestEmpty(
+  pathname: string,
+  init: RequestInit = {},
+): Promise<void> {
+  const headers = new Headers(init.headers);
+  if (init.body) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const response = await fetch(pathname, {
+    ...init,
+    headers,
+    cache: "no-store",
+  });
+
+  const payload = (await response
+    .json()
+    .catch(() => null)) as RequestError | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.detail ?? "Request failed.");
+  }
 }
 
 function formatDate(value: string) {
@@ -126,6 +161,10 @@ function roleLabel(role: string | null | undefined) {
   return normalized;
 }
 
+function leaveTypeModeLabel(mode: LeaveTypePolicyMode) {
+  return mode === "incremental" ? "Incremental" : "Fixed";
+}
+
 type LeaveManagementClientProps = {
   initialTab?: ManagementTab;
 };
@@ -144,6 +183,7 @@ export function LeaveManagementClient({
   const [requests, setRequests] = useState<LeaveRequestRecord[]>([]);
   const [credits, setCredits] = useState<LeaveCredit[]>([]);
   const [years, setYears] = useState<number[]>([]);
+  const [leaveTypes, setLeaveTypes] = useState<LeaveTypePolicy[]>([]);
 
   const [requestFilters, setRequestFilters] = useState<RequestFilters>({
     userId: "all",
@@ -153,13 +193,21 @@ export function LeaveManagementClient({
     month: "all",
   });
 
-  const [creditSavingUserId, setCreditSavingUserId] = useState<string | null>(
+  const [creditLeaveTypeFilter, setCreditLeaveTypeFilter] = useState("");
+  const [escalatingLeaveId, setEscalatingLeaveId] = useState<number | null>(
     null,
   );
-  const [creditResettingUserId, setCreditResettingUserId] = useState<
-    string | null
-  >(null);
-  const [escalatingLeaveId, setEscalatingLeaveId] = useState<number | null>(
+
+  const [leaveTypeDialogOpen, setLeaveTypeDialogOpen] = useState(false);
+  const [editingLeaveTypeId, setEditingLeaveTypeId] = useState<string | null>(
+    null,
+  );
+  const [leaveTypeName, setLeaveTypeName] = useState("");
+  const [leaveTypeMaxCredits, setLeaveTypeMaxCredits] = useState("0");
+  const [leaveTypeMode, setLeaveTypeMode] =
+    useState<LeaveTypePolicyMode>("fixed");
+  const [leaveTypeSaving, setLeaveTypeSaving] = useState(false);
+  const [leaveTypeDeletingId, setLeaveTypeDeletingId] = useState<string | null>(
     null,
   );
 
@@ -174,12 +222,14 @@ export function LeaveManagementClient({
           requestsResponse,
           creditsResponse,
           yearsResponse,
+          leaveTypesResponse,
         ] = await Promise.all([
           requestJson<AuthDepartment[]>("/api/departments"),
           requestJson<AuthUser[]>("/api/users?include_superusers=true"),
           requestJson<LeaveRequestRecord[]>("/api/leave/requests"),
           requestJson<LeaveCredit[]>("/api/leave/credits"),
           requestJson<number[]>("/api/leave/years").catch(() => []),
+          requestJson<LeaveTypePolicy[]>("/api/leave/types/manage"),
         ]);
 
         if (!mounted) {
@@ -191,6 +241,7 @@ export function LeaveManagementClient({
         setRequests(requestsResponse);
         setCredits(creditsResponse);
         setYears(yearsResponse);
+        setLeaveTypes(leaveTypesResponse);
       } catch (error) {
         toast.error(
           error instanceof Error
@@ -218,6 +269,14 @@ export function LeaveManagementClient({
     }
     return map;
   }, [users]);
+
+  const leaveTypeNameByCode = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const item of leaveTypes) {
+      map.set(item.code, item.name);
+    }
+    return map;
+  }, [leaveTypes]);
 
   const filteredRequests = useMemo(() => {
     return requests.filter((item) => {
@@ -296,6 +355,35 @@ export function LeaveManagementClient({
     });
   }, [credits, users, usersById]);
 
+  useEffect(() => {
+    if (leaveTypes.length === 0) {
+      if (creditLeaveTypeFilter !== "") {
+        setCreditLeaveTypeFilter("");
+      }
+      return;
+    }
+
+    const hasSelectedType = leaveTypes.some(
+      (leaveType) => leaveType.code === creditLeaveTypeFilter,
+    );
+    if (!hasSelectedType) {
+      setCreditLeaveTypeFilter(leaveTypes[0]?.code ?? "");
+    }
+  }, [creditLeaveTypeFilter, leaveTypes]);
+
+  const reloadCredits = useCallback(async () => {
+    const query = new URLSearchParams();
+    if (creditLeaveTypeFilter) {
+      query.set("leave_type", creditLeaveTypeFilter);
+    }
+    const creditPath =
+      query.size > 0
+        ? `/api/leave/credits?${query.toString()}`
+        : "/api/leave/credits";
+    const data = await requestJson<LeaveCredit[]>(creditPath);
+    setCredits(data);
+  }, [creditLeaveTypeFilter]);
+
   const reloadRequests = useCallback(async () => {
     const query = new URLSearchParams();
     if (requestFilters.userId !== "all") {
@@ -314,12 +402,12 @@ export function LeaveManagementClient({
       query.set("month", requestFilters.month);
     }
 
-    const pathname =
+    const requestPath =
       query.size > 0
         ? `/api/leave/requests?${query.toString()}`
         : "/api/leave/requests";
 
-    const data = await requestJson<LeaveRequestRecord[]>(pathname);
+    const data = await requestJson<LeaveRequestRecord[]>(requestPath);
     setRequests(data);
   }, [requestFilters]);
 
@@ -337,62 +425,19 @@ export function LeaveManagementClient({
     });
   }, [loading, reloadRequests]);
 
-  async function saveCredit(userId: string, creditsValue: number) {
-    if (!Number.isFinite(creditsValue) || creditsValue < 0) {
-      toast.error("Credits must be zero or greater.");
+  useEffect(() => {
+    if (loading) {
       return;
     }
 
-    setCreditSavingUserId(userId);
-    try {
-      const payload: LeaveCreditUpsertPayload = {
-        credits: Math.floor(creditsValue),
-      };
-      const updated = await requestJson<LeaveCredit>(
-        `/api/leave/credits/${userId}`,
-        {
-          method: "PUT",
-          body: JSON.stringify(payload),
-        },
-      );
-
-      setCredits((prev) => {
-        const next = prev.filter((item) => item.user_id !== userId);
-        return [...next, updated].sort((a, b) =>
-          a.user_id.localeCompare(b.user_id),
-        );
-      });
-      toast.success("Leave credit updated.");
-    } catch (error) {
+    reloadCredits().catch((error) => {
       toast.error(
-        error instanceof Error ? error.message : "Unable to update credit.",
+        error instanceof Error
+          ? error.message
+          : "Unable to refresh leave credits.",
       );
-    } finally {
-      setCreditSavingUserId(null);
-    }
-  }
-
-  async function resetCredit(userId: string) {
-    setCreditResettingUserId(userId);
-    try {
-      const updated = await requestJson<LeaveCredit>(
-        `/api/leave/credits/${userId}/reset`,
-        {
-          method: "POST",
-        },
-      );
-      setCredits((prev) =>
-        prev.map((item) => (item.user_id === userId ? updated : item)),
-      );
-      toast.success("Used leave credits reset.");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Unable to reset credits.",
-      );
-    } finally {
-      setCreditResettingUserId(null);
-    }
-  }
+    });
+  }, [loading, reloadCredits]);
 
   async function escalateToBackup(leaveId: number) {
     setEscalatingLeaveId(leaveId);
@@ -416,6 +461,101 @@ export function LeaveManagementClient({
     }
   }
 
+  function openCreateLeaveTypeDialog() {
+    setEditingLeaveTypeId(null);
+    setLeaveTypeName("");
+    setLeaveTypeMaxCredits("0");
+    setLeaveTypeMode("fixed");
+    setLeaveTypeDialogOpen(true);
+  }
+
+  function openEditLeaveTypeDialog(leaveType: LeaveTypePolicy) {
+    setEditingLeaveTypeId(leaveType.id);
+    setLeaveTypeName(leaveType.name);
+    setLeaveTypeMaxCredits(leaveType.max_credits.toString());
+    setLeaveTypeMode(leaveType.credit_mode);
+    setLeaveTypeDialogOpen(true);
+  }
+
+  async function submitLeaveTypeForm() {
+    const trimmedName = leaveTypeName.trim();
+    const parsedMaxCredits = Number.parseInt(leaveTypeMaxCredits, 10);
+
+    if (!trimmedName) {
+      toast.error("Leave type name is required.");
+      return;
+    }
+    if (!Number.isFinite(parsedMaxCredits) || parsedMaxCredits < 0) {
+      toast.error("Max credits must be zero or greater.");
+      return;
+    }
+
+    const payload: LeaveTypePolicyUpsertPayload = {
+      name: trimmedName,
+      max_credits: parsedMaxCredits,
+      credit_mode: leaveTypeMode,
+    };
+
+    setLeaveTypeSaving(true);
+    try {
+      if (editingLeaveTypeId) {
+        const updated = await requestJson<LeaveTypePolicy>(
+          `/api/leave/types/${editingLeaveTypeId}`,
+          {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          },
+        );
+        setLeaveTypes((prev) =>
+          prev
+            .map((item) => (item.id === updated.id ? updated : item))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        );
+        toast.success("Leave type updated.");
+      } else {
+        const created = await requestJson<LeaveTypePolicy>("/api/leave/types", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        setLeaveTypes((prev) =>
+          [...prev, created].sort((a, b) => a.name.localeCompare(b.name)),
+        );
+        toast.success("Leave type added.");
+      }
+      setLeaveTypeDialogOpen(false);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to save leave type.",
+      );
+    } finally {
+      setLeaveTypeSaving(false);
+    }
+  }
+
+  async function deleteLeaveType(leaveType: LeaveTypePolicy) {
+    const confirmed = window.confirm(
+      `Delete leave type "${leaveType.name}"? This cannot be undone.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setLeaveTypeDeletingId(leaveType.id);
+    try {
+      await requestEmpty(`/api/leave/types/${leaveType.id}`, {
+        method: "DELETE",
+      });
+      setLeaveTypes((prev) => prev.filter((item) => item.id !== leaveType.id));
+      toast.success("Leave type deleted.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to delete leave type.",
+      );
+    } finally {
+      setLeaveTypeDeletingId(null);
+    }
+  }
+
   const setTabWithUrl = useCallback(
     (nextTab: ManagementTab) => {
       setTab(nextTab);
@@ -431,7 +571,11 @@ export function LeaveManagementClient({
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "requests" || tabParam === "credits") {
+    if (
+      tabParam === "requests" ||
+      tabParam === "credits" ||
+      tabParam === "leave-types"
+    ) {
       if (tab !== tabParam) {
         setTab(tabParam);
       }
@@ -452,8 +596,8 @@ export function LeaveManagementClient({
               Leave Management
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Manage user leave credits and monitor organization-wide leave
-              requests.
+              Manage user leave credits, leave type policies, and
+              organization-wide leave requests.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -480,6 +624,14 @@ export function LeaveManagementClient({
           >
             <Wallet className="size-4" />
             Leave Credits
+          </Button>
+          <Button
+            type="button"
+            variant={tab === "leave-types" ? "default" : "outline"}
+            onClick={() => setTabWithUrl("leave-types")}
+          >
+            <ClipboardList className="size-4" />
+            Leave Types
           </Button>
         </div>
       </section>
@@ -637,7 +789,8 @@ export function LeaveManagementClient({
                           </TableCell>
                           <TableCell>{formatDate(item.leave_date)}</TableCell>
                           <TableCell>
-                            {leaveTypeLabel(item.leave_type)}
+                            {leaveTypeNameByCode.get(item.leave_type) ??
+                              leaveTypeLabel(item.leave_type)}
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -697,27 +850,38 @@ export function LeaveManagementClient({
           <CardHeader>
             <CardTitle>Leave Credits</CardTitle>
             <CardDescription>
-              Set and reset employee leave credits.
+              Track used and remaining leave credits by leave type.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:max-w-sm">
+              <SelectField
+                id="filter_credit_leave_type"
+                label="Leave Type"
+                value={creditLeaveTypeFilter}
+                onChange={(_, value) => setCreditLeaveTypeFilter(value)}
+                options={leaveTypes.map((leaveType) => ({
+                  value: leaveType.code,
+                  label: leaveType.name,
+                }))}
+                placeholder="Leave Type"
+              />
+            </div>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Department</TableHead>
-                    <TableHead>Total Credits</TableHead>
                     <TableHead>Used</TableHead>
                     <TableHead>Remaining</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {creditRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={4}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No users found.
@@ -734,47 +898,8 @@ export function LeaveManagementClient({
                             {displayUser(user, credit.user_id)}
                           </TableCell>
                           <TableCell>{user?.department?.name ?? "-"}</TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min={0}
-                              defaultValue={credit.credits}
-                              disabled={creditSavingUserId === credit.user_id}
-                              onBlur={(event) => {
-                                const nextValue = Number.parseInt(
-                                  event.target.value,
-                                  10,
-                                );
-                                if (nextValue === credit.credits) {
-                                  return;
-                                }
-                                void saveCredit(credit.user_id, nextValue);
-                              }}
-                              className="h-8 w-24"
-                            />
-                          </TableCell>
                           <TableCell>{credit.used_credits}</TableCell>
                           <TableCell>{credit.remaining_credits}</TableCell>
-                          <TableCell className="text-right">
-                            <div className="inline-flex gap-2">
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={
-                                  creditResettingUserId === credit.user_id
-                                }
-                                onClick={() => resetCredit(credit.user_id)}
-                              >
-                                {creditResettingUserId === credit.user_id ? (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                  <RotateCcw className="mr-2 h-4 w-4" />
-                                )}
-                                Reset Used
-                              </Button>
-                            </div>
-                          </TableCell>
                         </TableRow>
                       );
                     })
@@ -785,6 +910,159 @@ export function LeaveManagementClient({
           </CardContent>
         </Card>
       ) : null}
+
+      {!loading && tab === "leave-types" ? (
+        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
+          <CardHeader>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <CardTitle>Leave Types</CardTitle>
+                <CardDescription>
+                  Configure leave type policies used by leave requests.
+                </CardDescription>
+              </div>
+              <Button type="button" onClick={openCreateLeaveTypeDialog}>
+                <Plus className="size-4" />
+                Add Leave Type
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Max Credits</TableHead>
+                    <TableHead>Mode</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leaveTypes.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="py-8 text-center text-muted-foreground"
+                      >
+                        No leave types found.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    leaveTypes.map((leaveType) => (
+                      <TableRow key={leaveType.id}>
+                        <TableCell>{leaveType.name}</TableCell>
+                        <TableCell>{leaveType.max_credits}</TableCell>
+                        <TableCell>
+                          {leaveTypeModeLabel(leaveType.credit_mode)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openEditLeaveTypeDialog(leaveType)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={leaveTypeDeletingId === leaveType.id}
+                              onClick={() => deleteLeaveType(leaveType)}
+                            >
+                              {leaveTypeDeletingId === leaveType.id ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                "Delete"
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Dialog open={leaveTypeDialogOpen} onOpenChange={setLeaveTypeDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editingLeaveTypeId ? "Edit Leave Type" : "Add Leave Type"}
+            </DialogTitle>
+            <DialogDescription>
+              Provide the leave type name, max credits, and mode.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="leave_type_name">Name</Label>
+              <Input
+                id="leave_type_name"
+                value={leaveTypeName}
+                onChange={(event) => setLeaveTypeName(event.target.value)}
+                placeholder="Leave Type Name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="leave_type_max_credits">Max Credits</Label>
+              <Input
+                id="leave_type_max_credits"
+                type="number"
+                min={0}
+                value={leaveTypeMaxCredits}
+                onChange={(event) => setLeaveTypeMaxCredits(event.target.value)}
+              />
+            </div>
+
+            <SelectField
+              id="leave_type_mode"
+              label="Mode"
+              value={leaveTypeMode}
+              onChange={(_, value) =>
+                setLeaveTypeMode(value as LeaveTypePolicyMode)
+              }
+              options={[
+                { value: "fixed", label: "Fixed" },
+                { value: "incremental", label: "Incremental" },
+              ]}
+              placeholder="Mode"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLeaveTypeDialogOpen(false)}
+              disabled={leaveTypeSaving}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={submitLeaveTypeForm}
+              disabled={leaveTypeSaving}
+            >
+              {leaveTypeSaving ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Plus className="size-4" />
+              )}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

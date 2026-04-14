@@ -13,6 +13,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -28,6 +36,7 @@ import { overtimeStatusClass, overtimeStatusLabel } from "@/lib/attendance";
 import {
   type LeaveRequestRecord,
   type LeaveRequestStatus,
+  type LeaveReviewPayload,
   leaveStatusClass,
   leaveStatusLabel,
   leaveTypeLabel,
@@ -317,6 +326,9 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
   const [actionMap, setActionMap] = useState<
     Record<string, RowAction | undefined>
   >({});
+  const [pendingApprovalLeaveId, setPendingApprovalLeaveId] = useState<
+    number | null
+  >(null);
   const [filters, setFilters] = useState<FilterState>({
     type: "all",
     status: "all",
@@ -551,6 +563,7 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
   async function respondToLeave(
     leaveId: number,
     response: "APPROVE" | "REJECT",
+    approvalType?: "PAID" | "NON_PAID",
   ) {
     const key = rowKey("leave", leaveId);
     setActionMap((prev) => ({
@@ -558,11 +571,15 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
       [key]: response === "APPROVE" ? "approve" : "reject",
     }));
     try {
+      const payload: LeaveReviewPayload = { response };
+      if (response === "APPROVE" && approvalType) {
+        payload.approval_type = approvalType;
+      }
       const updated = await requestJson<LeaveRequestRecord>(
         `/api/leave/requests/${leaveId}/review`,
         {
           method: "PATCH",
-          body: JSON.stringify({ response }),
+          body: JSON.stringify(payload),
         },
       );
       setLeaveRequests((prev) =>
@@ -802,6 +819,57 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
 
   return (
     <div className="space-y-6">
+      <Dialog
+        open={pendingApprovalLeaveId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingApprovalLeaveId(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve Leave As</DialogTitle>
+            <DialogDescription>
+              Select whether this leave should be approved as paid or non-paid.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (pendingApprovalLeaveId !== null) {
+                  void respondToLeave(
+                    pendingApprovalLeaveId,
+                    "APPROVE",
+                    "NON_PAID",
+                  );
+                  setPendingApprovalLeaveId(null);
+                }
+              }}
+            >
+              Approve As Non-Paid
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (pendingApprovalLeaveId !== null) {
+                  void respondToLeave(
+                    pendingApprovalLeaveId,
+                    "APPROVE",
+                    "PAID",
+                  );
+                  setPendingApprovalLeaveId(null);
+                }
+              }}
+            >
+              Approve As Paid
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <section className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-lg shadow-black/5 sm:p-5">
         <div className="space-y-2">
           <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">
@@ -1001,7 +1069,7 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
                                       size="sm"
                                       disabled={actionInProgress !== undefined}
                                       onClick={() =>
-                                        void respondToLeave(item.id, "APPROVE")
+                                        setPendingApprovalLeaveId(item.id)
                                       }
                                     >
                                       {actionInProgress === "approve" ? (

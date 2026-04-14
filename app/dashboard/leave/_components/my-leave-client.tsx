@@ -36,13 +36,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type {
-  LeaveCredit,
   LeaveRequestCreatePayload,
   LeaveRequestRecord,
   LeaveTypeOption,
@@ -170,7 +164,6 @@ export function MyLeaveClient() {
   const searchParams = useSearchParams();
   const [requests, setRequests] = useState<LeaveRequestRecord[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<LeaveTypeOption[]>([]);
-  const [credit, setCredit] = useState<LeaveCredit | null>(null);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [filters, setFilters] = useState<FilterState>({
@@ -193,7 +186,7 @@ export function MyLeaveClient() {
     resolver: zodResolver(createLeaveRequestSchema),
     defaultValues: {
       leave_date: "",
-      leave_type: "PA",
+      leave_type: "",
       info: "",
     },
   });
@@ -203,20 +196,24 @@ export function MyLeaveClient() {
 
     async function load() {
       try {
-        const [typesResponse, creditResponse, requestsResponse] =
-          await Promise.all([
-            requestJson<LeaveTypeOption[]>("/api/leave/types"),
-            requestJson<LeaveCredit>("/api/leave/credits/me"),
-            requestJson<LeaveRequestRecord[]>("/api/leave/requests/me"),
-          ]);
+        const [typesResponse, requestsResponse] = await Promise.all([
+          requestJson<LeaveTypeOption[]>("/api/leave/types"),
+          requestJson<LeaveRequestRecord[]>("/api/leave/requests/me"),
+        ]);
 
         if (!mounted) {
           return;
         }
 
         setLeaveTypes(typesResponse);
-        setCredit(creditResponse);
         setRequests(requestsResponse);
+        const defaultLeaveType = typesResponse[0]?.value ?? "";
+        if (defaultLeaveType) {
+          setValue("leave_type", defaultLeaveType, {
+            shouldDirty: false,
+            shouldValidate: true,
+          });
+        }
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Unable to load leave data.",
@@ -233,7 +230,7 @@ export function MyLeaveClient() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [setValue]);
 
   const yearOptions = useMemo(() => {
     const values = new Set<number>();
@@ -278,22 +275,13 @@ export function MyLeaveClient() {
     };
   }, [deepLinkedLeaveId, filteredRequests]);
 
-  const canCreatePaidLeave = (credit?.remaining_credits ?? 0) > 0;
-
   const selectedLeaveType = watch("leave_type");
   const selectedLeaveDate = watch("leave_date");
   const leaveInfoValue = watch("info");
-  const isPaidLeaveWithoutCredits =
-    selectedLeaveType === "PA" && !canCreatePaidLeave;
   const isCreateFormIncomplete =
     !selectedLeaveDate || !leaveInfoValue || !leaveInfoValue.trim();
 
   async function handleCreateRequest(values: CreateLeaveRequestFormValues) {
-    if (values.leave_type === "PA" && !canCreatePaidLeave) {
-      toast.error("Paid leave is disabled when remaining credits are zero.");
-      return;
-    }
-
     try {
       const payload: LeaveRequestCreatePayload = {
         leave_date: values.leave_date,
@@ -311,7 +299,7 @@ export function MyLeaveClient() {
       );
 
       setRequests((prev) => [created, ...prev]);
-      reset({ leave_date: "", leave_type: "PA", info: "" });
+      reset({ leave_date: "", leave_type: values.leave_type, info: "" });
       setIsCreateDialogOpen(false);
       toast.success("Leave request submitted.");
     } catch (error) {
@@ -331,10 +319,6 @@ export function MyLeaveClient() {
       setRequests((prev) =>
         prev.map((item) => (item.id === leaveId ? cancelled : item)),
       );
-      const refreshedCredit = await requestJson<LeaveCredit>(
-        "/api/leave/credits/me",
-      );
-      setCredit(refreshedCredit);
       toast.success("Leave request cancelled.");
     } catch (error) {
       toast.error(
@@ -360,8 +344,7 @@ export function MyLeaveClient() {
               My Leave
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Submit leave requests, track approvals, and monitor remaining
-              credits.
+              Submit leave requests and track approvals.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -371,33 +354,6 @@ export function MyLeaveClient() {
             </Link>
           </Button>
         </div>
-      </section>
-
-      <section>
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardHeader>
-            <CardTitle>Leave Credits</CardTitle>
-            <CardDescription>Current leave credit usage.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-border/70 bg-background/70 p-3">
-              <p className="text-xs text-muted-foreground">Total</p>
-              <p className="text-xl font-semibold">{credit?.credits ?? 0}</p>
-            </div>
-            <div className="rounded-xl border border-border/70 bg-background/70 p-3">
-              <p className="text-xs text-muted-foreground">Used</p>
-              <p className="text-xl font-semibold">
-                {credit?.used_credits ?? 0}
-              </p>
-            </div>
-            <div className="rounded-xl border border-border/70 bg-background/70 p-3">
-              <p className="text-xs text-muted-foreground">Remaining</p>
-              <p className="text-xl font-semibold">
-                {credit?.remaining_credits ?? 0}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       </section>
 
       <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
@@ -422,9 +378,7 @@ export function MyLeaveClient() {
               <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Create Leave Request</DialogTitle>
-                  <DialogDescription>
-                    Paid leave is disabled when remaining credits are zero.
-                  </DialogDescription>
+                  <DialogDescription>Create a leave request.</DialogDescription>
                 </DialogHeader>
                 <form
                   className="space-y-4"
@@ -459,10 +413,7 @@ export function MyLeaveClient() {
                       }
                       options={leaveTypes.map((item) => ({
                         value: item.value,
-                        label:
-                          item.value === "PA" && !canCreatePaidLeave
-                            ? `${item.label} (No credits)`
-                            : item.label,
+                        label: item.label,
                       }))}
                       placeholder="Select type"
                     />
@@ -483,33 +434,17 @@ export function MyLeaveClient() {
                     ) : null}
                   </div>
                   <div className="flex justify-end">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="inline-flex">
-                          <Button
-                            type="submit"
-                            disabled={
-                              isSubmitting ||
-                              isPaidLeaveWithoutCredits ||
-                              isCreateFormIncomplete
-                            }
-                          >
-                            {isSubmitting ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <Plus className="mr-2 h-4 w-4" />
-                            )}
-                            Submit Request
-                          </Button>
-                        </span>
-                      </TooltipTrigger>
-                      {isPaidLeaveWithoutCredits ? (
-                        <TooltipContent side="top">
-                          Paid leave cannot be submitted when remaining credits
-                          are zero.
-                        </TooltipContent>
-                      ) : null}
-                    </Tooltip>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting || isCreateFormIncomplete}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plus className="mr-2 h-4 w-4" />
+                      )}
+                      Submit Request
+                    </Button>
                   </div>
                 </form>
               </DialogContent>

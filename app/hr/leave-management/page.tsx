@@ -12,7 +12,7 @@ type SearchParams =
   | Record<string, string | string[] | undefined>
   | Promise<Record<string, string | string[] | undefined>>;
 
-type LeaveManagementTab = "requests" | "credits";
+type LeaveManagementTab = "requests" | "credits" | "leave-types";
 
 function firstValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) {
@@ -23,6 +23,9 @@ function firstValue(value: string | string[] | undefined) {
 
 function parseLeaveManagementTab(value: string): LeaveManagementTab {
   if (value === "credits") {
+    return value;
+  }
+  if (value === "leave-types") {
     return value;
   }
   return "requests";
