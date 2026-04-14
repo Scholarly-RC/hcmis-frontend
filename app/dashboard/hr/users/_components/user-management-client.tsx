@@ -119,6 +119,14 @@ function buildUserEditorSchema(mode: UserEditorMode) {
     })
     .superRefine((values, context) => {
       if (mode === "create") {
+        if (values.username.trim().length === 0) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["username"],
+            message: "Username is required.",
+          });
+        }
+
         if (values.password.length < 8) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
@@ -775,7 +783,7 @@ export function UserEditorDialog({
                 <FormField
                   label="Username"
                   htmlFor="user-username"
-                  hint="Optional. Can be used together with email for login."
+                  hint="Required. Can be used together with email for login."
                   error={errors.username?.message}
                 >
                   <Input
@@ -831,40 +839,6 @@ export function UserEditorDialog({
                       placeholder="Select a department"
                       triggerClassName={controlHeightClass}
                       error={errors.department_id?.message}
-                    />
-                  )}
-                />
-
-                <Controller
-                  control={control}
-                  name="employee_type"
-                  render={({ field }) => (
-                    <SelectField
-                      id="user-employee-type"
-                      label="Employee Type"
-                      value={field.value}
-                      onChange={(_, value) => field.onChange(value)}
-                      options={EMPLOYEE_TYPE_OPTIONS}
-                      placeholder="Choose employee type"
-                      triggerClassName={controlHeightClass}
-                      error={errors.employee_type?.message}
-                    />
-                  )}
-                />
-
-                <Controller
-                  control={control}
-                  name="employment_status"
-                  render={({ field }) => (
-                    <SelectField
-                      id="user-employment-status"
-                      label="Employment Status"
-                      value={field.value}
-                      onChange={(_, value) => field.onChange(value)}
-                      options={EMPLOYMENT_STATUS_OPTIONS}
-                      placeholder="Choose employment status"
-                      triggerClassName={controlHeightClass}
-                      error={errors.employment_status?.message}
                     />
                   )}
                 />
@@ -1156,6 +1130,40 @@ export function UserEditorDialog({
                     {...register("date_of_hiring")}
                   />
                 </FormField>
+
+                <Controller
+                  control={control}
+                  name="employee_type"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-employee-type"
+                      label="Employee Type"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={EMPLOYEE_TYPE_OPTIONS}
+                      placeholder="Choose employee type"
+                      triggerClassName={controlHeightClass}
+                      error={errors.employee_type?.message}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="employment_status"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-employment-status"
+                      label="Employment Status"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={EMPLOYMENT_STATUS_OPTIONS}
+                      placeholder="Choose employment status"
+                      triggerClassName={controlHeightClass}
+                      error={errors.employment_status?.message}
+                    />
+                  )}
+                />
               </FormSection>
             </div>
           </div>

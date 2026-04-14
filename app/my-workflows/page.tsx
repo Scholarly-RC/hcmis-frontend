@@ -1,8 +1,9 @@
 import {
   BadgeDollarSign,
+  BriefcaseBusiness,
   CalendarDays,
-  ClipboardList,
   Clock3,
+  FileBadge2,
   FolderOpen,
   Megaphone,
   ReceiptText,
@@ -49,11 +50,20 @@ export default function MyWorkflowsPage() {
               requiredCapabilities: ["view_attendance_self"],
             },
             {
-              label: "Request Inbox",
+              label: "My Official Business",
               description:
-                "View leave and overtime requests in a single filtered list.",
-              icon: ClipboardList,
-              href: "/requests/inbox",
+                "Submit official business requests and track approval status.",
+              icon: BriefcaseBusiness,
+              href: "/official-business",
+              requiredCapabilities: ["view_attendance_self"],
+            },
+            {
+              label: "My Certificate of Attendance",
+              description:
+                "Submit certificate of attendance requests and track approval status.",
+              icon: FileBadge2,
+              href: "/certificate-of-attendance",
+              requiredCapabilities: ["view_attendance_self"],
             },
             {
               label: "My Payslips",

@@ -3,7 +3,8 @@ import { RequestInboxClient } from "@/app/requests/inbox/_components/request-inb
 
 export const metadata = {
   title: "Request Inbox",
-  description: "Review and track leave and overtime requests",
+  description:
+    "Review and track leave, overtime, official business, and certificate requests",
 };
 
 export default function RequestInboxPage() {

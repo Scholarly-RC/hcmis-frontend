@@ -202,7 +202,14 @@ const sidebarItems: SidebarItem[] = [
     label: "Request Inbox",
     icon: ClipboardCheck,
     href: "/requests/inbox",
-    keywords: ["request inbox", "leave inbox", "overtime inbox", "approvals"],
+    keywords: [
+      "request inbox",
+      "leave inbox",
+      "overtime inbox",
+      "official business inbox",
+      "certificate attendance inbox",
+      "approvals",
+    ],
   },
   {
     label: "My Workflows",
@@ -215,6 +222,18 @@ const sidebarItems: SidebarItem[] = [
         href: "/leave",
         keywords: ["leave", "time off", "request"],
         requiredCapabilities: ["manage_leave_self"],
+      },
+      {
+        label: "My Official Business",
+        href: "/official-business",
+        keywords: ["official business", "request"],
+        requiredCapabilities: ["view_attendance_self"],
+      },
+      {
+        label: "My Certificate of Attendance",
+        href: "/certificate-of-attendance",
+        keywords: ["certificate", "attendance", "request"],
+        requiredCapabilities: ["view_attendance_self"],
       },
       {
         label: "My Payslips",

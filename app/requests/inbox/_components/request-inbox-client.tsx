@@ -32,6 +32,15 @@ import {
   leaveStatusLabel,
   leaveTypeLabel,
 } from "@/lib/leave";
+import type {
+  CertificateAttendanceRequestRecord,
+  OfficialBusinessRequestRecord,
+  SpecialRequestStatus,
+} from "@/lib/special-requests";
+import {
+  specialRequestStatusClass,
+  specialRequestStatusLabel,
+} from "@/lib/special-requests";
 import { toast } from "@/lib/toast";
 import { cn } from "@/utils/cn";
 
@@ -44,7 +53,12 @@ type RequestInboxClientProps = {
 };
 
 type FilterState = {
-  type: "all" | "leave" | "overtime";
+  type:
+    | "all"
+    | "leave"
+    | "overtime"
+    | "official_business"
+    | "certificate_attendance";
   status: "all" | "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
   year: string;
   month: string;
@@ -66,6 +80,22 @@ type UnifiedRow =
       createdAt: string;
       status: OvertimeRequestStatus;
       record: OvertimeRequestRecord;
+    }
+  | {
+      kind: "official_business";
+      id: number;
+      date: string;
+      createdAt: string;
+      status: SpecialRequestStatus;
+      record: OfficialBusinessRequestRecord;
+    }
+  | {
+      kind: "certificate_attendance";
+      id: number;
+      date: string;
+      createdAt: string;
+      status: SpecialRequestStatus;
+      record: CertificateAttendanceRequestRecord;
     };
 
 type RowAction = "approve" | "reject" | "cancel";
@@ -173,6 +203,21 @@ function canRespondToOvertime(
   );
 }
 
+function canRespondToSpecialRequest(
+  item: OfficialBusinessRequestRecord | CertificateAttendanceRequestRecord,
+  currentUserId: string,
+  canReview: boolean,
+) {
+  if (!canReview || item.status !== "PENDING") {
+    return false;
+  }
+  return item.approver_pool.some(
+    (assignment) =>
+      assignment.approver_id === currentUserId &&
+      assignment.status === "PENDING",
+  );
+}
+
 function actedByLabelForLeave(item: LeaveRequestRecord) {
   const actedAssignment = item.approver_pool.find(
     (assignment) => assignment.acted_at !== undefined,
@@ -189,6 +234,21 @@ function actedByLabelForLeave(item: LeaveRequestRecord) {
 function actedByLabelForOvertime(item: OvertimeRequestRecord) {
   const actedAssignment = item.approver_pool.find(
     (assignment) => assignment.acted_at !== undefined,
+  );
+  if (actedAssignment?.approver) {
+    return (
+      `${actedAssignment.approver.first_name} ${actedAssignment.approver.last_name}`.trim() ||
+      actedAssignment.approver.email
+    );
+  }
+  return "Pending";
+}
+
+function actedByLabelForSpecialRequest(
+  item: OfficialBusinessRequestRecord | CertificateAttendanceRequestRecord,
+) {
+  const actedAssignment = item.approver_pool.find(
+    (assignment) => assignment.acted_at !== null,
   );
   if (actedAssignment?.approver) {
     return (
@@ -227,6 +287,19 @@ function requesterLabelForOvertime(
   return `User #${item.user_id}`;
 }
 
+function requesterLabelForSpecialRequest(
+  item: OfficialBusinessRequestRecord | CertificateAttendanceRequestRecord,
+  currentUserId: string,
+) {
+  if (item.user_id === currentUserId) {
+    return "Me";
+  }
+  if (item.user_name && item.user_name.trim().length > 0) {
+    return item.user_name;
+  }
+  return `User #${item.user_id}`;
+}
+
 export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
   const canReviewLeave = true;
   const canReviewOvertime = true;
@@ -236,6 +309,11 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
   const [overtimeRequests, setOvertimeRequests] = useState<
     OvertimeRequestRecord[]
   >([]);
+  const [officialBusinessRequests, setOfficialBusinessRequests] = useState<
+    OfficialBusinessRequestRecord[]
+  >([]);
+  const [certificateAttendanceRequests, setCertificateAttendanceRequests] =
+    useState<CertificateAttendanceRequestRecord[]>([]);
   const [actionMap, setActionMap] = useState<
     Record<string, RowAction | undefined>
   >({});
@@ -254,6 +332,10 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
           reviewLeaveResponse,
           myOvertimeResponse,
           reviewOvertimeResponse,
+          myOfficialBusinessResponse,
+          reviewOfficialBusinessResponse,
+          myCertificateAttendanceResponse,
+          reviewCertificateAttendanceResponse,
         ] = await Promise.all([
           requestJson<LeaveRequestRecord[]>("/api/leave/requests/me"),
           requestJson<LeaveRequestRecord[]>("/api/leave/requests/review"),
@@ -263,11 +345,32 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
           requestJson<OvertimeRequestRecord[]>(
             "/api/attendance/overtime?scope=approvals",
           ),
+          requestJson<OfficialBusinessRequestRecord[]>(
+            "/api/official-business?scope=mine",
+          ),
+          requestJson<OfficialBusinessRequestRecord[]>(
+            "/api/official-business?scope=approvals",
+          ),
+          requestJson<CertificateAttendanceRequestRecord[]>(
+            "/api/certificate-attendance?scope=mine",
+          ),
+          requestJson<CertificateAttendanceRequestRecord[]>(
+            "/api/certificate-attendance?scope=approvals",
+          ),
         ]);
 
         setLeaveRequests(mergeById(myLeaveResponse, reviewLeaveResponse));
         setOvertimeRequests(
           mergeById(myOvertimeResponse, reviewOvertimeResponse),
+        );
+        setOfficialBusinessRequests(
+          mergeById(myOfficialBusinessResponse, reviewOfficialBusinessResponse),
+        );
+        setCertificateAttendanceRequests(
+          mergeById(
+            myCertificateAttendanceResponse,
+            reviewCertificateAttendanceResponse,
+          ),
         );
       } catch {
         const [
@@ -275,6 +378,10 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
           reviewLeaveResult,
           myOvertimeResult,
           reviewOvertimeResult,
+          myOfficialBusinessResult,
+          reviewOfficialBusinessResult,
+          myCertificateAttendanceResult,
+          reviewCertificateAttendanceResult,
         ] = await Promise.allSettled([
           requestJson<LeaveRequestRecord[]>("/api/leave/requests/me"),
           requestJson<LeaveRequestRecord[]>("/api/leave/requests/review"),
@@ -283,6 +390,18 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
           ),
           requestJson<OvertimeRequestRecord[]>(
             "/api/attendance/overtime?scope=approvals",
+          ),
+          requestJson<OfficialBusinessRequestRecord[]>(
+            "/api/official-business?scope=mine",
+          ),
+          requestJson<OfficialBusinessRequestRecord[]>(
+            "/api/official-business?scope=approvals",
+          ),
+          requestJson<CertificateAttendanceRequestRecord[]>(
+            "/api/certificate-attendance?scope=mine",
+          ),
+          requestJson<CertificateAttendanceRequestRecord[]>(
+            "/api/certificate-attendance?scope=approvals",
           ),
         ]);
 
@@ -298,15 +417,41 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
           reviewOvertimeResult.status === "fulfilled"
             ? reviewOvertimeResult.value
             : [];
+        const myOfficialBusiness =
+          myOfficialBusinessResult.status === "fulfilled"
+            ? myOfficialBusinessResult.value
+            : [];
+        const reviewOfficialBusiness =
+          reviewOfficialBusinessResult.status === "fulfilled"
+            ? reviewOfficialBusinessResult.value
+            : [];
+        const myCertificateAttendance =
+          myCertificateAttendanceResult.status === "fulfilled"
+            ? myCertificateAttendanceResult.value
+            : [];
+        const reviewCertificateAttendance =
+          reviewCertificateAttendanceResult.status === "fulfilled"
+            ? reviewCertificateAttendanceResult.value
+            : [];
 
         setLeaveRequests(mergeById(myLeave, reviewLeave));
         setOvertimeRequests(mergeById(myOvertime, reviewOvertime));
+        setOfficialBusinessRequests(
+          mergeById(myOfficialBusiness, reviewOfficialBusiness),
+        );
+        setCertificateAttendanceRequests(
+          mergeById(myCertificateAttendance, reviewCertificateAttendance),
+        );
 
         if (
           myLeaveResult.status === "rejected" &&
           reviewLeaveResult.status === "rejected" &&
           myOvertimeResult.status === "rejected" &&
-          reviewOvertimeResult.status === "rejected"
+          reviewOvertimeResult.status === "rejected" &&
+          myOfficialBusinessResult.status === "rejected" &&
+          reviewOfficialBusinessResult.status === "rejected" &&
+          myCertificateAttendanceResult.status === "rejected" &&
+          reviewCertificateAttendanceResult.status === "rejected"
         ) {
           toast.error("Unable to load request inbox.");
         }
@@ -334,6 +479,22 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
         status: item.status,
         record: item,
       })),
+      ...officialBusinessRequests.map((item) => ({
+        kind: "official_business" as const,
+        id: item.id,
+        date: item.date,
+        createdAt: item.created_at,
+        status: item.status,
+        record: item,
+      })),
+      ...certificateAttendanceRequests.map((item) => ({
+        kind: "certificate_attendance" as const,
+        id: item.id,
+        date: item.date,
+        createdAt: item.created_at,
+        status: item.status,
+        record: item,
+      })),
     ];
 
     rows.sort((a, b) => {
@@ -345,7 +506,12 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
     });
 
     return rows;
-  }, [leaveRequests, overtimeRequests]);
+  }, [
+    leaveRequests,
+    overtimeRequests,
+    officialBusinessRequests,
+    certificateAttendanceRequests,
+  ]);
 
   const yearOptions = useMemo(() => {
     const values = new Set<number>();
@@ -508,6 +674,132 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
     }
   }
 
+  async function respondToOfficialBusiness(
+    requestId: number,
+    response: "APPROVE" | "REJECT",
+  ) {
+    const key = rowKey("official_business", requestId);
+    setActionMap((prev) => ({
+      ...prev,
+      [key]: response === "APPROVE" ? "approve" : "reject",
+    }));
+    try {
+      const updated = await requestJson<OfficialBusinessRequestRecord>(
+        `/api/official-business/${requestId}/respond`,
+        {
+          method: "POST",
+          body: JSON.stringify({ response }),
+        },
+      );
+      setOfficialBusinessRequests((prev) =>
+        prev.map((item) =>
+          item.id === requestId ? { ...item, ...updated } : item,
+        ),
+      );
+      toast.success(
+        response === "APPROVE"
+          ? "Official business request approved."
+          : "Official business request rejected.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to update official business request.",
+      );
+    } finally {
+      setActionMap((prev) => ({ ...prev, [key]: undefined }));
+    }
+  }
+
+  async function cancelOfficialBusiness(requestId: number) {
+    const key = rowKey("official_business", requestId);
+    setActionMap((prev) => ({ ...prev, [key]: "cancel" }));
+    try {
+      const updated = await requestJson<OfficialBusinessRequestRecord>(
+        `/api/official-business/${requestId}/cancel`,
+        { method: "PATCH" },
+      );
+      setOfficialBusinessRequests((prev) =>
+        prev.map((item) =>
+          item.id === requestId ? { ...item, ...updated } : item,
+        ),
+      );
+      toast.success("Official business request cancelled.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to cancel official business request.",
+      );
+    } finally {
+      setActionMap((prev) => ({ ...prev, [key]: undefined }));
+    }
+  }
+
+  async function respondToCertificateAttendance(
+    requestId: number,
+    response: "APPROVE" | "REJECT",
+  ) {
+    const key = rowKey("certificate_attendance", requestId);
+    setActionMap((prev) => ({
+      ...prev,
+      [key]: response === "APPROVE" ? "approve" : "reject",
+    }));
+    try {
+      const updated = await requestJson<CertificateAttendanceRequestRecord>(
+        `/api/certificate-attendance/${requestId}/respond`,
+        {
+          method: "POST",
+          body: JSON.stringify({ response }),
+        },
+      );
+      setCertificateAttendanceRequests((prev) =>
+        prev.map((item) =>
+          item.id === requestId ? { ...item, ...updated } : item,
+        ),
+      );
+      toast.success(
+        response === "APPROVE"
+          ? "Certificate attendance request approved."
+          : "Certificate attendance request rejected.",
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to update certificate attendance request.",
+      );
+    } finally {
+      setActionMap((prev) => ({ ...prev, [key]: undefined }));
+    }
+  }
+
+  async function cancelCertificateAttendance(requestId: number) {
+    const key = rowKey("certificate_attendance", requestId);
+    setActionMap((prev) => ({ ...prev, [key]: "cancel" }));
+    try {
+      const updated = await requestJson<CertificateAttendanceRequestRecord>(
+        `/api/certificate-attendance/${requestId}/cancel`,
+        { method: "PATCH" },
+      );
+      setCertificateAttendanceRequests((prev) =>
+        prev.map((item) =>
+          item.id === requestId ? { ...item, ...updated } : item,
+        ),
+      );
+      toast.success("Certificate attendance request cancelled.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Unable to cancel certificate attendance request.",
+      );
+    } finally {
+      setActionMap((prev) => ({ ...prev, [key]: undefined }));
+    }
+  }
+
   return (
     <div className="space-y-6">
       <section className="rounded-2xl border border-border/70 bg-card/85 p-4 shadow-lg shadow-black/5 sm:p-5">
@@ -516,7 +808,8 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
             Request Inbox
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Review and track leave and overtime requests from a single inbox.
+            Review and track leave, overtime, official business, and certificate
+            attendance requests from a single inbox.
           </p>
         </div>
       </section>
@@ -543,6 +836,11 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
               { value: "all", label: "All types" },
               { value: "leave", label: "Leave" },
               { value: "overtime", label: "Overtime" },
+              { value: "official_business", label: "Official Business" },
+              {
+                value: "certificate_attendance",
+                label: "Certificate Attendance",
+              },
             ]}
             placeholder="Request Type"
           />
@@ -612,7 +910,8 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
         <CardHeader>
           <CardTitle>Requests</CardTitle>
           <CardDescription>
-            Unified request list for leave and overtime workflows.
+            Unified request list for leave, overtime, official business, and
+            certificate attendance workflows.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -737,6 +1036,240 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
                                     size="sm"
                                     disabled={actionInProgress !== undefined}
                                     onClick={() => void cancelLeave(item.id)}
+                                  >
+                                    {actionInProgress === "cancel" ? (
+                                      <Loader2 className="mr-2 size-4 animate-spin" />
+                                    ) : (
+                                      <Ban className="mr-2 size-4" />
+                                    )}
+                                    Cancel
+                                  </Button>
+                                ) : null}
+                                {!canRespond && !canCancel ? (
+                                  <span className="text-xs text-muted-foreground">
+                                    -
+                                  </span>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      if (row.kind === "official_business") {
+                        const item = row.record;
+                        const canRespond = canRespondToSpecialRequest(
+                          item,
+                          currentUserId,
+                          true,
+                        );
+                        const canCancel =
+                          item.status === "PENDING" &&
+                          item.user_id === currentUserId;
+
+                        return (
+                          <TableRow key={key}>
+                            <TableCell>
+                              <Badge variant="outline">Official Business</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {requesterLabelForSpecialRequest(
+                                item,
+                                currentUserId,
+                              )}
+                            </TableCell>
+                            <TableCell>{formatDate(item.date)}</TableCell>
+                            <TableCell>
+                              <Badge
+                                className={cn(
+                                  "border-0 font-medium",
+                                  specialRequestStatusClass(item.status),
+                                )}
+                              >
+                                {specialRequestStatusLabel(item.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-xs text-muted-foreground">
+                                Acted: {actedByLabelForSpecialRequest(item)}
+                              </p>
+                            </TableCell>
+                            <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
+                              {item.info?.trim() || "-"}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="inline-flex gap-2">
+                                {canRespond ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      disabled={actionInProgress !== undefined}
+                                      onClick={() =>
+                                        void respondToOfficialBusiness(
+                                          item.id,
+                                          "APPROVE",
+                                        )
+                                      }
+                                    >
+                                      {actionInProgress === "approve" ? (
+                                        <Loader2 className="mr-2 size-4 animate-spin" />
+                                      ) : (
+                                        <Check className="mr-2 size-4" />
+                                      )}
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={actionInProgress !== undefined}
+                                      onClick={() =>
+                                        void respondToOfficialBusiness(
+                                          item.id,
+                                          "REJECT",
+                                        )
+                                      }
+                                    >
+                                      {actionInProgress === "reject" ? (
+                                        <Loader2 className="mr-2 size-4 animate-spin" />
+                                      ) : (
+                                        <X className="mr-2 size-4" />
+                                      )}
+                                      Reject
+                                    </Button>
+                                  </>
+                                ) : null}
+                                {canCancel ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={actionInProgress !== undefined}
+                                    onClick={() =>
+                                      void cancelOfficialBusiness(item.id)
+                                    }
+                                  >
+                                    {actionInProgress === "cancel" ? (
+                                      <Loader2 className="mr-2 size-4 animate-spin" />
+                                    ) : (
+                                      <Ban className="mr-2 size-4" />
+                                    )}
+                                    Cancel
+                                  </Button>
+                                ) : null}
+                                {!canRespond && !canCancel ? (
+                                  <span className="text-xs text-muted-foreground">
+                                    -
+                                  </span>
+                                ) : null}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      }
+
+                      if (row.kind === "certificate_attendance") {
+                        const item = row.record;
+                        const canRespond = canRespondToSpecialRequest(
+                          item,
+                          currentUserId,
+                          true,
+                        );
+                        const canCancel =
+                          item.status === "PENDING" &&
+                          item.user_id === currentUserId;
+
+                        return (
+                          <TableRow key={key}>
+                            <TableCell>
+                              <Badge variant="outline">
+                                Certificate Attendance
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {requesterLabelForSpecialRequest(
+                                item,
+                                currentUserId,
+                              )}
+                            </TableCell>
+                            <TableCell>{formatDate(item.date)}</TableCell>
+                            <TableCell>
+                              <Badge
+                                className={cn(
+                                  "border-0 font-medium",
+                                  specialRequestStatusClass(item.status),
+                                )}
+                              >
+                                {specialRequestStatusLabel(item.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <p className="text-xs text-muted-foreground">
+                                Acted: {actedByLabelForSpecialRequest(item)}
+                              </p>
+                            </TableCell>
+                            <TableCell className="max-w-[18rem] whitespace-normal text-sm text-muted-foreground">
+                              <div className="space-y-1">
+                                <p>
+                                  Time: {item.time || "-"} | Punch:{" "}
+                                  {item.punch || "-"}
+                                </p>
+                                <p>{item.info?.trim() || "-"}</p>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="inline-flex gap-2">
+                                {canRespond ? (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      disabled={actionInProgress !== undefined}
+                                      onClick={() =>
+                                        void respondToCertificateAttendance(
+                                          item.id,
+                                          "APPROVE",
+                                        )
+                                      }
+                                    >
+                                      {actionInProgress === "approve" ? (
+                                        <Loader2 className="mr-2 size-4 animate-spin" />
+                                      ) : (
+                                        <Check className="mr-2 size-4" />
+                                      )}
+                                      Approve
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={actionInProgress !== undefined}
+                                      onClick={() =>
+                                        void respondToCertificateAttendance(
+                                          item.id,
+                                          "REJECT",
+                                        )
+                                      }
+                                    >
+                                      {actionInProgress === "reject" ? (
+                                        <Loader2 className="mr-2 size-4 animate-spin" />
+                                      ) : (
+                                        <X className="mr-2 size-4" />
+                                      )}
+                                      Reject
+                                    </Button>
+                                  </>
+                                ) : null}
+                                {canCancel ? (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={actionInProgress !== undefined}
+                                    onClick={() =>
+                                      void cancelCertificateAttendance(item.id)
+                                    }
                                   >
                                     {actionInProgress === "cancel" ? (
                                       <Loader2 className="mr-2 size-4 animate-spin" />
