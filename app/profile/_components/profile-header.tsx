@@ -13,12 +13,14 @@ type ProfileHeaderProps = {
   user: AuthUser;
   displayName: string;
   initials: string;
+  canEditPhoto?: boolean;
 };
 
 export function ProfileHeader({
   user,
   displayName,
   initials,
+  canEditPhoto = true,
 }: ProfileHeaderProps) {
   const router = useRouter();
   const [isEditingPhoto, setIsEditingPhoto] = useState(false);
@@ -102,53 +104,55 @@ export function ProfileHeader({
             {displayName}
           </h1>
 
-          <div className="mt-3">
-            {isEditingPhoto ? (
-              <div className="space-y-3">
-                <div className="flex flex-col gap-3 sm:flex-row">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) =>
-                      setSelectedPhoto(event.target.files?.[0] ?? null)
-                    }
-                  />
-                  <Button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={isSaving || !selectedPhoto}
-                  >
-                    <Check className="size-4" />
-                    {isSaving ? "Saving..." : "Save Photo"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={resetEditor}
-                    disabled={isSaving}
-                  >
-                    <X className="size-4" />
-                    Cancel
-                  </Button>
+          {canEditPhoto ? (
+            <div className="mt-3">
+              {isEditingPhoto ? (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        setSelectedPhoto(event.target.files?.[0] ?? null)
+                      }
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={isSaving || !selectedPhoto}
+                    >
+                      <Check className="size-4" />
+                      {isSaving ? "Saving..." : "Save Photo"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={resetEditor}
+                      disabled={isSaving}
+                    >
+                      <X className="size-4" />
+                      Cancel
+                    </Button>
+                  </div>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    Upload a JPG, PNG, GIF, WEBP, or BMP file.
+                  </p>
                 </div>
-                <p className="text-sm leading-6 text-muted-foreground">
-                  Upload a JPG, PNG, GIF, WEBP, or BMP file.
-                </p>
-              </div>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => setIsEditingPhoto(true)}
-              >
-                <Camera className="size-4" />
-                Change Photo
-              </Button>
-            )}
-          </div>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditingPhoto(true)}
+                >
+                  <Camera className="size-4" />
+                  Change Photo
+                </Button>
+              )}
+            </div>
+          ) : null}
 
-          {feedback ? (
+          {canEditPhoto && feedback ? (
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
               {feedback}
             </p>

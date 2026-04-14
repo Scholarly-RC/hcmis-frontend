@@ -47,7 +47,11 @@ import type {
   LeaveRequestRecord,
   LeaveTypeOption,
 } from "@/lib/leave";
-import { leaveStatusClass, leaveTypeLabel } from "@/lib/leave";
+import {
+  leaveStatusClass,
+  leaveStatusLabel,
+  leaveTypeLabel,
+} from "@/lib/leave";
 import { toast } from "@/lib/toast";
 import { cn } from "@/utils/cn";
 
@@ -361,9 +365,9 @@ export function MyLeaveClient() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link href="/leave/inbox">
+            <Link href="/requests/inbox">
               <ClipboardList className="size-4" />
-              Open Review Inbox
+              Open Request Inbox
             </Link>
           </Button>
         </div>
@@ -622,7 +626,7 @@ export function MyLeaveClient() {
                                 leaveStatusClass(item.status),
                               )}
                             >
-                              {item.status}
+                              {leaveStatusLabel(item.status)}
                             </Badge>
                           </TableCell>
                           <TableCell>

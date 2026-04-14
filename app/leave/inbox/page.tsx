@@ -1,11 +1,31 @@
-import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
-import { LeaveInboxClient } from "@/app/dashboard/leave/inbox/_components/leave-inbox-client";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "Leave Review Inbox",
-  description: "Review leave requests assigned to you",
-};
+type SearchParams =
+  | Record<string, string | string[] | undefined>
+  | Promise<Record<string, string | string[] | undefined>>;
 
-export default function LeaveInboxPage() {
-  return <DashboardPageFrame>{() => <LeaveInboxClient />}</DashboardPageFrame>;
+export default async function LeaveInboxRedirectPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  const params = (await searchParams) ?? {};
+  const query = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        query.append(key, entry);
+      }
+      continue;
+    }
+    if (typeof value === "string") {
+      query.set(key, value);
+    }
+  }
+
+  const serialized = query.toString();
+  redirect(
+    serialized.length > 0 ? `/requests/inbox?${serialized}` : "/requests/inbox",
+  );
 }

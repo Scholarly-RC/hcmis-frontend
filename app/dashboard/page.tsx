@@ -299,9 +299,9 @@ function buildHrDashboard(input: {
 
   const actions: DashboardAction[] = [
     {
-      label: "Review leave inbox",
-      description: "Prioritize pending leave requests and decisions.",
-      href: "/leave/inbox",
+      label: "Open Request Inbox",
+      description: "Review leave and overtime requests from one queue.",
+      href: "/requests/inbox",
     },
     {
       label: "Process overtime approvals",
@@ -320,7 +320,7 @@ function buildHrDashboard(input: {
     tasks.push({
       label: "Leave approvals pending",
       detail: `${pendingLeaveApprovals} leave request${pendingLeaveApprovals === 1 ? "" : "s"} need review.`,
-      href: "/leave/inbox",
+      href: "/requests/inbox",
     });
   }
   if (input.pendingOvertimeCount > 0) {

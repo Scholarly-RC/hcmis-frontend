@@ -33,7 +33,8 @@ const profileSchema = z.object({
   middle_name: z.string(),
   last_name: z.string().trim().min(1, "Last name is required."),
   gender: z.string(),
-  education: z.string(),
+  highest_education_level: z.string(),
+  highest_education_program: z.string(),
   civil_status: z.string(),
   religion: z.string(),
   phone_number: z.string(),
@@ -58,7 +59,8 @@ function createInitialValues(user: AuthUser): ProfileFormValues {
     middle_name: user.middle_name ?? "",
     last_name: user.last_name ?? "",
     gender: user.gender ?? "",
-    education: user.education ?? "",
+    highest_education_level: user.highest_education_level ?? "",
+    highest_education_program: user.highest_education_program ?? "",
     civil_status: user.civil_status ?? "",
     religion: user.religion ?? "",
     phone_number: user.phone_number ?? "",
@@ -267,7 +269,12 @@ export function ProfileEditForm({
           middle_name: toNullableText(values.middle_name),
           last_name: values.last_name.trim(),
           gender: toNullableText(values.gender),
-          education: toNullableText(values.education),
+          highest_education_level: toNullableText(
+            values.highest_education_level,
+          ),
+          highest_education_program: toNullableText(
+            values.highest_education_program,
+          ),
           civil_status: toNullableText(values.civil_status),
           religion: toNullableText(values.religion),
           phone_number: toNullableText(values.phone_number),
@@ -356,12 +363,24 @@ export function ProfileEditForm({
               options={RELIGION_OPTIONS}
               placeholder="Choose religion..."
             />
+          </ProfileSection>
+
+          <ProfileSection
+            title="Educational Background"
+            description="Your highest educational attainment and completed program."
+          >
             <SelectField
               control={control}
-              id="education"
-              label="Education"
+              id="highest_education_level"
+              label="Highest Educational Background"
               options={EDUCATION_OPTIONS}
-              placeholder="Choose education..."
+              placeholder="Choose education level..."
+            />
+            <TextField
+              control={control}
+              id="highest_education_program"
+              label="Program / Degree"
+              placeholder="e.g. Bachelor of Science in Computer Science"
             />
           </ProfileSection>
 

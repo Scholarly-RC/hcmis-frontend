@@ -38,8 +38,8 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
   OvertimeApproverAssignment,
   OvertimeRequestRecord,
-  OvertimeRequestStatus,
 } from "@/lib/attendance";
+import { overtimeStatusClass, overtimeStatusLabel } from "@/lib/attendance";
 import { toast } from "@/lib/toast";
 import { cn } from "@/utils/cn";
 
@@ -136,32 +136,6 @@ function parseMonthValue(value: string) {
   }
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed >= 1 && parsed <= 12 ? parsed : null;
-}
-
-function statusLabel(status: OvertimeRequestStatus) {
-  if (status === "APPROVED") {
-    return "Approved";
-  }
-  if (status === "REJECTED") {
-    return "Rejected";
-  }
-  if (status === "CANCELLED") {
-    return "Cancelled";
-  }
-  return "Pending";
-}
-
-function statusClass(status: OvertimeRequestStatus) {
-  if (status === "APPROVED") {
-    return "bg-emerald-100 text-emerald-700";
-  }
-  if (status === "REJECTED") {
-    return "bg-rose-100 text-rose-700";
-  }
-  if (status === "CANCELLED") {
-    return "bg-slate-200 text-slate-700";
-  }
-  return "bg-amber-100 text-amber-700";
 }
 
 function filterRequests(
@@ -608,10 +582,10 @@ export function MyOvertimeClient({ currentUserId }: MyOvertimeClientProps) {
                             <Badge
                               className={cn(
                                 "border-0 font-medium",
-                                statusClass(request.status),
+                                overtimeStatusClass(request.status),
                               )}
                             >
-                              {statusLabel(request.status)}
+                              {overtimeStatusLabel(request.status)}
                             </Badge>
                           </TableCell>
                           <TableCell>

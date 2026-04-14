@@ -25,6 +25,7 @@ import {
 import {
   type LeaveRequestRecord,
   leaveStatusClass,
+  leaveStatusLabel,
   leaveTypeLabel,
 } from "@/lib/leave";
 import { toast } from "@/lib/toast";
@@ -407,7 +408,7 @@ export function LeaveInboxClient() {
                                 leaveStatusClass(item.status),
                               )}
                             >
-                              {item.status}
+                              {leaveStatusLabel(item.status)}
                             </Badge>
                           </TableCell>
                           <TableCell>

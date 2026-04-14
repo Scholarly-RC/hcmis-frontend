@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,9 @@ type NotificationItem = {
 type UnreadCountResponse = {
   unread_count: number;
 };
+
+const INITIAL_VISIBLE_NOTIFICATIONS = 8;
+const VISIBLE_NOTIFICATIONS_STEP = 8;
 
 function formatTimeLabel(isoDate: string) {
   const parsed = new Date(isoDate);
@@ -59,6 +62,9 @@ export function SidebarNotificationMenu() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [visibleCount, setVisibleCount] = useState(
+    INITIAL_VISIBLE_NOTIFICATIONS,
+  );
 
   const loadUnreadCount = useCallback(async () => {
     const response = await fetch("/api/notifications/unread-count", {
@@ -143,6 +149,7 @@ export function SidebarNotificationMenu() {
     setOpen(nextOpen);
     if (!nextOpen) {
       setErrorMessage(null);
+      setVisibleCount(INITIAL_VISIBLE_NOTIFICATIONS);
     }
   }, []);
 
@@ -181,6 +188,14 @@ export function SidebarNotificationMenu() {
     () => notifications.length > 0,
     [notifications],
   );
+  const visibleNotifications = useMemo(
+    () => notifications.slice(0, visibleCount),
+    [notifications, visibleCount],
+  );
+  const hasMoreToShow = useMemo(
+    () => notifications.length > visibleNotifications.length,
+    [notifications.length, visibleNotifications.length],
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -208,7 +223,7 @@ export function SidebarNotificationMenu() {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[65vh] space-y-1 overflow-y-auto px-2 py-2">
+        <div className="max-h-[26rem] space-y-1 overflow-y-auto px-2 py-2">
           {isLoading ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">
               Loading notifications...
@@ -226,7 +241,7 @@ export function SidebarNotificationMenu() {
           ) : null}
 
           {!isLoading && !errorMessage
-            ? notifications.map((notification, index) => (
+            ? visibleNotifications.map((notification, index) => (
                 <div key={notification.id}>
                   <button
                     type="button"
@@ -249,12 +264,33 @@ export function SidebarNotificationMenu() {
                       </div>
                     </div>
                   </button>
-                  {index < notifications.length - 1 ? (
+                  {index < visibleNotifications.length - 1 ? (
                     <Separator className="mt-2" />
                   ) : null}
                 </div>
               ))
             : null}
+
+          {!isLoading && !errorMessage && hasMoreToShow ? (
+            <div className="px-2 py-2">
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() =>
+                  setVisibleCount((current) =>
+                    Math.min(
+                      notifications.length,
+                      current + VISIBLE_NOTIFICATIONS_STEP,
+                    ),
+                  )
+                }
+              >
+                <ChevronDown className="size-4" />
+                See More
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <DialogFooter className="mx-0 mb-0 justify-center rounded-none border-t bg-muted/30 px-4 py-3 sm:justify-center">

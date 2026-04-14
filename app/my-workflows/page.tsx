@@ -1,6 +1,7 @@
 import {
   BadgeDollarSign,
   CalendarDays,
+  ClipboardList,
   Clock3,
   FolderOpen,
   Megaphone,
@@ -46,6 +47,13 @@ export default function MyWorkflowsPage() {
               icon: Timer,
               href: "/overtime",
               requiredCapabilities: ["view_attendance_self"],
+            },
+            {
+              label: "Request Inbox",
+              description:
+                "View leave and overtime requests in a single filtered list.",
+              icon: ClipboardList,
+              href: "/requests/inbox",
             },
             {
               label: "My Payslips",

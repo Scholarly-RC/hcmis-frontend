@@ -120,6 +120,9 @@ Follow these rules before making changes.
 - Write typed, readable code with explicit names.
 - Keep modules focused and small.
 - Prefer composition over deep prop drilling.
+- Reuse existing helpers from `lib/` and shared utilities before adding component-local helper functions.
+- For repeated presentation mapping logic (for example label formatting, status text/class mapping, badge variants, or date display), centralize it in shared utilities and consume it from components.
+- If a shared helper does not exist and the logic is used (or likely to be used) in multiple places, create it in `lib/` instead of duplicating logic per component.
 - Avoid introducing new dependencies unless clearly justified.
 - Preserve backward compatibility of existing routes and expected UI behavior unless requested otherwise.
 

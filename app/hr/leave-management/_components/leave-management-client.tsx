@@ -35,7 +35,11 @@ import type {
   LeaveCreditUpsertPayload,
   LeaveRequestRecord,
 } from "@/lib/leave";
-import { leaveStatusClass, leaveTypeLabel } from "@/lib/leave";
+import {
+  leaveStatusClass,
+  leaveStatusLabel,
+  leaveTypeLabel,
+} from "@/lib/leave";
 import { toast } from "@/lib/toast";
 import type { AuthDepartment, AuthUser } from "@/types/auth";
 import { cn } from "@/utils/cn";
@@ -642,7 +646,7 @@ export function LeaveManagementClient({
                                 leaveStatusClass(item.status),
                               )}
                             >
-                              {item.status}
+                              {leaveStatusLabel(item.status)}
                             </Badge>
                           </TableCell>
                           <TableCell>

@@ -69,10 +69,11 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
     items: [
       {
         label: "Shift Management",
-        description: "Configure shift templates and department shift policies.",
+        description:
+          "Configure shift templates for user-based shift assignment.",
         icon: CalendarClock,
         href: "/hr/shift-management",
-        keywords: ["shift", "schedule", "templates", "policies"],
+        keywords: ["shift", "schedule", "templates", "users"],
         requiredCapabilities: ["manage_shift_templates"],
       },
       {
@@ -214,12 +215,12 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         requiredCapabilities: ["manage_leave_requests"],
       },
       {
-        label: "Leave Review Inbox",
+        label: "Request Inbox",
         description:
-          "Review and decide leave requests assigned to your account.",
+          "Review leave and overtime requests assigned to your account.",
         icon: ClipboardCheck,
-        href: "/leave/inbox",
-        keywords: ["leave inbox", "pending leave", "review requests"],
+        href: "/requests/inbox",
+        keywords: ["request inbox", "leave inbox", "overtime inbox"],
         requiredCapabilities: ["manage_leave_requests"],
       },
     ],

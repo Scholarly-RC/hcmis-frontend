@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDashboardSession } from "@/app/dashboard/_components/dashboard-page-frame";
 import { AttendanceManagementClient } from "@/app/dashboard/user-attendance-management/_components/attendance-management-client";
-import type { DepartmentShiftPolicy } from "@/app/hr/shift-management/_components/shift-management-client";
+import type { ShiftTemplateRecord } from "@/app/hr/shift-management/_components/shift-management-client";
 import { AssignmentCalendarModal } from "@/app/hr/user-attendance-management/_components/assignment-calendar-modal";
 import { AttendanceFilters } from "@/app/hr/user-attendance-management/_components/attendance-filters";
 import { ShiftAssignmentManager } from "@/app/hr/user-attendance-management/_components/shift-assignment-manager";
@@ -71,6 +71,11 @@ function buildUserLabel(user: AuthUser) {
 
 type AttendanceTab = "today" | "monthly" | "shifts";
 
+type UserShiftPolicy = {
+  id: string;
+  shifts: ShiftTemplateRecord[];
+};
+
 function parseTab(value: string): AttendanceTab {
   if (value === "monthly" || value === "shifts") {
     return value;
@@ -110,7 +115,7 @@ export default async function UserAttendanceManagementPage({
   let users: AuthUser[] = [];
   let summary: AttendanceSummary | null = null;
   let selectedUser: AuthUser | null = null;
-  let departmentShiftPolicy: DepartmentShiftPolicy | null = null;
+  let shiftTemplates: ShiftTemplateRecord[] = [];
   let loadError: string | null = null;
 
   try {
@@ -133,23 +138,22 @@ export default async function UserAttendanceManagementPage({
       users.find((user) => user.id === requestedUserId) ?? users[0] ?? null;
 
     if (selectedUser) {
+      const selectedUserId = selectedUser.id;
       const [summaryResponse, shiftPolicyResponse] = await Promise.all([
         fetchBackendJsonWithAuth<AttendanceSummary>({
           token: session.token,
-          pathname: `/attendance/users/${selectedUser.id}/${year}/${month}`,
+          pathname: `/attendance/users/${selectedUserId}/${year}/${month}`,
           fallbackMessage: "Unable to load attendance data.",
         }),
-        selectedUser.department_id
-          ? fetchBackendJsonWithAuth<DepartmentShiftPolicy>({
-              token: session.token,
-              pathname: `/attendance/departments/${selectedUser.department_id}/shift-policy`,
-              fallbackMessage: "Unable to load attendance data.",
-            }).catch(() => null)
-          : Promise.resolve(null),
+        fetchBackendJsonWithAuth<UserShiftPolicy>({
+          token: session.token,
+          pathname: `/attendance/users/${selectedUserId}/shift-policy`,
+          fallbackMessage: "Unable to load attendance data.",
+        }).catch(() => ({ id: selectedUserId, shifts: [] })),
       ]);
 
       summary = summaryResponse;
-      departmentShiftPolicy = shiftPolicyResponse;
+      shiftTemplates = shiftPolicyResponse.shifts;
     }
   } catch (error) {
     loadError =
@@ -260,7 +264,7 @@ export default async function UserAttendanceManagementPage({
                 key={`assign-${selectedUser.id}-${summary.year}-${summary.month}`}
                 user={selectedUser}
                 summary={summary}
-                departmentShiftPolicy={departmentShiftPolicy}
+                shiftTemplates={shiftTemplates}
               />
             ) : null}
             {activeTab !== "shifts" ? (

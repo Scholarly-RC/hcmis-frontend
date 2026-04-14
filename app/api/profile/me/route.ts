@@ -7,7 +7,8 @@ type ProfileUpdateRequestBody = {
   last_name?: unknown;
   middle_name?: unknown;
   gender?: unknown;
-  education?: unknown;
+  highest_education_level?: unknown;
+  highest_education_program?: unknown;
   civil_status?: unknown;
   religion?: unknown;
   phone_number?: unknown;
@@ -43,7 +44,12 @@ function normalizePayload(
     last_name: normalizeString(body.last_name),
     middle_name: normalizeNullableString(body.middle_name),
     gender: normalizeNullableString(body.gender),
-    education: normalizeNullableString(body.education),
+    highest_education_level: normalizeNullableString(
+      body.highest_education_level,
+    ),
+    highest_education_program: normalizeNullableString(
+      body.highest_education_program,
+    ),
     civil_status: normalizeNullableString(body.civil_status),
     religion: normalizeNullableString(body.religion),
     phone_number: normalizeNullableString(body.phone_number),

@@ -4,15 +4,13 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { fetchBackendJsonWithAuth } from "@/lib/backend-server";
 
 import {
-  type DepartmentShiftPolicy,
-  type DepartmentSummary,
   ShiftManagementClient,
   type ShiftTemplateRecord,
 } from "./_components/shift-management-client";
 
 export const metadata = {
   title: "Shift Management",
-  description: "Configure shift templates and department schedules",
+  description: "Configure reusable shift templates",
 };
 
 export default async function ShiftManagementPage() {
@@ -22,45 +20,15 @@ export default async function ShiftManagementPage() {
     redirect("/dashboard");
   }
 
-  let departments: DepartmentSummary[] = [];
   let shiftTemplates: ShiftTemplateRecord[] = [];
-  let initialDepartmentShiftPolicy: DepartmentShiftPolicy | null = null;
   let loadError: string | null = null;
 
   try {
-    const [departmentResponse, shiftResponse] = await Promise.all([
-      fetchBackendJsonWithAuth<DepartmentSummary[]>({
-        token: session.token,
-        pathname: "/departments",
-        fallbackMessage: "Unable to load shift management data.",
-      }),
-      fetchBackendJsonWithAuth<ShiftTemplateRecord[]>({
-        token: session.token,
-        pathname: "/attendance/shift-templates",
-        fallbackMessage: "Unable to load shift management data.",
-      }),
-    ]);
-
-    departments = departmentResponse;
-    shiftTemplates = shiftResponse;
-
-    const selectedDepartment =
-      departments.find((department) => department.is_active) ??
-      departments[0] ??
-      null;
-
-    if (selectedDepartment) {
-      try {
-        initialDepartmentShiftPolicy =
-          await fetchBackendJsonWithAuth<DepartmentShiftPolicy>({
-            token: session.token,
-            pathname: `/attendance/departments/${selectedDepartment.id}/shift-policy`,
-            fallbackMessage: "Unable to load shift management data.",
-          });
-      } catch {
-        initialDepartmentShiftPolicy = null;
-      }
-    }
+    shiftTemplates = await fetchBackendJsonWithAuth<ShiftTemplateRecord[]>({
+      token: session.token,
+      pathname: "/attendance/shift-templates",
+      fallbackMessage: "Unable to load shift management data.",
+    });
   } catch (error) {
     loadError =
       error instanceof Error ? error.message : "Unable to load shift data.";
@@ -84,19 +52,7 @@ export default async function ShiftManagementPage() {
           </div>
         </div>
       ) : (
-        <ShiftManagementClient
-          departments={departments}
-          shiftTemplates={shiftTemplates}
-          initialDepartmentId={
-            initialDepartmentShiftPolicy?.id.toString() ??
-            departments
-              .find((department) => department.is_active)
-              ?.id.toString() ??
-            departments[0]?.id.toString() ??
-            ""
-          }
-          initialDepartmentShiftPolicy={initialDepartmentShiftPolicy}
-        />
+        <ShiftManagementClient shiftTemplates={shiftTemplates} />
       )}
     </DashboardShell>
   );

@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { type KeyboardEvent, useEffect, useState } from "react";
 
-import type { DepartmentShiftPolicy } from "@/app/hr/shift-management/_components/shift-management-client";
+import type { ShiftTemplateRecord } from "@/app/hr/shift-management/_components/shift-management-client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -71,7 +71,7 @@ function AssignmentRow({
   rowStatus: RowStatus;
   isMutating: boolean;
   isFocused: boolean;
-  templates: NonNullable<DepartmentShiftPolicy>["shifts"];
+  templates: ShiftTemplateRecord[];
   onFocusRow: (dayNumber: number) => void;
   onTemplateSelect: (dayNumber: number, templateId: string) => void;
   onRemove: (dayNumber: number) => void;
@@ -141,7 +141,7 @@ function AssignmentRow({
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">
-            No allowed templates for this department.
+            No shift templates available.
           </p>
         )}
       </div>
@@ -164,18 +164,18 @@ function AssignmentRow({
 export function ShiftAssignmentManager({
   user,
   summary,
-  departmentShiftPolicy,
+  shiftTemplates,
 }: {
   user: AuthUser;
   summary: AttendanceSummary;
-  departmentShiftPolicy: DepartmentShiftPolicy | null;
+  shiftTemplates: ShiftTemplateRecord[];
 }) {
   const router = useRouter();
   const [isCopyingPreviousMonth, setIsCopyingPreviousMonth] = useState(false);
   const [isGeneratingMonth, setIsGeneratingMonth] = useState(false);
   const [isSavingAll, setIsSavingAll] = useState(false);
   const [defaultShiftTemplateId, setDefaultShiftTemplateId] = useState<string>(
-    departmentShiftPolicy?.shifts[0]?.id.toString() ?? "",
+    shiftTemplates[0]?.id.toString() ?? "",
   );
   const [pendingTemplateByDay, setPendingTemplateByDay] = useState<
     Record<number, string>
@@ -185,13 +185,11 @@ export function ShiftAssignmentManager({
   >({});
   const [focusedDay, setFocusedDay] = useState<number | null>(null);
 
-  const allowedTemplates = departmentShiftPolicy?.shifts ?? [];
+  const allowedTemplates = shiftTemplates;
 
   useEffect(() => {
-    setDefaultShiftTemplateId(
-      departmentShiftPolicy?.shifts[0]?.id.toString() ?? "",
-    );
-  }, [departmentShiftPolicy?.shifts]);
+    setDefaultShiftTemplateId(shiftTemplates[0]?.id.toString() ?? "");
+  }, [shiftTemplates]);
 
   function getCurrentAssignment(dayNumber: number) {
     return summary.days.find((day) => day.day === dayNumber)?.shift ?? null;
@@ -520,7 +518,7 @@ export function ShiftAssignmentManager({
   }
 
   async function handleGenerateMonth() {
-    if (!departmentShiftPolicy) {
+    if (shiftTemplates.length === 0) {
       return;
     }
 
@@ -590,10 +588,7 @@ export function ShiftAssignmentManager({
               <Select
                 value={defaultShiftTemplateId}
                 onValueChange={setDefaultShiftTemplateId}
-                disabled={
-                  !departmentShiftPolicy ||
-                  departmentShiftPolicy.shifts.length === 0
-                }
+                disabled={shiftTemplates.length === 0}
               >
                 <SelectTrigger
                   id="month-template-select"
@@ -601,14 +596,12 @@ export function ShiftAssignmentManager({
                 >
                   <SelectValue
                     placeholder={
-                      departmentShiftPolicy?.shifts.length
-                        ? "Choose template"
-                        : "No templates"
+                      shiftTemplates.length ? "Choose template" : "No templates"
                     }
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {(departmentShiftPolicy?.shifts ?? []).map((shift) => (
+                  {shiftTemplates.map((shift) => (
                     <SelectItem key={shift.id} value={shift.id.toString()}>
                       {shift.description}
                     </SelectItem>
@@ -630,11 +623,7 @@ export function ShiftAssignmentManager({
               type="button"
               className="h-10"
               onClick={() => void handleGenerateMonth()}
-              disabled={
-                isGeneratingMonth ||
-                !departmentShiftPolicy ||
-                departmentShiftPolicy.shifts.length === 0
-              }
+              disabled={isGeneratingMonth || shiftTemplates.length === 0}
             >
               <CalendarDays className="size-4" />
               {isGeneratingMonth ? "Generating..." : "Generate Month"}
@@ -679,7 +668,6 @@ export function ShiftAssignmentManager({
               disabled={
                 isSavingAll ||
                 changedDays.length === 0 ||
-                !departmentShiftPolicy ||
                 allowedTemplates.length === 0
               }
             >

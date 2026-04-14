@@ -38,3 +38,16 @@ export const EDUCATION_OPTIONS: ProfileOption[] = [
   { value: "MA", label: "Master" },
   { value: "DR", label: "Doctorate" },
 ];
+
+export const EMPLOYEE_TYPE_OPTIONS: ProfileOption[] = [
+  { value: "RANK_AND_FILE", label: "Rank & File" },
+  { value: "SUPERVISOR", label: "Supervisor" },
+  { value: "MANAGER", label: "Manager" },
+  { value: "OFFICER", label: "Officer" },
+];
+
+export const EMPLOYMENT_STATUS_OPTIONS: ProfileOption[] = [
+  { value: "CONTRACTUAL", label: "Contractual" },
+  { value: "PROVISIONARY", label: "Provisionary" },
+  { value: "REGULAR", label: "Regular" },
+];

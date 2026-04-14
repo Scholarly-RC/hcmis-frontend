@@ -12,7 +12,8 @@ export type AuthUser = {
   last_name: string;
   middle_name: string | null;
   gender: string | null;
-  education: string | null;
+  highest_education_level: string | null;
+  highest_education_program: string | null;
   civil_status: string | null;
   religion: string | null;
   rank: string | null;
@@ -22,6 +23,8 @@ export type AuthUser = {
   employee_number: string | null;
   biometric_uid: number | null;
   role: string | null;
+  employee_type: string | null;
+  employment_status: string | null;
   department_id: number | null;
   level_1_approver_id: string | null;
   level_2_approver_id: string | null;
@@ -53,7 +56,8 @@ export type AuthUserProfileUpdate = {
   last_name?: string;
   middle_name?: string | null;
   gender?: string | null;
-  education?: string | null;
+  highest_education_level?: string | null;
+  highest_education_program?: string | null;
   civil_status?: string | null;
   religion?: string | null;
   phone_number?: string | null;

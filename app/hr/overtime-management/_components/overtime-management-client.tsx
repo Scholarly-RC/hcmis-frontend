@@ -20,10 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type {
-  OvertimeRequestRecord,
-  OvertimeRequestStatus,
-} from "@/lib/attendance";
+import type { OvertimeRequestRecord } from "@/lib/attendance";
+import { overtimeStatusClass, overtimeStatusLabel } from "@/lib/attendance";
 import { toast } from "@/lib/toast";
 import type { AuthDepartment, AuthUser } from "@/types/auth";
 import { cn } from "@/utils/cn";
@@ -99,32 +97,6 @@ function buildUrl(
 
   const query = search.toString();
   return query.length > 0 ? `${pathname}?${query}` : pathname;
-}
-
-function statusLabel(status: OvertimeRequestStatus) {
-  if (status === "APPROVED") {
-    return "Approved";
-  }
-  if (status === "REJECTED") {
-    return "Rejected";
-  }
-  if (status === "CANCELLED") {
-    return "Cancelled";
-  }
-  return "Pending";
-}
-
-function statusClass(status: OvertimeRequestStatus) {
-  if (status === "APPROVED") {
-    return "bg-emerald-100 text-emerald-700";
-  }
-  if (status === "REJECTED") {
-    return "bg-rose-100 text-rose-700";
-  }
-  if (status === "CANCELLED") {
-    return "bg-slate-200 text-slate-700";
-  }
-  return "bg-amber-100 text-amber-700";
 }
 
 function formatDate(value: string) {
@@ -494,10 +466,10 @@ export function OvertimeManagementClient({
                             <span
                               className={cn(
                                 "inline-flex rounded-full px-2.5 py-1 text-xs font-medium",
-                                statusClass(request.status),
+                                overtimeStatusClass(request.status),
                               )}
                             >
-                              {statusLabel(request.status)}
+                              {overtimeStatusLabel(request.status)}
                             </span>
                           </TableCell>
                           <TableCell>

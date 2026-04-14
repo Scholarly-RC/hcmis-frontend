@@ -3,9 +3,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Copy,
+  Eye,
   KeyRound,
   Loader2,
-  Pencil,
   Plus,
   RefreshCw,
   Save,
@@ -19,7 +19,6 @@ import { type ChangeEvent, type ReactNode, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { ConfirmationModal } from "@/components/confirmation-modal";
 import { SelectField } from "@/components/form-select-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,16 +40,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { PayrollPosition } from "@/lib/payroll";
+import {
+  EDUCATION_OPTIONS,
+  EMPLOYEE_TYPE_OPTIONS,
+  EMPLOYMENT_STATUS_OPTIONS,
+} from "@/lib/profile-options";
 import { toast } from "@/lib/toast";
 import type { AuthDepartment, AuthUser } from "@/types/auth";
 import { cn } from "@/utils/cn";
 
 type UsersResponse = AuthUser[];
 type DepartmentsResponse = AuthDepartment[];
-type ResetPasswordResponse = {
-  temporary_password: string;
-};
-
 type UserStatusFilter = "all" | "active" | "inactive";
 export type UserEditorMode = "create" | "edit";
 
@@ -62,9 +62,13 @@ type UserFormState = {
   first_name: string;
   middle_name: string;
   last_name: string;
+  highest_education_level: string;
+  highest_education_program: string;
   employee_number: string;
   biometric_uid: string;
   role: (typeof userRoles)[number];
+  employee_type: string;
+  employment_status: string;
   department_id: string;
   level_1_approver_id: string;
   level_2_approver_id: string;
@@ -94,9 +98,13 @@ function buildUserEditorSchema(mode: UserEditorMode) {
       first_name: z.string().trim().min(1, "First name is required."),
       middle_name: z.string(),
       last_name: z.string().trim().min(1, "Last name is required."),
+      highest_education_level: z.string(),
+      highest_education_program: z.string(),
       employee_number: z.string(),
       biometric_uid: z.string(),
       role: z.enum(userRoles),
+      employee_type: z.string(),
+      employment_status: z.string(),
       department_id: z.string(),
       level_1_approver_id: z.string(),
       level_2_approver_id: z.string(),
@@ -218,9 +226,13 @@ export type UserEditorPayload = {
   first_name: string;
   middle_name: string | null;
   last_name: string;
+  highest_education_level: string | null;
+  highest_education_program: string | null;
   employee_number: string | null;
   biometric_uid: number | null;
   role: string | null;
+  employee_type: string | null;
+  employment_status: string | null;
   department_id: number | null;
   level_1_approver_id: string | null;
   level_2_approver_id: string | null;
@@ -254,9 +266,13 @@ const emptyFormState = (): UserFormState => ({
   first_name: "",
   middle_name: "",
   last_name: "",
+  highest_education_level: "",
+  highest_education_program: "",
   employee_number: "",
   biometric_uid: "",
   role: "EMP",
+  employee_type: "",
+  employment_status: "",
   department_id: "none",
   level_1_approver_id: "none",
   level_2_approver_id: "none",
@@ -270,7 +286,7 @@ const emptyFormState = (): UserFormState => ({
   can_modify_shift: false,
 });
 
-class ApiError extends Error {
+export class ApiError extends Error {
   status: number;
 
   constructor(message: string, status: number) {
@@ -279,7 +295,7 @@ class ApiError extends Error {
   }
 }
 
-async function requestJson<T>(
+export async function requestJson<T>(
   pathname: string,
   init: RequestInit = {},
 ): Promise<T> {
@@ -319,14 +335,14 @@ function formatDateInput(value: string | null | undefined) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function buildDisplayName(user: AuthUser) {
+export function buildDisplayName(user: AuthUser) {
   return [user.first_name, user.middle_name, user.last_name]
     .filter(Boolean)
     .join(" ")
     .trim();
 }
 
-function getRoleLabel(role: string | null) {
+export function getRoleLabel(role: string | null) {
   const normalized = role?.trim().toUpperCase();
   if (!normalized || normalized === "EMP") {
     return "Employee";
@@ -361,9 +377,13 @@ function buildFormState(
         first_name: user.first_name,
         middle_name: user.middle_name ?? "",
         last_name: user.last_name,
+        highest_education_level: user.highest_education_level ?? "",
+        highest_education_program: user.highest_education_program ?? "",
         employee_number: user.employee_number ?? "",
         biometric_uid: user.biometric_uid?.toString() ?? "",
         role: normalizeUserRole(user.role),
+        employee_type: user.employee_type ?? "",
+        employment_status: user.employment_status ?? "",
         department_id: user.department_id?.toString() ?? "none",
         level_1_approver_id: user.level_1_approver_id ?? "none",
         level_2_approver_id: user.level_2_approver_id ?? "none",
@@ -445,7 +465,7 @@ function FormSection({
   );
 }
 
-function ResetPasswordDialog({
+export function ResetPasswordDialog({
   open,
   user,
   onOpenChange,
@@ -625,7 +645,12 @@ export function UserEditorDialog({
   const approverOptions = [
     { value: "none", label: "Not set" },
     ...users
-      .filter((item) => item.is_active && item.id !== user?.id)
+      .filter((item) => {
+        const normalizedRole = item.role?.trim().toUpperCase() ?? "EMP";
+        return (
+          item.is_active && item.id !== user?.id && normalizedRole !== "EMP"
+        );
+      })
       .map((item) => ({
         value: item.id,
         label: `${buildDisplayName(item) || item.email} (${getRoleLabel(item.role)})`,
@@ -642,6 +667,10 @@ export function UserEditorDialog({
         first_name: values.first_name.trim(),
         middle_name: normalizeText(values.middle_name),
         last_name: values.last_name.trim(),
+        highest_education_level: normalizeText(values.highest_education_level),
+        highest_education_program: normalizeText(
+          values.highest_education_program,
+        ),
         employee_number: normalizeText(values.employee_number),
         biometric_uid:
           values.biometric_uid.trim() === "none" ||
@@ -649,6 +678,8 @@ export function UserEditorDialog({
             ? null
             : Number(values.biometric_uid.trim()),
         role: normalizeText(values.role),
+        employee_type: normalizeText(values.employee_type),
+        employment_status: normalizeText(values.employment_status),
         department_id:
           values.department_id.trim() === "none" ||
           values.department_id.trim().length === 0
@@ -806,34 +837,34 @@ export function UserEditorDialog({
 
                 <Controller
                   control={control}
-                  name="level_1_approver_id"
+                  name="employee_type"
                   render={({ field }) => (
                     <SelectField
-                      id="user-level-1-approver"
-                      label="Level 1 Approver"
+                      id="user-employee-type"
+                      label="Employee Type"
                       value={field.value}
                       onChange={(_, value) => field.onChange(value)}
-                      options={approverOptions}
-                      placeholder="Select approver"
+                      options={EMPLOYEE_TYPE_OPTIONS}
+                      placeholder="Choose employee type"
                       triggerClassName={controlHeightClass}
-                      error={errors.level_1_approver_id?.message}
+                      error={errors.employee_type?.message}
                     />
                   )}
                 />
 
                 <Controller
                   control={control}
-                  name="level_2_approver_id"
+                  name="employment_status"
                   render={({ field }) => (
                     <SelectField
-                      id="user-level-2-approver"
-                      label="Level 2 Approver (Backup)"
+                      id="user-employment-status"
+                      label="Employment Status"
                       value={field.value}
                       onChange={(_, value) => field.onChange(value)}
-                      options={approverOptions}
-                      placeholder="Select backup approver"
+                      options={EMPLOYMENT_STATUS_OPTIONS}
+                      placeholder="Choose employment status"
                       triggerClassName={controlHeightClass}
-                      error={errors.level_2_approver_id?.message}
+                      error={errors.employment_status?.message}
                     />
                   )}
                 />
@@ -871,6 +902,45 @@ export function UserEditorDialog({
                     </FormField>
                   </>
                 ) : null}
+              </FormSection>
+
+              <FormSection
+                title="Approver Assignment"
+                description="Set primary and backup approvers for approval workflows."
+              >
+                <Controller
+                  control={control}
+                  name="level_1_approver_id"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-level-1-approver"
+                      label="Level 1 Approver"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={approverOptions}
+                      placeholder="Select approver"
+                      triggerClassName={controlHeightClass}
+                      error={errors.level_1_approver_id?.message}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="level_2_approver_id"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-level-2-approver"
+                      label="Level 2 Approver"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={approverOptions}
+                      placeholder="Select approver"
+                      triggerClassName={controlHeightClass}
+                      error={errors.level_2_approver_id?.message}
+                    />
+                  )}
+                />
               </FormSection>
 
               <FormSection
@@ -944,6 +1014,44 @@ export function UserEditorDialog({
                     className={controlHeightClass}
                     aria-invalid={errors.date_of_birth ? "true" : "false"}
                     {...register("date_of_birth")}
+                  />
+                </FormField>
+              </FormSection>
+
+              <FormSection
+                title="Educational Background"
+                description="Highest educational attainment and degree/program details."
+              >
+                <Controller
+                  control={control}
+                  name="highest_education_level"
+                  render={({ field }) => (
+                    <SelectField
+                      id="user-highest-education-level"
+                      label="Highest Educational Background"
+                      value={field.value}
+                      onChange={(_, value) => field.onChange(value)}
+                      options={EDUCATION_OPTIONS}
+                      placeholder="Choose education level"
+                      triggerClassName={controlHeightClass}
+                      error={errors.highest_education_level?.message}
+                    />
+                  )}
+                />
+
+                <FormField
+                  label="Program / Degree"
+                  htmlFor="user-highest-education-program"
+                  error={errors.highest_education_program?.message}
+                >
+                  <Input
+                    id="user-highest-education-program"
+                    placeholder="e.g. Bachelor of Science in Computer Science"
+                    className={controlHeightClass}
+                    aria-invalid={
+                      errors.highest_education_program ? "true" : "false"
+                    }
+                    {...register("highest_education_program")}
                   />
                 </FormField>
               </FormSection>
@@ -1098,12 +1206,6 @@ export function UserManagementClient({
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("all");
   const [editorOpen, setEditorOpen] = useState(false);
-  const [editorMode, setEditorMode] = useState<UserEditorMode>("create");
-  const [editingUser, setEditingUser] = useState<AuthUser | null>(null);
-  const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
-  const [resetPasswordUser, setResetPasswordUser] = useState<AuthUser | null>(
-    null,
-  );
   const departmentFilterOptions = [
     { value: "all", label: "All departments" },
     ...departments.map((department) => ({
@@ -1127,9 +1229,7 @@ export function UserManagementClient({
       try {
         const [loadedUsers, loadedDepartments, loadedPositions] =
           await Promise.all([
-            requestJson<UsersResponse>(
-              "/api/users?include_superusers=true&exclude_self=true",
-            ),
+            requestJson<UsersResponse>("/api/users?include_superusers=true"),
             requestJson<DepartmentsResponse>("/api/departments"),
             requestJson<PayrollPosition[]>("/api/payroll/positions"),
           ]);
@@ -1208,68 +1308,22 @@ export function UserManagementClient({
   });
 
   function openCreateDialog() {
-    setEditingUser(null);
-    setEditorMode("create");
-    setEditorOpen(true);
-  }
-
-  function openEditDialog(user: AuthUser) {
-    setEditingUser(user);
-    setEditorMode("edit");
     setEditorOpen(true);
   }
 
   function closeEditor(nextOpen: boolean) {
     setEditorOpen(nextOpen);
-    if (!nextOpen) {
-      setEditingUser(null);
-      setEditorMode("create");
-    }
-  }
-
-  function openResetPasswordDialog(user: AuthUser) {
-    setResetPasswordUser(user);
-    setResetPasswordOpen(true);
-  }
-
-  function closeResetPasswordDialog(nextOpen: boolean) {
-    setResetPasswordOpen(nextOpen);
-    if (!nextOpen) {
-      setResetPasswordUser(null);
-    }
   }
 
   async function handleSaveUser(payload: UserEditorPayload) {
     try {
-      const targetUserId = editingUser?.id;
-      if (editorMode === "edit" && !targetUserId) {
-        throw new Error("No user is selected for editing.");
-      }
-
-      const response =
-        editorMode === "create" && editingUser === null
-          ? await requestJson<AuthUser>("/api/users", {
-              method: "POST",
-              body: JSON.stringify(payload),
-            })
-          : await requestJson<AuthUser>(`/api/users/${targetUserId}`, {
-              method: "PATCH",
-              body: JSON.stringify(payload),
-            });
-
-      setUsers((current) => {
-        if (editorMode === "create") {
-          return [response, ...current];
-        }
-
-        return current.map((item) =>
-          item.id === response.id ? response : item,
-        );
+      const response = await requestJson<AuthUser>("/api/users", {
+        method: "POST",
+        body: JSON.stringify(payload),
       });
 
-      toast.success(
-        editorMode === "create" ? "User created." : "User updated.",
-      );
+      setUsers((current) => [response, ...current]);
+      toast.success("User created.");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         router.replace("/login");
@@ -1280,65 +1334,6 @@ export function UserManagementClient({
         err instanceof Error ? err.message : "Unable to save user.";
       toast.error(message);
       throw err;
-    }
-  }
-
-  async function toggleUserStatus(user: AuthUser) {
-    if (user.id === currentUser?.id && user.is_active) {
-      toast.error("You cannot deactivate your own account.");
-      return;
-    }
-
-    try {
-      const response = await requestJson<AuthUser>(
-        `/api/users/${user.id}/toggle-status`,
-        {
-          method: "POST",
-        },
-      );
-
-      setUsers((current) =>
-        current.map((item) => (item.id === response.id ? response : item)),
-      );
-
-      toast.success(
-        response.is_active ? "User activated." : "User deactivated.",
-      );
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        router.replace("/login");
-        return;
-      }
-
-      const message =
-        err instanceof Error ? err.message : "Unable to update user status.";
-      toast.error(message);
-    }
-  }
-
-  async function handleResetPassword(): Promise<string> {
-    if (!resetPasswordUser) {
-      throw new Error("No user selected.");
-    }
-
-    try {
-      const response = await requestJson<ResetPasswordResponse>(
-        `/api/users/${resetPasswordUser.id}/reset-password`,
-        {
-          method: "POST",
-        },
-      );
-      toast.success("Temporary password generated.");
-      return response.temporary_password;
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        router.replace("/login");
-        throw err;
-      }
-
-      throw err instanceof Error
-        ? err
-        : new Error("Unable to reset user password.");
     }
   }
 
@@ -1423,7 +1418,7 @@ export function UserManagementClient({
                   const [loadedUsers, loadedDepartments, loadedPositions] =
                     await Promise.all([
                       requestJson<UsersResponse>(
-                        "/api/users?include_superusers=true&exclude_self=true",
+                        "/api/users?include_superusers=true",
                       ),
                       requestJson<DepartmentsResponse>("/api/departments"),
                       requestJson<PayrollPosition[]>("/api/payroll/positions"),
@@ -1529,56 +1524,12 @@ export function UserManagementClient({
                     </TableCell>
                     <TableCell className="border-b border-border/60 px-4 py-4 align-top">
                       <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openEditDialog(user)}
-                        >
-                          <Pencil className="size-4" />
-                          Edit
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/hr/users/${user.id}`}>
+                            <Eye className="size-4" />
+                            View
+                          </Link>
                         </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => openResetPasswordDialog(user)}
-                        >
-                          <KeyRound className="size-4" />
-                          Reset Password
-                        </Button>
-
-                        <ConfirmationModal
-                          trigger={
-                            <Button
-                              type="button"
-                              variant={
-                                user.is_active ? "destructive" : "secondary"
-                              }
-                              size="sm"
-                              className="min-w-28 justify-center"
-                            >
-                              {user.is_active ? "Deactivate" : "Activate"}
-                            </Button>
-                          }
-                          title={
-                            user.is_active
-                              ? `Deactivate ${buildDisplayName(user) || user.email}?`
-                              : `Activate ${buildDisplayName(user) || user.email}?`
-                          }
-                          description={
-                            user.is_active
-                              ? "The account will remain in the system but lose access until it is reactivated."
-                              : "The account will regain access after activation."
-                          }
-                          confirmLabel={
-                            user.is_active ? "Deactivate" : "Activate"
-                          }
-                          confirmVariant={
-                            user.is_active ? "destructive" : "default"
-                          }
-                          onConfirm={() => toggleUserStatus(user)}
-                        />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1590,21 +1541,15 @@ export function UserManagementClient({
       </div>
 
       <UserEditorDialog
-        key={`${editorMode}-${editingUser?.id ?? "new"}`}
+        key="create-user"
         open={editorOpen}
-        mode={editorMode}
-        user={editingUser}
+        mode="create"
+        user={null}
         departments={departments}
         positions={positions}
-        users={visibleUsers}
+        users={users}
         onOpenChange={closeEditor}
         onSubmit={handleSaveUser}
-      />
-      <ResetPasswordDialog
-        open={resetPasswordOpen}
-        user={resetPasswordUser}
-        onOpenChange={closeResetPasswordDialog}
-        onSubmit={handleResetPassword}
       />
     </div>
   );

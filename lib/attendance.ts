@@ -125,3 +125,29 @@ export type OvertimeRequestRecord = {
   created_at: string;
   updated_at: string;
 };
+
+export function overtimeStatusLabel(status: OvertimeRequestStatus) {
+  if (status === "APPROVED") {
+    return "Approved";
+  }
+  if (status === "REJECTED") {
+    return "Rejected";
+  }
+  if (status === "CANCELLED") {
+    return "Cancelled";
+  }
+  return "Pending";
+}
+
+export function overtimeStatusClass(status: OvertimeRequestStatus) {
+  if (status === "APPROVED") {
+    return "bg-emerald-100 text-emerald-700";
+  }
+  if (status === "REJECTED") {
+    return "bg-rose-100 text-rose-700";
+  }
+  if (status === "CANCELLED") {
+    return "bg-slate-200 text-slate-700";
+  }
+  return "bg-amber-100 text-amber-700";
+}

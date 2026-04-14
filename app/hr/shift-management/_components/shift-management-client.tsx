@@ -1,30 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  CalendarRange,
-  Check,
-  Clock3,
-  PencilLine,
-  Plus,
-  RefreshCw,
-  Save,
-  Trash2,
-  Users,
-  X,
-} from "lucide-react";
-import {
-  type ComponentType,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { Check, Clock3, PencilLine, Plus, Save, Trash2, X } from "lucide-react";
+import { type ComponentType, useState } from "react";
 import { type Control, Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { ConfirmationModal } from "@/components/confirmation-modal";
-import { SelectField } from "@/components/form-select-field";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,7 +26,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { WORKWEEK_DAYS } from "@/constants/date";
 import { toast } from "@/lib/toast";
 import { cn } from "@/utils/cn";
 
@@ -58,18 +39,6 @@ export type ShiftTemplateRecord = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-};
-
-export type DepartmentSummary = {
-  id: number;
-  name: string;
-  code: string;
-  workweek: string[];
-  is_active: boolean;
-};
-
-export type DepartmentShiftPolicy = DepartmentSummary & {
-  shifts: ShiftTemplateRecord[];
 };
 
 type ShiftEditorMode = "create" | "edit";
@@ -215,10 +184,7 @@ type ShiftPayload = {
 };
 
 type ShiftManagementClientProps = {
-  departments: DepartmentSummary[];
   shiftTemplates: ShiftTemplateRecord[];
-  initialDepartmentId: string;
-  initialDepartmentShiftPolicy: DepartmentShiftPolicy | null;
 };
 
 class ApiError extends Error {
@@ -302,20 +268,6 @@ function buildShiftFormState(
     start_time_2: shift?.start_time_2 ?? "",
     end_time_2: shift?.end_time_2 ?? "",
     is_active: shift?.is_active ?? true,
-  };
-}
-
-function syncScheduleShifts(
-  schedule: DepartmentShiftPolicy,
-  shiftCatalog: ShiftTemplateRecord[],
-) {
-  const shiftById = new Map(shiftCatalog.map((shift) => [shift.id, shift]));
-
-  return {
-    ...schedule,
-    shifts: schedule.shifts
-      .map((shift) => shiftById.get(shift.id) ?? shift)
-      .filter((shift) => shiftById.has(shift.id)),
   };
 }
 
@@ -430,7 +382,7 @@ function ShiftEditorDialog({
       <DialogContent className="!max-w-3xl w-[min(96vw,48rem)]">
         <DialogHeader>
           <DialogTitle>
-            {mode === "create" ? "Create shift" : "Edit shift"}
+            {mode === "create" ? "Create Shift" : "Edit Shift"}
           </DialogTitle>
           <DialogDescription>
             Keep the core shift template lean. Use a second time range only when
@@ -487,7 +439,7 @@ function ShiftEditorDialog({
             control={control}
             name="is_active"
             label="Active shift"
-            description="Inactive shifts remain in the catalog but can be hidden from department schedules."
+            description="Inactive shifts remain in the catalog but can be hidden from assignment screens."
           />
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -573,80 +525,18 @@ function ShiftCard({
   );
 }
 
-function DepartmentWorkweekToggle({
-  day,
-  checked,
-  onCheckedChange,
-}: {
-  day: string;
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  const id = `workweek-${day.toLowerCase()}`;
-
-  return (
-    <Label
-      htmlFor={id}
-      className={cn(
-        "flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-3 transition-colors",
-        checked
-          ? "border-primary/30 bg-primary/5"
-          : "border-border/70 bg-background/70 hover:bg-muted/60",
-      )}
-    >
-      <Checkbox
-        id={id}
-        checked={checked}
-        onCheckedChange={(next) => onCheckedChange(next === true)}
-      />
-      <span className="text-sm font-medium text-foreground">{day}</span>
-    </Label>
-  );
-}
-
 export function ShiftManagementClient({
-  departments,
   shiftTemplates,
-  initialDepartmentId,
-  initialDepartmentShiftPolicy,
 }: ShiftManagementClientProps) {
   const [shiftCatalog, setShiftCatalog] = useState<ShiftTemplateRecord[]>(
     sortShifts(shiftTemplates),
   );
-  const [selectedDepartmentId, setSelectedDepartmentId] =
-    useState(initialDepartmentId);
-  const [selectedPolicy, setSelectedPolicy] =
-    useState<DepartmentShiftPolicy | null>(initialDepartmentShiftPolicy);
-  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
-  const [scheduleError, setScheduleError] = useState<string | null>(null);
-  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
   const [isShiftEditorOpen, setIsShiftEditorOpen] = useState(false);
   const [shiftEditorMode, setShiftEditorMode] =
     useState<ShiftEditorMode>("create");
   const [editingShift, setEditingShift] = useState<ShiftTemplateRecord | null>(
     null,
   );
-
-  const initialScheduleRequested = useRef(false);
-
-  useEffect(() => {
-    setShiftCatalog(sortShifts(shiftTemplates));
-  }, [shiftTemplates]);
-
-  function getDepartmentLabel(department: DepartmentSummary) {
-    return `${department.name} (${department.code})`;
-  }
-
-  const departmentOptions = departments.map((department) => ({
-    value: department.id.toString(),
-    label: getDepartmentLabel(department),
-  }));
-
-  function shiftSync(nextShifts: ShiftTemplateRecord[]) {
-    setSelectedPolicy((current) =>
-      current ? syncScheduleShifts(current, nextShifts) : current,
-    );
-  }
 
   async function loadShiftCatalog() {
     const nextShifts = sortShifts(
@@ -655,55 +545,8 @@ export function ShiftManagementClient({
       ),
     );
     setShiftCatalog(nextShifts);
-    shiftSync(nextShifts);
     return nextShifts;
   }
-
-  const loadDepartmentShiftPolicy = useCallback(
-    async (departmentId: string) => {
-      if (!departmentId) {
-        setSelectedPolicy(null);
-        setScheduleError(null);
-        return;
-      }
-
-      setIsLoadingSchedule(true);
-      setScheduleError(null);
-      setSelectedPolicy(null);
-
-      try {
-        const nextPolicy = await requestJson<DepartmentShiftPolicy>(
-          `/api/attendance/departments/${departmentId}/shift-policy`,
-        );
-        setSelectedPolicy(nextPolicy);
-      } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : "Unable to load the selected department shift policy.";
-        setScheduleError(message);
-        toast.error(message);
-      } finally {
-        setIsLoadingSchedule(false);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (
-      !initialScheduleRequested.current &&
-      selectedDepartmentId &&
-      initialDepartmentShiftPolicy === null
-    ) {
-      initialScheduleRequested.current = true;
-      void loadDepartmentShiftPolicy(selectedDepartmentId);
-    }
-  }, [
-    initialDepartmentShiftPolicy,
-    selectedDepartmentId,
-    loadDepartmentShiftPolicy,
-  ]);
 
   function openCreateShift() {
     setShiftEditorMode("create");
@@ -751,78 +594,9 @@ export function ShiftManagementClient({
     }
   }
 
-  async function saveDepartmentSchedule() {
-    if (!selectedPolicy || !selectedDepartmentId) {
-      return;
-    }
-
-    setIsSavingSchedule(true);
-    setScheduleError(null);
-
-    try {
-      const nextPolicy = await requestJson<DepartmentShiftPolicy>(
-        `/api/attendance/departments/${selectedDepartmentId}/shift-policy`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            workweek: selectedPolicy.workweek,
-            shift_ids: selectedPolicy.shifts.map((shift) => shift.id),
-          }),
-        },
-      );
-
-      setSelectedPolicy(nextPolicy);
-      toast.success("Department shift policy saved.");
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to save the selected department shift policy.";
-      setScheduleError(message);
-      toast.error(message);
-    } finally {
-      setIsSavingSchedule(false);
-    }
-  }
-
-  function updateSelectedSchedule(
-    updater: (current: DepartmentShiftPolicy) => DepartmentShiftPolicy,
-  ) {
-    setSelectedPolicy((current) => (current ? updater(current) : current));
-  }
-
-  function toggleWorkweekDay(day: string, checked: boolean) {
-    updateSelectedSchedule((current) => ({
-      ...current,
-      workweek: checked
-        ? Array.from(new Set([...current.workweek, day]))
-        : current.workweek.filter((entry) => entry !== day),
-    }));
-  }
-
-  function toggleShift(shift: ShiftTemplateRecord, checked: boolean) {
-    updateSelectedSchedule((current) => ({
-      ...current,
-      shifts: checked
-        ? [...current.shifts.filter((entry) => entry.id !== shift.id), shift]
-        : current.shifts.filter((entry) => entry.id !== shift.id),
-    }));
-  }
-
-  function handleDepartmentChange(value: string) {
-    setSelectedDepartmentId(value);
-    void loadDepartmentShiftPolicy(value);
-  }
-
-  const selectedDepartment =
-    departments.find(
-      (department) => department.id.toString() === selectedDepartmentId,
-    ) ?? null;
   const activeShiftCount = shiftCatalog.filter(
     (shift) => shift.is_active,
   ).length;
-  const selectedDepartmentShiftCount = selectedPolicy?.shifts.length ?? 0;
-  const selectedWorkweekCount = selectedPolicy?.workweek.length ?? 0;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -832,45 +606,39 @@ export function ShiftManagementClient({
             Shift Management
           </h1>
           <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-            Keep shift templates compact, then define each department&apos;s
-            default workweek and allowed templates from one place.
+            Maintain reusable shift templates. Shift assignment now happens per
+            user in each user profile and attendance workspace.
           </p>
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MiniStatCard
-          label="Total templates"
+          label="Total Templates"
           value={shiftCatalog.length.toString()}
           helper="Shift templates in the catalog"
           icon={Clock3}
         />
         <MiniStatCard
-          label="Active templates"
+          label="Active Templates"
           value={activeShiftCount.toString()}
-          helper="Currently available for employee assignments"
+          helper="Currently available for assignment"
           icon={Check}
         />
         <MiniStatCard
-          label="Allowed templates"
-          value={selectedDepartmentShiftCount.toString()}
-          helper="Templates available to the current department"
-          icon={Users}
-        />
-        <MiniStatCard
-          label="Workweek days"
-          value={selectedWorkweekCount.toString()}
-          helper="Default days enabled for this department"
-          icon={CalendarRange}
+          label="Inactive Templates"
+          value={(shiftCatalog.length - activeShiftCount).toString()}
+          helper="Retained for historical records"
+          icon={Clock3}
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <section>
         <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
           <CardHeader className="space-y-2">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-2">
-                <CardTitle>Shift templates</CardTitle>
+                <CardTitle>Shift Templates</CardTitle>
                 <CardDescription>
                   Create reusable shift templates and keep the list easy to
                   scan.
@@ -899,201 +667,6 @@ export function ShiftManagementClient({
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Add the first shift template to start assigning schedules.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardHeader className="space-y-2">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-2">
-                <CardTitle>Department shift policy</CardTitle>
-                <CardDescription>
-                  Choose a department, then adjust its default workweek and
-                  allowed templates together.
-                </CardDescription>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() =>
-                  selectedDepartmentId
-                    ? void loadDepartmentShiftPolicy(selectedDepartmentId)
-                    : undefined
-                }
-                disabled={isLoadingSchedule}
-              >
-                <RefreshCw
-                  className={cn("size-4", isLoadingSchedule && "animate-spin")}
-                />
-                Refresh
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {departments.length > 0 ? (
-              <div className="space-y-4">
-                <SelectField
-                  id="department-select"
-                  label="Department"
-                  value={selectedDepartmentId}
-                  onChange={(_, value) => handleDepartmentChange(value)}
-                  options={departmentOptions}
-                  placeholder="Select a department"
-                />
-
-                <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <p className="text-base font-semibold text-foreground">
-                        {selectedDepartment
-                          ? getDepartmentLabel(selectedDepartment)
-                          : "No department selected"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedPolicy
-                          ? "Default workweek and allowed templates are ready to edit."
-                          : "Loading the selected department shift policy."}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={
-                        selectedDepartment?.is_active ? "secondary" : "outline"
-                      }
-                    >
-                      {selectedDepartment?.is_active ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </div>
-
-                {scheduleError ? (
-                  <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-                    {scheduleError}
-                  </div>
-                ) : null}
-
-                {isLoadingSchedule ? (
-                  <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-8 text-center text-sm text-muted-foreground">
-                    Loading the selected department shift policy...
-                  </div>
-                ) : selectedPolicy ? (
-                  <div className="space-y-4">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-foreground">
-                          Workweek
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Pick the default operating days for the department.
-                        </p>
-                      </div>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {WORKWEEK_DAYS.map((day) => (
-                          <DepartmentWorkweekToggle
-                            key={day}
-                            day={day}
-                            checked={selectedPolicy.workweek.includes(day)}
-                            onCheckedChange={(checked) =>
-                              toggleWorkweekDay(day, checked)
-                            }
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-foreground">
-                          Allowed shift templates
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Select the templates this department is allowed to use
-                          when assigning employee shifts.
-                        </p>
-                      </div>
-
-                      {shiftCatalog.length > 0 ? (
-                        <div className="space-y-2">
-                          {shiftCatalog.map((shift) => {
-                            const checked = selectedPolicy.shifts.some(
-                              (item) => item.id === shift.id,
-                            );
-
-                            return (
-                              <Label
-                                htmlFor={`shift-${shift.id}`}
-                                key={shift.id}
-                                className={cn(
-                                  "flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 transition-colors",
-                                  checked
-                                    ? "border-primary/30 bg-primary/5"
-                                    : "border-border/70 bg-background/70 hover:bg-muted/60",
-                                )}
-                              >
-                                <Checkbox
-                                  id={`shift-${shift.id}`}
-                                  checked={checked}
-                                  onCheckedChange={(next) =>
-                                    toggleShift(shift, next === true)
-                                  }
-                                />
-                                <span className="space-y-1">
-                                  <span className="block text-sm font-medium text-foreground">
-                                    {shift.description}
-                                  </span>
-                                  <span className="block text-xs text-muted-foreground">
-                                    {buildShiftSummary(shift)}
-                                  </span>
-                                </span>
-                              </Label>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-                          Create at least one template before assigning
-                          departments.
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-muted/20 px-4 py-3">
-                      <p className="text-sm text-muted-foreground">
-                        Changes are saved per department, not per calendar
-                        month. Actual employee assignments are managed
-                        separately.
-                      </p>
-                      <Button
-                        type="button"
-                        onClick={() => void saveDepartmentSchedule()}
-                        disabled={isSavingSchedule || !selectedPolicy}
-                      >
-                        <Save className="size-4" />
-                        {isSavingSchedule ? "Saving..." : "Save Shift Policy"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
-                    <p className="text-sm font-medium text-foreground">
-                      No shift policy loaded.
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Choose a department to configure its default workweek and
-                      allowed templates.
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-8 text-center">
-                <p className="text-sm font-medium text-foreground">
-                  No departments available.
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Add departments before configuring shift assignments.
                 </p>
               </div>
             )}

@@ -92,3 +92,16 @@ export function leaveStatusClass(status: LeaveRequestStatus) {
   }
   return "bg-amber-100 text-amber-700";
 }
+
+export function leaveStatusLabel(status: LeaveRequestStatus) {
+  if (status === "APPROVED") {
+    return "Approved";
+  }
+  if (status === "REJECTED") {
+    return "Rejected";
+  }
+  if (status === "CANCELLED") {
+    return "Cancelled";
+  }
+  return "Pending";
+}

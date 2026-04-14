@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpenText,
   Building2,
+  ClipboardCheck,
   LayoutDashboard,
   ListTodo,
   NotebookTabs,
@@ -198,6 +199,12 @@ const sidebarItems: SidebarItem[] = [
     keywords: ["home", "overview", "main"],
   },
   {
+    label: "Request Inbox",
+    icon: ClipboardCheck,
+    href: "/requests/inbox",
+    keywords: ["request inbox", "leave inbox", "overtime inbox", "approvals"],
+  },
+  {
     label: "My Workflows",
     icon: ListTodo,
     href: "/my-workflows",
@@ -251,7 +258,18 @@ const sidebarItems: SidebarItem[] = [
       {
         label: "Users",
         href: "/hr/users",
-        keywords: ["employees", "staff", "accounts", "people"],
+        keywords: [
+          "employees",
+          "staff",
+          "accounts",
+          "people",
+          "user profile",
+          "employee profile",
+          "education background",
+          "profile security",
+          "reset password",
+          "shift template selection",
+        ],
         requiredCapabilities: ["manage_hr_users"],
       },
       {
