@@ -8,7 +8,8 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import type { CSSProperties } from "react";
-import { Toaster as Sonner, type ToasterProps, toast } from "sonner";
+import { Toaster as Sonner, type ToasterProps } from "sonner";
+import { toast } from "@/lib/toast";
 
 const toasterStyles = {
   "--normal-bg": "var(--popover)",

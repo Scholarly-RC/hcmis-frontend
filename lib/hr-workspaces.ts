@@ -4,6 +4,7 @@ import {
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  CircleCheckBig,
   ClipboardCheck,
   FileBarChart,
   FileSearch,
@@ -103,6 +104,28 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
         href: "/hr/overtime-management",
         keywords: ["overtime", "extra hours", "ot requests"],
         requiredCapabilities: ["manage_overtime_requests"],
+      },
+      {
+        label: "Official Business Management",
+        description:
+          "Review official business requests and escalate to backup approvers.",
+        icon: CalendarRange,
+        href: "/hr/official-business-management",
+        keywords: ["official business", "request approvals", "escalation"],
+        requiredCapabilities: ["access_hr_workspace"],
+      },
+      {
+        label: "Certificate Attendance Management",
+        description:
+          "Review certificate attendance requests and escalate to backup approvers.",
+        icon: CircleCheckBig,
+        href: "/hr/certificate-attendance-management",
+        keywords: [
+          "certificate attendance",
+          "attendance correction",
+          "escalation",
+        ],
+        requiredCapabilities: ["access_hr_workspace"],
       },
     ],
   },
