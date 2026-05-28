@@ -103,8 +103,6 @@ export default async function UserAttendanceManagementPage({
   const currentDay = currentDate.getDate();
   const params = (await searchParams) ?? {};
 
-  const query = firstValue(params.q).trim();
-  const requestedUserIdParam = firstValue(params.user);
   const requestedUserId = firstValue(params.user);
   const year = parsePositiveInteger(firstValue(params.year), currentYear);
   const month = parseMonth(firstValue(params.month), currentMonth);
@@ -123,10 +121,6 @@ export default async function UserAttendanceManagementPage({
       active_only: "true",
       exclude_hr: "true",
     });
-
-    if (query.length > 0) {
-      queryString.set("q", query);
-    }
 
     users = await fetchBackendJsonWithAuth<AuthUser[]>({
       token: session.token,
@@ -179,9 +173,6 @@ export default async function UserAttendanceManagementPage({
 
   function buildTabHref(tab: AttendanceTab) {
     const search = new URLSearchParams();
-    if (query.length > 0) {
-      search.set("q", query);
-    }
     if (selectedUser?.id) {
       search.set("user", selectedUser.id);
     }
@@ -240,8 +231,7 @@ export default async function UserAttendanceManagementPage({
           </div>
 
           <AttendanceFilters
-            key={`${query}|${requestedUserIdParam}|${year}|${month}`}
-            query={query}
+            key={`${requestedUserId}|${year}|${month}`}
             userId={selectedUser?.id ?? ""}
             year={year}
             month={month}

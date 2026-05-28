@@ -89,7 +89,34 @@ export type LeaveCreditUpsertPayload = {
 };
 
 export function leaveTypeLabel(type: string) {
-  return type;
+  const raw = type.trim();
+  if (raw.length === 0) {
+    return "Leave";
+  }
+
+  const compact = raw.replace(/[\s_-]+/g, "").toUpperCase();
+  if (compact === "UN" || compact === "UNPAID") {
+    return "Unpaid";
+  }
+  if (compact === "PA" || compact === "PAID") {
+    return "Paid";
+  }
+  if (compact === "SL" || compact === "SICK" || compact === "SICKLEAVE") {
+    return "Sick";
+  }
+  if (
+    compact === "VL" ||
+    compact === "VACATION" ||
+    compact === "VACATIONLEAVE"
+  ) {
+    return "Vacation";
+  }
+
+  return raw
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function leaveStatusClass(status: LeaveRequestStatus) {

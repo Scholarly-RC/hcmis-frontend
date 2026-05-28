@@ -177,6 +177,14 @@ function rowKey(kind: UnifiedRow["kind"], id: number) {
   return `${kind}-${id}`;
 }
 
+function leaveTypeDisplayLabel(type: string) {
+  const label = leaveTypeLabel(type);
+  if (label.toLowerCase().endsWith("leave")) {
+    return label;
+  }
+  return `${label} Leave`;
+}
+
 function canRespondToLeave(
   item: LeaveRequestRecord,
   currentUserId: string,
@@ -1036,7 +1044,7 @@ export function RequestInboxClient({ currentUserId }: RequestInboxClientProps) {
                               <div className="space-y-1">
                                 <Badge variant="outline">Leave</Badge>
                                 <p className="text-xs text-muted-foreground">
-                                  {leaveTypeLabel(item.leave_type)}
+                                  Type: {leaveTypeDisplayLabel(item.leave_type)}
                                 </p>
                               </div>
                             </TableCell>

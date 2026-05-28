@@ -342,9 +342,9 @@ function buildHrDashboard(input: {
       icon: Activity,
     },
     {
-      title: "Unreleased Payslips",
+      title: "Unreleased Payslips (All Periods)",
       value: input.unreleasedPayslipsCount.toString(),
-      detail: "Payroll records still pending release",
+      detail: "All unreleased payroll records across every month and cutoff",
       icon: Wallet,
     },
     {
@@ -391,7 +391,7 @@ function buildHrDashboard(input: {
   if (input.unreleasedPayslipsCount > 0) {
     tasks.push({
       label: "Payslips to release",
-      detail: `${input.unreleasedPayslipsCount} payslip record${input.unreleasedPayslipsCount === 1 ? "" : "s"} are unreleased.`,
+      detail: `${input.unreleasedPayslipsCount} total payslip record${input.unreleasedPayslipsCount === 1 ? "" : "s"} are unreleased across all periods.`,
       href: "/hr/payslips",
     });
   }

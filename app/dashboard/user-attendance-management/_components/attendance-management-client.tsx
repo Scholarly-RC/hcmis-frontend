@@ -298,7 +298,7 @@ function getDayStatus(
   }
 
   if (day.shift && records.length === 1) {
-    return { label: "Pending correction", variant: "outline" };
+    return { label: "Partial record", variant: "outline" };
   }
 
   const firstClockIn = records.find((record) => record.punch === "IN");
