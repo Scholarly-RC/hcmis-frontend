@@ -16,3 +16,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     body,
   });
 }
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  const { payslip_id } = await context.params;
+  return proxyJson(request, `/payroll/payslips/${payslip_id}`, {
+    method: "DELETE",
+  });
+}

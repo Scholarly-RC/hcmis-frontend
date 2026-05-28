@@ -440,6 +440,7 @@ export function DashboardShell({
                   <div className="flex min-w-0 flex-col gap-1">
                     <Link
                       href="/dashboard"
+                      prefetch={false}
                       className="inline-flex w-fit rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       aria-label="Go to Dashboard"
                     >
@@ -555,6 +556,7 @@ export function DashboardShell({
                       {isItemClickable(item) && href ? (
                         <Link
                           href={href}
+                          prefetch={false}
                           aria-current={active ? "page" : undefined}
                           className={itemClasses}
                         >
@@ -579,6 +581,7 @@ export function DashboardShell({
                               <Link
                                 key={`${key}-${child.label}-${childHref}`}
                                 href={childHref}
+                                prefetch={false}
                                 aria-current={childActive ? "page" : undefined}
                                 className={cn(
                                   "block rounded-lg border px-2.5 py-1.5 text-xs",

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { ConfirmationModal } from "@/components/confirmation-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -137,6 +138,9 @@ export function PayslipsClient() {
   });
   const [creatingPayslip, setCreatingPayslip] = useState(false);
   const [togglingPayslipId, setTogglingPayslipId] = useState<number | null>(
+    null,
+  );
+  const [deletingPayslipId, setDeletingPayslipId] = useState<number | null>(
     null,
   );
   const [summaryOpen, setSummaryOpen] = useState(false);
@@ -285,6 +289,23 @@ export function PayslipsClient() {
       );
     } finally {
       setTogglingPayslipId(null);
+    }
+  }
+
+  async function deletePayslip(payslipId: number) {
+    try {
+      setDeletingPayslipId(payslipId);
+      await requestJson<void>(`/api/payroll/payslips/${payslipId}`, {
+        method: "DELETE",
+      });
+      toast.success("Draft payslip deleted.");
+      await loadPayslips(filters);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Unable to delete payslip.",
+      );
+    } finally {
+      setDeletingPayslipId(null);
     }
   }
 
@@ -763,6 +784,7 @@ export function PayslipsClient() {
                       : `User #${payslip.user_id}`;
 
                     const isToggling = togglingPayslipId === payslip.id;
+                    const isDeleting = deletingPayslipId === payslip.id;
 
                     return (
                       <TableRow key={payslip.id}>
@@ -807,7 +829,7 @@ export function PayslipsClient() {
                                 payslip.released ? "secondary" : "default"
                               }
                               onClick={() => void toggleRelease(payslip.id)}
-                              disabled={isToggling}
+                              disabled={isToggling || isDeleting}
                             >
                               <Send className="size-4" />
                               {isToggling
@@ -816,6 +838,26 @@ export function PayslipsClient() {
                                   ? "Mark As Draft"
                                   : "Release Payslip"}
                             </Button>
+                            {!payslip.released ? (
+                              <ConfirmationModal
+                                trigger={
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    disabled={isDeleting || isToggling}
+                                  >
+                                    <Trash2 className="size-4" />
+                                    {isDeleting
+                                      ? "Deleting..."
+                                      : "Delete Payslip"}
+                                  </Button>
+                                }
+                                title="Delete Draft Payslip"
+                                description="This will permanently delete the selected draft payslip."
+                                confirmLabel="Delete Payslip"
+                                onConfirm={() => deletePayslip(payslip.id)}
+                              />
+                            ) : null}
                           </div>
                         </TableCell>
                       </TableRow>

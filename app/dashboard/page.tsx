@@ -547,6 +547,7 @@ export default async function DashboardPage() {
                     <Link
                       key={task.label}
                       href={task.href}
+                      prefetch={false}
                       className="block rounded-2xl border border-border/70 bg-background/70 p-4 transition-colors hover:bg-muted/50"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -584,6 +585,7 @@ export default async function DashboardPage() {
                   <Link
                     key={action.label}
                     href={action.href}
+                    prefetch={false}
                     className="block rounded-2xl border border-border/70 bg-background/70 p-4 transition-colors hover:bg-muted/50"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -696,6 +698,7 @@ export default async function DashboardPage() {
                     <Link
                       key={task.label}
                       href={task.href}
+                      prefetch={false}
                       className="block rounded-2xl border border-border/70 bg-background/70 p-4 transition-colors hover:bg-muted/50"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -733,6 +736,7 @@ export default async function DashboardPage() {
                   <Link
                     key={action.label}
                     href={action.href}
+                    prefetch={false}
                     className="rounded-2xl border border-border/70 bg-background/70 p-4 transition-colors hover:bg-muted/50"
                   >
                     <div className="flex items-start justify-between gap-3">
