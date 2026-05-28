@@ -57,7 +57,10 @@ function buildYearOptions() {
 }
 
 function formatCurrency(value: string | number | null | undefined) {
-  return toNumber(value).toFixed(2);
+  return toNumber(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatDateTime(value: string | null) {

@@ -179,6 +179,17 @@ function asText(value: unknown) {
   return value === null || value === undefined ? "" : String(value);
 }
 
+function formatCurrency(value: string | number | null | undefined) {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount)) {
+    return "0.00";
+  }
+  return amount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function rowId() {
   return crypto.randomUUID();
 }
@@ -2820,7 +2831,7 @@ export function PayrollSettingsClient() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        PHP {enrollment.amount}
+                        {formatCurrency(enrollment.amount)}
                       </TableCell>
                       <TableCell>{enrollment.effective_from}</TableCell>
                       <TableCell>

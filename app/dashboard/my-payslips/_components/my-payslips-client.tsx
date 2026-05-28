@@ -42,6 +42,13 @@ function parsePositiveInt(value: string | null) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function formatCurrency(value: string | number | null | undefined) {
+  return toNumber(value).toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -143,50 +150,50 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
         period: selectedPayslip.period ?? "-",
         rank: selectedPayslip.rank ?? "-",
         status: selectedPayslip.released ? "Released" : "Draft",
-        basePay: toNumber(summary.salary).toFixed(2),
-        grossPay: toNumber(summary.gross_pay).toFixed(2),
-        totalDeductions: toNumber(summary.total_deductions).toFixed(2),
-        netSalary: toNumber(summary.net_salary).toFixed(2),
+        basePay: formatCurrency(summary.salary),
+        grossPay: formatCurrency(summary.gross_pay),
+        totalDeductions: formatCurrency(summary.total_deductions),
+        netSalary: formatCurrency(summary.net_salary),
         earnings: [
           {
             label: "Base Pay",
-            amount: toNumber(summary.salary).toFixed(2),
+            amount: formatCurrency(summary.salary),
           },
           ...summary.compensations.map((item) => ({
             label: item.name,
-            amount: toNumber(item.amount).toFixed(2),
+            amount: formatCurrency(item.amount),
             note: "Fixed compensation",
           })),
           ...summary.variable_compensations.map((item) => ({
             label: item.name,
-            amount: toNumber(item.amount).toFixed(2),
+            amount: formatCurrency(item.amount),
             note: "Variable compensation",
           })),
         ],
         deductions: [
           {
             label: "SSS",
-            amount: toNumber(summary.sss_deduction).toFixed(2),
+            amount: formatCurrency(summary.sss_deduction),
           },
           {
             label: "PhilHealth",
-            amount: toNumber(summary.philhealth_deduction).toFixed(2),
+            amount: formatCurrency(summary.philhealth_deduction),
           },
           {
             label: "Pag-IBIG",
-            amount: toNumber(summary.pag_ibig_deduction).toFixed(2),
+            amount: formatCurrency(summary.pag_ibig_deduction),
           },
           {
             label: "MP2",
-            amount: toNumber(summary.mp2_deduction).toFixed(2),
+            amount: formatCurrency(summary.mp2_deduction),
           },
           {
             label: "Tax",
-            amount: toNumber(summary.tax_deduction).toFixed(2),
+            amount: formatCurrency(summary.tax_deduction),
           },
           ...summary.variable_deductions.map((item) => ({
             label: item.name,
-            amount: toNumber(item.amount).toFixed(2),
+            amount: formatCurrency(item.amount),
             note: "Variable deduction",
           })),
         ],
@@ -252,7 +259,7 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
                   </TableCell>
                   <TableCell>{payslip.period ?? "-"}</TableCell>
                   <TableCell>{payslip.rank ?? "-"}</TableCell>
-                  <TableCell>{toNumber(payslip.salary).toFixed(2)}</TableCell>
+                  <TableCell>{formatCurrency(payslip.salary)}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="outline"
@@ -288,13 +295,12 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
           ) : (
             <div className="space-y-2 text-sm">
               <p>Period: {summary.period ?? "-"}</p>
-              <p>Gross Pay: {toNumber(summary.gross_pay).toFixed(2)}</p>
+              <p>Gross Pay: {formatCurrency(summary.gross_pay)}</p>
               <p>
-                Total Deductions:{" "}
-                {toNumber(summary.total_deductions).toFixed(2)}
+                Total Deductions: {formatCurrency(summary.total_deductions)}
               </p>
               <p className="font-medium">
-                Net Salary: {toNumber(summary.net_salary).toFixed(2)}
+                Net Salary: {formatCurrency(summary.net_salary)}
               </p>
               <Button
                 className="mt-3"
