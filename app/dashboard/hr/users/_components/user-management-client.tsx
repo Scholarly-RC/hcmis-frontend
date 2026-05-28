@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -1252,13 +1253,7 @@ export function UserEditorDialog({
   );
 }
 
-type UserManagementClientProps = {
-  currentUser: AuthUser;
-};
-
-export function UserManagementClient({
-  currentUser,
-}: UserManagementClientProps) {
+export function UserManagementClient() {
   const router = useRouter();
   const [users, setUsers] = useState<UsersResponse>([]);
   const [departments, setDepartments] = useState<DepartmentsResponse>([]);
@@ -1331,13 +1326,7 @@ export function UserManagementClient({
     };
   }, [router]);
 
-  const currentUserId = currentUser?.id ?? null;
-
-  const visibleUsers = users.filter((user) => {
-    return currentUserId === null || user.id !== currentUserId;
-  });
-
-  const filteredUsers = visibleUsers.filter((user) => {
+  const filteredUsers = users.filter((user) => {
     const matchesSearch = (() => {
       const normalized = search.trim().toLowerCase();
       if (!normalized) {
@@ -1464,11 +1453,11 @@ export function UserManagementClient({
       </section>
 
       <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-        <p>
-          {isLoading
-            ? "Loading directory..."
-            : `${filteredUsers.length} of ${visibleUsers.length} users shown`}
-        </p>
+        {isLoading ? (
+          <Skeleton className="h-4 w-40" />
+        ) : (
+          <p>{`${filteredUsers.length} of ${users.length} users shown`}</p>
+        )}
         {error ? (
           <Button
             type="button"

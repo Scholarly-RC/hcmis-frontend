@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type NotificationItem = {
   id: number;
@@ -225,9 +226,11 @@ export function SidebarNotificationMenu() {
 
         <div className="max-h-[26rem] space-y-1 overflow-y-auto px-2 py-2">
           {isLoading ? (
-            <p className="px-2 py-3 text-sm text-muted-foreground">
-              Loading notifications...
-            </p>
+            <div className="space-y-2 px-2 py-2">
+              <Skeleton className="h-14 w-full rounded-xl" />
+              <Skeleton className="h-14 w-full rounded-xl" />
+              <Skeleton className="h-14 w-full rounded-xl" />
+            </div>
           ) : null}
 
           {errorMessage ? (

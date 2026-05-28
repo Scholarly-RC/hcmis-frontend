@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -346,7 +347,12 @@ export function ThirteenthMonthClient() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6}>Loading payouts...</TableCell>
+                  <TableCell colSpan={6}>
+                    <div className="space-y-2 py-1">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                  </TableCell>
                 </TableRow>
               ) : filteredPayouts.length === 0 ? (
                 <TableRow>

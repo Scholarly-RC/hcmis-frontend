@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -638,9 +639,10 @@ export function LeaveManagementClient({
 
       {loading ? (
         <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-          <CardContent className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading leave management data...
+          <CardContent className="space-y-3 py-6">
+            <Skeleton className="h-5 w-52" />
+            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-10 w-full rounded-lg" />
           </CardContent>
         </Card>
       ) : null}

@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -451,11 +452,11 @@ export function BiometricSyncClient() {
           <TableBody className="bg-background">
             {isLoadingSyncStatus ? (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="px-4 py-4 text-sm text-muted-foreground"
-                >
-                  Loading biometric sync records...
+                <TableCell colSpan={6} className="px-4 py-4">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-56" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
                 </TableCell>
               </TableRow>
             ) : reconcileRows.length === 0 ? (

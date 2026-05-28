@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -92,7 +93,12 @@ export function MyThirteenthMonthClient() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5}>Loading payouts...</TableCell>
+                  <TableCell colSpan={5}>
+                    <div className="space-y-2 py-1">
+                      <Skeleton className="h-4 w-40" />
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                  </TableCell>
                 </TableRow>
               ) : payouts.length === 0 ? (
                 <TableRow>

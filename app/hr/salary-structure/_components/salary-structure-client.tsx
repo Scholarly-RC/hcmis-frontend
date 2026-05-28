@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -225,7 +226,12 @@ export function SalaryStructureClient() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6}>Loading positions...</TableCell>
+                <TableCell colSpan={6}>
+                  <div className="space-y-2 py-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                </TableCell>
               </TableRow>
             ) : positions.length === 0 ? (
               <TableRow>

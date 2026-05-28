@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -222,7 +223,12 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5}>Loading payslips...</TableCell>
+                <TableCell colSpan={5}>
+                  <div className="space-y-2 py-1">
+                    <Skeleton className="h-4 w-40" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                </TableCell>
               </TableRow>
             ) : payslips.length === 0 ? (
               <TableRow>
@@ -272,7 +278,13 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
             </DialogDescription>
           </DialogHeader>
           {summaryLoading || !summary ? (
-            <p className="text-sm text-muted-foreground">Loading summary...</p>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-4 w-52" />
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-4 w-44" />
+              <Skeleton className="h-8 w-32" />
+            </div>
           ) : (
             <div className="space-y-2 text-sm">
               <p>Period: {summary.period ?? "-"}</p>

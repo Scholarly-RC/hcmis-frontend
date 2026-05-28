@@ -18,7 +18,7 @@ export default function HrUsersPage() {
           redirect("/dashboard");
         }
 
-        return <UserManagementClient currentUser={user} />;
+        return <UserManagementClient />;
       }}
     </DashboardPageFrame>
   );

@@ -17,7 +17,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { SidebarNotificationMenu } from "@/components/sidebar-notification-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -304,6 +304,7 @@ const sidebarItems: SidebarItem[] = [
   },
   ...hrWorkspaceSidebarItems,
 ];
+const SIDEBAR_SEARCH_STORAGE_KEY = "hcmis-sidebar-search-query";
 
 export function DashboardShell({
   user,
@@ -312,7 +313,23 @@ export function DashboardShell({
   children,
 }: DashboardShellProps) {
   const pathname = usePathname();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    return window.sessionStorage.getItem(SIDEBAR_SEARCH_STORAGE_KEY) ?? "";
+  });
+
+  useEffect(() => {
+    if (searchQuery.trim().length === 0) {
+      window.sessionStorage.removeItem(SIDEBAR_SEARCH_STORAGE_KEY);
+      return;
+    }
+
+    window.sessionStorage.setItem(SIDEBAR_SEARCH_STORAGE_KEY, searchQuery);
+  }, [searchQuery]);
+
   const resolvedSidebarItems = sidebarItems.map((item) => {
     if (item.label !== "My Workflows") {
       return item;

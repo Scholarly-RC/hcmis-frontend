@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -226,11 +227,11 @@ export function TrainingsManagementClient() {
               ))
             ) : isLoadingTrainings ? (
               <TableRow>
-                <TableCell
-                  colSpan={6}
-                  className="py-10 text-center text-muted-foreground"
-                >
-                  Loading trainings...
+                <TableCell colSpan={6} className="py-6">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-10 w-full rounded-lg" />
+                  </div>
                 </TableCell>
               </TableRow>
             ) : (

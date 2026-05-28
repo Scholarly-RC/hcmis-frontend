@@ -43,6 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -545,97 +546,6 @@ export function PayslipsClient() {
 
       <Card className="border-border/70">
         <CardHeader>
-          <CardTitle className="text-xl">Find Payslips</CardTitle>
-          <CardDescription>
-            Start by choosing the month, year, and employee you want to view.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-4 xl:grid-cols-5">
-          <div className="min-w-0 space-y-2">
-            <Label htmlFor="filter_month">Month</Label>
-            <Select
-              value={filters.month}
-              onValueChange={(value) =>
-                setFilters((current) => ({ ...current, month: value }))
-              }
-            >
-              <SelectTrigger id="filter_month" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {MONTH_OPTIONS.map((month) => (
-                  <SelectItem key={month.value} value={month.value}>
-                    {month.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="min-w-0 space-y-2">
-            <Label htmlFor="filter_year">Year</Label>
-            <Select
-              value={filters.year}
-              onValueChange={(value) =>
-                setFilters((current) => ({ ...current, year: value }))
-              }
-            >
-              <SelectTrigger id="filter_year" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {yearOptions.map((year) => (
-                  <SelectItem key={year} value={year}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="min-w-0 space-y-2 md:col-span-2">
-            <Label htmlFor="filter_user">Employee</Label>
-            <Select
-              value={filters.user_id || "__all__"}
-              onValueChange={(value) =>
-                setFilters((current) => ({
-                  ...current,
-                  user_id: value === "__all__" ? "" : value,
-                }))
-              }
-            >
-              <SelectTrigger id="filter_user" className="w-full">
-                <SelectValue placeholder="All employees" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All employees</SelectItem>
-                {users.map((user) => {
-                  const label =
-                    [user.first_name, user.last_name]
-                      .filter(Boolean)
-                      .join(" ")
-                      .trim() || user.email;
-                  return (
-                    <SelectItem key={user.id} value={String(user.id)}>
-                      {label}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex min-w-0 items-end gap-2">
-            <Button
-              className="flex-1"
-              onClick={() => void loadPayslips(filters)}
-            >
-              <RefreshCw className="size-4" />
-              Load Payslips
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/70">
-        <CardHeader>
           <CardTitle className="text-xl">Create Or Refresh A Payslip</CardTitle>
           <CardDescription>
             Choose one employee and one payroll cutoff. If the payslip already
@@ -741,6 +651,97 @@ export function PayslipsClient() {
 
       <Card className="border-border/70">
         <CardHeader>
+          <CardTitle className="text-xl">Find Payslips</CardTitle>
+          <CardDescription>
+            Start by choosing the month, year, and employee you want to view.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-4 xl:grid-cols-5">
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="filter_month">Month</Label>
+            <Select
+              value={filters.month}
+              onValueChange={(value) =>
+                setFilters((current) => ({ ...current, month: value }))
+              }
+            >
+              <SelectTrigger id="filter_month" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTH_OPTIONS.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="filter_year">Year</Label>
+            <Select
+              value={filters.year}
+              onValueChange={(value) =>
+                setFilters((current) => ({ ...current, year: value }))
+              }
+            >
+              <SelectTrigger id="filter_year" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={year}>
+                    {year}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="min-w-0 space-y-2 md:col-span-2">
+            <Label htmlFor="filter_user">Employee</Label>
+            <Select
+              value={filters.user_id || "__all__"}
+              onValueChange={(value) =>
+                setFilters((current) => ({
+                  ...current,
+                  user_id: value === "__all__" ? "" : value,
+                }))
+              }
+            >
+              <SelectTrigger id="filter_user" className="w-full">
+                <SelectValue placeholder="All employees" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">All employees</SelectItem>
+                {users.map((user) => {
+                  const label =
+                    [user.first_name, user.last_name]
+                      .filter(Boolean)
+                      .join(" ")
+                      .trim() || user.email;
+                  return (
+                    <SelectItem key={user.id} value={String(user.id)}>
+                      {label}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex min-w-0 items-end gap-2">
+            <Button
+              className="flex-1"
+              onClick={() => void loadPayslips(filters)}
+            >
+              <RefreshCw className="size-4" />
+              Load Payslips
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/70">
+        <CardHeader>
           <CardTitle className="text-xl">Payslip List</CardTitle>
           <CardDescription>
             Review each payslip, open the full breakdown, and release it only
@@ -764,7 +765,12 @@ export function PayslipsClient() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7}>Loading payslips...</TableCell>
+                    <TableCell colSpan={7}>
+                      <div className="space-y-2 py-1">
+                        <Skeleton className="h-4 w-40" />
+                        <Skeleton className="h-4 w-full" />
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ) : payslips.length === 0 ? (
                   <TableRow>
@@ -884,10 +890,44 @@ export function PayslipsClient() {
             </DialogDescription>
           </DialogHeader>
           {summaryLoading || !summary ? (
-            <div className="flex-1 overflow-y-auto">
-              <p className="px-4 py-8 text-sm text-muted-foreground sm:px-6">
-                Loading breakdown...
-              </p>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30 px-4 py-5 sm:px-6 sm:py-6">
+              <div className="mx-auto max-w-3xl space-y-4">
+                <section className="rounded-3xl border border-border/60 bg-background p-4 shadow-sm sm:p-5">
+                  <div className="flex flex-wrap gap-2">
+                    <Skeleton className="h-7 w-32 rounded-full" />
+                    <Skeleton className="h-7 w-24 rounded-full" />
+                    <Skeleton className="h-7 w-20 rounded-full" />
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <Skeleton className="h-8 w-64" />
+                    <Skeleton className="h-4 w-40" />
+                  </div>
+                  <div className="mt-5 rounded-2xl border border-border/60 bg-background px-4 py-4">
+                    <Skeleton className="h-4 w-20" />
+                    <Skeleton className="mt-3 h-10 w-40" />
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-border/60 bg-background p-4">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="mt-3 h-8 w-28" />
+                    </div>
+                    <div className="rounded-2xl border border-border/60 bg-background p-4">
+                      <Skeleton className="h-4 w-20" />
+                      <Skeleton className="mt-3 h-8 w-28" />
+                    </div>
+                    <div className="col-span-2 rounded-2xl border border-border/60 bg-background p-4">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="mt-3 h-8 w-36" />
+                    </div>
+                  </div>
+                </section>
+                <section className="space-y-3 rounded-3xl border border-border/60 bg-background p-4 shadow-sm sm:p-5">
+                  <Skeleton className="h-6 w-40" />
+                  <Skeleton className="h-12 w-full rounded-xl" />
+                  <Skeleton className="h-12 w-full rounded-xl" />
+                  <Skeleton className="h-12 w-full rounded-xl" />
+                </section>
+              </div>
             </div>
           ) : (
             <>

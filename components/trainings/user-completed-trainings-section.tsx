@@ -3,6 +3,7 @@
 import { GraduationCap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -107,8 +108,13 @@ export function UserCompletedTrainingsSection({
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-6 text-sm text-muted-foreground">
-              Loading completed trainings...
+            <div className="rounded-2xl border border-border/70 bg-muted/20 px-4 py-6">
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-56" />
+                <Skeleton className="h-10 w-full rounded-xl" />
+                <Skeleton className="h-10 w-full rounded-xl" />
+                <Skeleton className="h-10 w-full rounded-xl" />
+              </div>
             </div>
           ) : trainings.length > 0 ? (
             <div className="overflow-x-auto rounded-xl border border-border/70">

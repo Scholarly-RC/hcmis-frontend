@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Loader2, Users } from "lucide-react";
+import { CalendarDays, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { MONTH_NAMES } from "@/constants/date";
 import type { EmployeeShiftAssignmentRecord } from "@/lib/attendance";
 import type { AuthUser } from "@/types/auth";
@@ -497,10 +498,7 @@ export function AssignmentCalendarModal({
                   {isLoadingDepartments ||
                   isLoadingUsers ||
                   isLoadingAssignments ? (
-                    <span className="inline-flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1">
-                      <Loader2 className="size-3 animate-spin" />
-                      Loading data...
-                    </span>
+                    <Skeleton className="h-6 w-28 rounded-md" />
                   ) : (
                     <span className="rounded-md bg-muted/40 px-2 py-1 font-medium">
                       {visibleAssignments.length} assignment
@@ -513,9 +511,10 @@ export function AssignmentCalendarModal({
               <div className="space-y-2 rounded-xl border border-border/70 bg-background p-3">
                 <Label htmlFor="calendar-user-filter">Filter by user</Label>
                 {isLoadingUsers ? (
-                  <p className="text-sm text-muted-foreground">
-                    Loading users...
-                  </p>
+                  <div className="space-y-2">
+                    <Skeleton className="h-9 w-full rounded-md" />
+                    <Skeleton className="h-9 w-full rounded-md" />
+                  </div>
                 ) : users.length > 0 ? (
                   <Select
                     value={selectedUserId}

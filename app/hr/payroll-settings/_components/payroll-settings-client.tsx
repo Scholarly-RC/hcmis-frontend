@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -1154,7 +1155,10 @@ export function PayrollSettingsClient() {
       <Card>
         <CardHeader>
           <CardTitle>Payroll Settings</CardTitle>
-          <CardDescription>Loading payroll setup...</CardDescription>
+          <CardDescription className="space-y-2 pt-1">
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="h-4 w-60" />
+          </CardDescription>
         </CardHeader>
       </Card>
     );

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -410,11 +411,11 @@ export function DepartmentManagementClient() {
       </section>
 
       <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-        <p>
-          {isLoading
-            ? "Loading departments..."
-            : `${filteredDepartments.length} of ${departments.length} departments shown`}
-        </p>
+        {isLoading ? (
+          <Skeleton className="h-4 w-48" />
+        ) : (
+          <p>{`${filteredDepartments.length} of ${departments.length} departments shown`}</p>
+        )}
       </div>
 
       {error ? (

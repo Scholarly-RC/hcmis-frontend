@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   AnnouncementCreatePayload,
@@ -746,9 +747,10 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
       <section className="space-y-3">
         {loading ? (
           <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-            <CardContent className="flex items-center gap-3 py-8 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading announcements and polls...
+            <CardContent className="space-y-3 py-6">
+              <Skeleton className="h-5 w-48" />
+              <Skeleton className="h-16 w-full rounded-xl" />
+              <Skeleton className="h-16 w-full rounded-xl" />
             </CardContent>
           </Card>
         ) : null}
@@ -1013,9 +1015,10 @@ export function AnnouncementsPollsClient({ isStaff }: { isStaff: boolean }) {
           </DialogHeader>
 
           {archivedLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading archived items...
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
             </div>
           ) : (
             <div className="space-y-6">

@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -527,11 +528,11 @@ export function SharedResourcesClient({
         <TableBody>
           {loading ? (
             <TableRow>
-              <TableCell
-                colSpan={showUploader ? 6 : 5}
-                className="py-10 text-center text-sm text-muted-foreground"
-              >
-                Loading resources...
+              <TableCell colSpan={showUploader ? 6 : 5} className="py-6">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-10 w-full rounded-lg" />
+                </div>
               </TableCell>
             </TableRow>
           ) : items.length > 0 ? (
@@ -746,9 +747,11 @@ export function SharedResourcesClient({
                 <Label>Shared With</Label>
                 <div className="max-h-52 space-y-2 overflow-y-auto rounded-md border p-3">
                   {usersLoading ? (
-                    <p className="text-sm text-muted-foreground">
-                      Loading users...
-                    </p>
+                    <div className="space-y-2">
+                      <Skeleton className="h-8 w-full rounded-md" />
+                      <Skeleton className="h-8 w-full rounded-md" />
+                      <Skeleton className="h-8 w-full rounded-md" />
+                    </div>
                   ) : users.length > 0 ? (
                     users.map((user) => (
                       <Label
@@ -877,9 +880,11 @@ export function SharedResourcesClient({
                 <Label>Shared With</Label>
                 <div className="max-h-72 space-y-2 overflow-y-auto rounded-md border p-3">
                   {usersLoading ? (
-                    <p className="text-sm text-muted-foreground">
-                      Loading users...
-                    </p>
+                    <div className="space-y-2">
+                      <Skeleton className="h-8 w-full rounded-md" />
+                      <Skeleton className="h-8 w-full rounded-md" />
+                      <Skeleton className="h-8 w-full rounded-md" />
+                    </div>
                   ) : filteredUsers.length > 0 ? (
                     filteredUsers.map((user) => (
                       <Label
