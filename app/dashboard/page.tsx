@@ -406,15 +406,15 @@ export default async function DashboardPage() {
   const currentMonth = now.getMonth() + 1;
   const currentDay = now.getDate();
 
-  const feed = await tryFetch<FeedItemRecord[]>(
+  const feedPromise = tryFetch<FeedItemRecord[]>(
     session.token,
     "/performance/feed",
     "Unable to load updates feed.",
   );
 
-  const employeeData = session.isHr
-    ? null
-    : await Promise.all([
+  const employeeDataPromise = session.isHr
+    ? Promise.resolve(null)
+    : Promise.all([
         tryFetch<LeaveCredit>(
           session.token,
           "/leave/credits/me",
@@ -452,8 +452,8 @@ export default async function DashboardPage() {
         ),
       ]);
 
-  const hrData = session.isHr
-    ? await Promise.all([
+  const hrDataPromise = session.isHr
+    ? Promise.all([
         tryFetch<LeaveRequestRecord[]>(
           session.token,
           "/leave/requests/review?status=PENDING",
@@ -475,7 +475,13 @@ export default async function DashboardPage() {
           "Unable to load unreleased payslips.",
         ),
       ])
-    : null;
+    : Promise.resolve(null);
+
+  const [feed, employeeData, hrData] = await Promise.all([
+    feedPromise,
+    employeeDataPromise,
+    hrDataPromise,
+  ]);
 
   const dashboard = session.isHr
     ? buildHrDashboard({

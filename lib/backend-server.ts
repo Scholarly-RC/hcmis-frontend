@@ -1,4 +1,8 @@
-import { buildBackendUrl, readBackendJson } from "@/lib/backend";
+import {
+  buildBackendUrl,
+  createBackendTimeoutSignal,
+  readBackendJson,
+} from "@/lib/backend";
 
 type BackendFetchOptions = {
   token: string;
@@ -20,6 +24,7 @@ export async function fetchBackendJsonWithAuth<T>({
     ...init,
     headers,
     cache: init?.cache ?? "no-store",
+    signal: init?.signal ?? createBackendTimeoutSignal(),
   });
 
   const payload = await readBackendJson<Partial<T> & { detail?: string }>(

@@ -1,7 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { AUTH_COOKIE_NAME } from "@/constants/auth";
-import { buildBackendUrl, readBackendJson } from "@/lib/backend";
+import {
+  buildBackendUrl,
+  createBackendTimeoutSignal,
+  readBackendJson,
+} from "@/lib/backend";
 
 function getAuthToken(request: NextRequest) {
   return request.cookies.get(AUTH_COOKIE_NAME)?.value ?? null;
@@ -31,6 +35,7 @@ export async function proxyJson(
     ...init,
     headers,
     cache: "no-store",
+    signal: init.signal ?? createBackendTimeoutSignal(),
   });
 
   const payload = await readBackendJson<unknown>(response);

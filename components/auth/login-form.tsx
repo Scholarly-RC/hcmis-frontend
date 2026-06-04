@@ -67,7 +67,6 @@ export function LoginForm() {
       router.replace(
         payload?.must_change_password ? "/change-password" : "/dashboard",
       );
-      router.refresh();
     } catch {
       setError("Unable to reach the authentication service.");
     }

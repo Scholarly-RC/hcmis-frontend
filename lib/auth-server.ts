@@ -1,6 +1,10 @@
 export { AUTH_COOKIE_NAME } from "@/constants/auth";
 
-import { buildBackendUrl, readBackendJson } from "@/lib/backend";
+import {
+  buildBackendUrl,
+  createBackendTimeoutSignal,
+  readBackendJson,
+} from "@/lib/backend";
 import type {
   AuthLoginResponse,
   AuthUser,
@@ -8,7 +12,6 @@ import type {
   AuthUserProfileUpdate,
 } from "@/types/auth";
 
-const LOGIN_BACKEND_TIMEOUT_MS = 10_000;
 const LOGIN_BACKEND_RETRY_DELAY_MS = 300;
 const LOGIN_BACKEND_MAX_ATTEMPTS = 2;
 
@@ -32,7 +35,6 @@ async function fetchLoginWithTimeout(
   password: string,
   requestId?: string,
 ) {
-  const timeoutSignal = AbortSignal.timeout(LOGIN_BACKEND_TIMEOUT_MS);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -46,7 +48,7 @@ async function fetchLoginWithTimeout(
     headers,
     body: JSON.stringify({ identifier, password }),
     cache: "no-store",
-    signal: timeoutSignal,
+    signal: createBackendTimeoutSignal(),
   });
 }
 
@@ -146,12 +148,19 @@ export async function loginWithBackend(
 export async function fetchCurrentUser(
   token: string,
 ): Promise<AuthUser | null> {
-  const response = await fetch(buildBackendUrl("/auth/me"), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    cache: "no-store",
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(buildBackendUrl("/auth/me"), {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      cache: "no-store",
+      signal: createBackendTimeoutSignal(),
+    });
+  } catch {
+    return null;
+  }
 
   if (!response.ok) {
     return null;
