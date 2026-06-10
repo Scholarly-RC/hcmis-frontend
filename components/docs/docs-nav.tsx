@@ -6,29 +6,35 @@ import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
+  type DocCategory,
+  type DocCategoryId,
   type DocPage,
-  docsCategories,
-  getCategoryPages,
   getDocHref,
-} from "@/lib/docs";
+} from "@/lib/docs-schema";
 import { cn } from "@/utils/cn";
 
 type DocsNavProps = {
+  categories: readonly DocCategory[];
   currentPage: DocPage;
+  pagesByCategory: Record<DocCategoryId, DocPage[]>;
 };
 
 function normalize(value: string) {
   return value.toLowerCase().trim();
 }
 
-export function DocsNav({ currentPage }: DocsNavProps) {
+export function DocsNav({
+  categories,
+  currentPage,
+  pagesByCategory,
+}: DocsNavProps) {
   const [query, setQuery] = useState("");
   const normalizedQuery = normalize(query);
 
   const filteredCategories = useMemo(() => {
-    return docsCategories
+    return categories
       .map((category) => {
-        const pages = getCategoryPages(category.id).filter((page) => {
+        const pages = (pagesByCategory[category.id] ?? []).filter((page) => {
           if (normalizedQuery.length === 0) {
             return true;
           }
@@ -45,7 +51,7 @@ export function DocsNav({ currentPage }: DocsNavProps) {
         };
       })
       .filter(({ pages }) => pages.length > 0);
-  }, [normalizedQuery]);
+  }, [categories, normalizedQuery, pagesByCategory]);
 
   return (
     <div className="space-y-4">
