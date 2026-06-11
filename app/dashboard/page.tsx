@@ -342,7 +342,7 @@ function buildHrDashboard(input: {
       icon: Activity,
     },
     {
-      title: "Unreleased Payslips (All Periods)",
+      title: "Unreleased Payslips",
       value: input.unreleasedPayslipsCount.toString(),
       detail: "All unreleased payroll records across every month and cutoff",
       icon: Wallet,

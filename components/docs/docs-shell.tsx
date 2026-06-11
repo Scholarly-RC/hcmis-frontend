@@ -1,10 +1,9 @@
 import {
+  ArrowLeft,
   ArrowRight,
-  BookOpenText,
   ChevronRight,
   ExternalLink,
   FileText,
-  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -29,7 +28,8 @@ export function DocsShell({ page, children }: DocsShellProps) {
   const pagesByCategory = docsCategories.reduce(
     (result, category) => {
       result[category.id] = docsPages.filter(
-        (docPage) => docPage.categoryId === category.id,
+        (docPage) =>
+          docPage.categoryId === category.id && docPage.slug.length > 1,
       );
       return result;
     },
@@ -42,26 +42,24 @@ export function DocsShell({ page, children }: DocsShellProps) {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="rounded-full px-3 py-1">
-                  <BookOpenText className="mr-1 size-3.5" />
-                  Help Center
-                </Badge>
-                <Badge variant="outline" className="rounded-full px-3 py-1">
-                  Open to Everyone
-                </Badge>
-              </div>
               <div>
                 <h1 className="font-heading text-3xl font-semibold tracking-tight text-foreground">
-                  HCMIS Help Center
+                  Help Center
                 </h1>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  Simple guides for employees, approvers, and HR users. This
-                  area explains how to use the app. Internal setup and sensitive
-                  admin details are not included here.
+                  Operational guides for HR, attendance, payroll, and
+                  administrative workflows. This area focuses on account
+                  records, access management, shift setup, and related tasks.
                 </p>
               </div>
             </div>
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-background/80 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+            >
+              <ArrowLeft className="size-4" />
+              Back to App
+            </Link>
           </div>
         </div>
       </div>
@@ -78,26 +76,6 @@ export function DocsShell({ page, children }: DocsShellProps) {
                 currentPage={page}
                 pagesByCategory={pagesByCategory}
               />
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
-            <CardContent className="space-y-3 p-5">
-              <div className="flex items-start gap-3">
-                <span className="inline-flex size-10 items-center justify-center rounded-2xl bg-muted text-foreground">
-                  <ShieldCheck className="size-5" />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    What Is Included
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    These guides explain what users can do in the app and how
-                    the workflow works. They do not include secrets, setup
-                    steps, or private recovery procedures.
-                  </p>
-                </div>
-              </div>
             </CardContent>
           </Card>
         </aside>
@@ -206,7 +184,8 @@ function DocsHomePage({ page }: DocsHomePageProps) {
             Help Center
           </Badge>
           <Badge variant="outline" className="rounded-full px-3 py-1">
-            {docsPages.length} Guides
+            {docsPages.filter((docPage) => docPage.slug.length > 0).length}{" "}
+            Guides
           </Badge>
         </div>
         <h2 className="mt-4 font-heading text-3xl font-semibold tracking-tight text-foreground">
@@ -224,7 +203,8 @@ function DocsHomePage({ page }: DocsHomePageProps) {
 
         {docsCategories.map((category) => {
           const pages = docsPages.filter(
-            (docPage) => docPage.categoryId === category.id,
+            (docPage) =>
+              docPage.categoryId === category.id && docPage.slug.length > 1,
           );
 
           if (pages.length === 0) {

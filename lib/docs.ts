@@ -227,7 +227,11 @@ function readDocFile(filePath: string): DocPage {
   const source = fs.readFileSync(filePath, "utf8");
   const { frontmatter, body } = parseFrontmatter(source);
   const slugPath = path.relative(DOCS_ROOT, filePath).replace(/\.md$/, "");
-  const slug = slugPath === "index" ? [] : slugPath.split(path.sep);
+  const slugParts = slugPath.split(path.sep);
+  const slug =
+    slugParts.length > 0 && slugParts[slugParts.length - 1] === "index"
+      ? slugParts.slice(0, -1)
+      : slugParts;
 
   if (
     !frontmatter.title ||
@@ -276,7 +280,7 @@ function walkDocsDirectory(directory: string): string[] {
 }
 
 function sortDocs(pages: DocPage[]) {
-  const categoryOrder = new Map(
+  const categoryOrder = new Map<DocCategoryId, number>(
     docsCategories.map((category, index) => [category.id, index]),
   );
 
