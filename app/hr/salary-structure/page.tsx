@@ -5,8 +5,8 @@ import { SalaryStructureClient } from "@/app/hr/salary-structure/_components/sal
 import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
-  title: "Salary Structure",
-  description: "Manage positions, salary grades, and department mappings",
+  title: "Positions",
+  description: "Manage positions and department mappings",
 };
 
 export default function SalaryStructurePage() {

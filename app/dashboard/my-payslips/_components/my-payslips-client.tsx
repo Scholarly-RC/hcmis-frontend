@@ -148,7 +148,6 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
         employeeLabel,
         monthYear: `${selectedPayslip.month ?? "-"} / ${selectedPayslip.year ?? "-"}`,
         period: selectedPayslip.period ?? "-",
-        rank: selectedPayslip.rank ?? "-",
         status: selectedPayslip.released ? "Released" : "Draft",
         basePay: formatCurrency(summary.salary),
         grossPay: formatCurrency(summary.gross_pay),
@@ -222,7 +221,6 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
             <TableRow>
               <TableHead>Month / Year</TableHead>
               <TableHead>Period</TableHead>
-              <TableHead>Rank</TableHead>
               <TableHead>Salary</TableHead>
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
@@ -230,7 +228,7 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={4}>
                   <div className="space-y-2 py-1">
                     <Skeleton className="h-4 w-40" />
                     <Skeleton className="h-4 w-full" />
@@ -239,7 +237,7 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
               </TableRow>
             ) : payslips.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={4}>
                   No released payslips available.
                 </TableCell>
               </TableRow>
@@ -258,7 +256,6 @@ export function MyPayslipsClient({ user }: MyPayslipsClientProps) {
                     {payslip.month ?? "-"} / {payslip.year ?? "-"}
                   </TableCell>
                   <TableCell>{payslip.period ?? "-"}</TableCell>
-                  <TableCell>{payslip.rank ?? "-"}</TableCell>
                   <TableCell>{formatCurrency(payslip.salary)}</TableCell>
                   <TableCell className="text-right">
                     <Button

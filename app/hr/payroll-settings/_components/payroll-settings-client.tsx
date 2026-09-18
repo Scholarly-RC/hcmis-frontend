@@ -155,11 +155,6 @@ type PayrollPolicyRulesDetail = {
 type PolicyRulesForm = PayrollPolicyRulesPayload;
 
 type PayrollBaseSettingsForm = {
-  minimum_wage_amount: string;
-  basic_salary_multiplier: string;
-  basic_salary_step_multiplier: string;
-  basic_salary_steps: string;
-  max_position_rank: string;
   automatic_deduction_schedule: AutomaticDeductionSchedule;
 };
 
@@ -655,22 +650,12 @@ function toPayrollBaseSettingsForm(
   settings: PayrollSetting,
 ): PayrollBaseSettingsForm {
   return {
-    minimum_wage_amount: asText(settings.minimum_wage_amount),
-    basic_salary_multiplier: asText(settings.basic_salary_multiplier),
-    basic_salary_step_multiplier: asText(settings.basic_salary_step_multiplier),
-    basic_salary_steps: asText(settings.basic_salary_steps),
-    max_position_rank: asText(settings.max_position_rank),
     automatic_deduction_schedule: settings.automatic_deduction_schedule,
   };
 }
 
 function emptyPayrollBaseSettingsForm(): PayrollBaseSettingsForm {
   return {
-    minimum_wage_amount: "0.00",
-    basic_salary_multiplier: "1.0000",
-    basic_salary_step_multiplier: "1.0000",
-    basic_salary_steps: "10",
-    max_position_rank: "10",
     automatic_deduction_schedule: "SECOND_CUTOFF_ONLY",
   };
 }
@@ -870,31 +855,18 @@ export function PayrollSettingsClient() {
       const saved = await requestJson<PayrollSetting>("/api/payroll/settings", {
         method: "PATCH",
         body: JSON.stringify({
-          minimum_wage_amount: Number(
-            payrollBaseSettingsForm.minimum_wage_amount,
-          ),
-          basic_salary_multiplier: Number(
-            payrollBaseSettingsForm.basic_salary_multiplier,
-          ),
-          basic_salary_step_multiplier: Number(
-            payrollBaseSettingsForm.basic_salary_step_multiplier,
-          ),
-          basic_salary_steps: Number(
-            payrollBaseSettingsForm.basic_salary_steps,
-          ),
-          max_position_rank: Number(payrollBaseSettingsForm.max_position_rank),
           automatic_deduction_schedule:
             payrollBaseSettingsForm.automatic_deduction_schedule,
         }),
       });
       setPayrollSettings(saved);
       setPayrollBaseSettingsForm(toPayrollBaseSettingsForm(saved));
-      toast.success("Base salary settings saved.");
+      toast.success("Payroll settings saved.");
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Unable to save base salary settings.",
+          : "Unable to save payroll settings.",
       );
     } finally {
       setSavingPayrollBaseSettings(false);
@@ -1197,12 +1169,11 @@ export function PayrollSettingsClient() {
           <div className="space-y-2">
             <CardTitle className="flex items-center gap-2 text-xl">
               <Wallet className="size-5" />
-              Base Salary Settings
+              Payroll Schedule
             </CardTitle>
             <CardDescription>
-              These values currently drive the computed payslip base salary. Set
-              the basic salary here, then let higher salary grades and steps
-              build from that baseline.
+              Employee monthly salaries are maintained on each employee. This
+              setting controls when automatic deductions are applied.
             </CardDescription>
           </div>
           <Button
@@ -1210,135 +1181,38 @@ export function PayrollSettingsClient() {
             disabled={savingPayrollBaseSettings}
           >
             <Save className="size-4" />
-            {savingPayrollBaseSettings
-              ? "Saving..."
-              : "Save Base Salary Settings"}
+            {savingPayrollBaseSettings ? "Saving..." : "Save Schedule"}
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-            <div className="space-y-2">
-              <Label htmlFor="minimum_wage_amount">Basic Salary</Label>
-              <Input
-                id="minimum_wage_amount"
-                className="h-11"
-                type="number"
-                min="0"
-                step="0.01"
-                value={payrollBaseSettingsForm.minimum_wage_amount}
-                onChange={(event) =>
-                  setPayrollBaseSettingsForm((current) => ({
-                    ...current,
-                    minimum_wage_amount: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="basic_salary_multiplier">Salary Multiplier</Label>
-              <Input
-                id="basic_salary_multiplier"
-                className="h-11"
-                type="number"
-                min="0"
-                step="0.0001"
-                value={payrollBaseSettingsForm.basic_salary_multiplier}
-                onChange={(event) =>
-                  setPayrollBaseSettingsForm((current) => ({
-                    ...current,
-                    basic_salary_multiplier: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="basic_salary_step_multiplier">
-                Step Multiplier
-              </Label>
-              <Input
-                id="basic_salary_step_multiplier"
-                className="h-11"
-                type="number"
-                min="0"
-                step="0.0001"
-                value={payrollBaseSettingsForm.basic_salary_step_multiplier}
-                onChange={(event) =>
-                  setPayrollBaseSettingsForm((current) => ({
-                    ...current,
-                    basic_salary_step_multiplier: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="basic_salary_steps">Number Of Steps</Label>
-              <Input
-                id="basic_salary_steps"
-                className="h-11"
-                type="number"
-                min="1"
-                step="1"
-                value={payrollBaseSettingsForm.basic_salary_steps}
-                onChange={(event) =>
-                  setPayrollBaseSettingsForm((current) => ({
-                    ...current,
-                    basic_salary_steps: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="max_position_rank">Max Position Rank</Label>
-              <Input
-                id="max_position_rank"
-                className="h-11"
-                type="number"
-                min="1"
-                step="1"
-                value={payrollBaseSettingsForm.max_position_rank}
-                onChange={(event) =>
-                  setPayrollBaseSettingsForm((current) => ({
-                    ...current,
-                    max_position_rank: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="automatic_deduction_schedule">
-                Automatic Deductions
-              </Label>
-              <Select
-                value={payrollBaseSettingsForm.automatic_deduction_schedule}
-                onValueChange={(value: AutomaticDeductionSchedule) =>
-                  setPayrollBaseSettingsForm((current) => ({
-                    ...current,
-                    automatic_deduction_schedule: value,
-                  }))
-                }
-              >
-                <SelectTrigger
-                  id="automatic_deduction_schedule"
-                  className="h-11"
-                >
-                  <SelectValue placeholder="Select deduction timing" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="SECOND_CUTOFF_ONLY">
-                    Deduct On 2nd Cutoff Only
-                  </SelectItem>
-                  <SelectItem value="SPLIT_BOTH_CUTOFFS">
-                    Split Across Both Cutoffs
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="max-w-sm space-y-2">
+            <Label htmlFor="automatic_deduction_schedule">
+              Automatic Deductions
+            </Label>
+            <Select
+              value={payrollBaseSettingsForm.automatic_deduction_schedule}
+              onValueChange={(value: AutomaticDeductionSchedule) =>
+                setPayrollBaseSettingsForm((current) => ({
+                  ...current,
+                  automatic_deduction_schedule: value,
+                }))
+              }
+            >
+              <SelectTrigger id="automatic_deduction_schedule" className="h-11">
+                <SelectValue placeholder="Select deduction timing" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="SECOND_CUTOFF_ONLY">
+                  Deduct On 2nd Cutoff Only
+                </SelectItem>
+                <SelectItem value="SPLIT_BOTH_CUTOFFS">
+                  Split Across Both Cutoffs
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           {payrollSettings ? (
             <p className="mt-3 text-sm text-muted-foreground">
-              Current basic salary: {payrollSettings.minimum_wage_amount} with
-              salary multiplier {payrollSettings.basic_salary_multiplier} and
-              step multiplier {payrollSettings.basic_salary_step_multiplier}.{" "}
               Automatic deductions are set to{" "}
               {payrollSettings.automatic_deduction_schedule ===
               "SPLIT_BOTH_CUTOFFS"

@@ -6,12 +6,7 @@ export type AutomaticDeductionSchedule =
 
 export type PayrollSetting = {
   id: number;
-  minimum_wage_amount: string;
   deduction_config: Array<Record<string, unknown>>;
-  basic_salary_multiplier: string;
-  basic_salary_step_multiplier: string;
-  basic_salary_steps: number;
-  max_position_rank: number;
   automatic_deduction_schedule: AutomaticDeductionSchedule;
   created_at: string;
   updated_at: string;
@@ -96,7 +91,6 @@ export type PayrollPosition = {
   id: number;
   title: string;
   code: string;
-  salary_grade: number;
   is_active: boolean;
   departments: Array<{ id: number; name: string }>;
   created_at: string;
@@ -153,7 +147,6 @@ export type PayrollRunInput = {
 export type PayrollPayslip = {
   id: number;
   user_id: string;
-  rank: string | null;
   salary: string | null;
   period: "1ST" | "2ND" | null;
   released: boolean;
@@ -364,7 +357,6 @@ export function openPayslipPrintWindow(input: {
   employeeLabel: string;
   monthYear: string;
   period: string;
-  rank: string;
   status: string;
   basePay: string;
   grossPay: string;
@@ -452,7 +444,6 @@ export function openPayslipPrintWindow(input: {
       <div>
         <div class="eyebrow">${input.period} Cutoff • ${input.monthYear}</div>
         <div class="name">${input.employeeLabel}</div>
-        <div class="subtle">Rank: ${input.rank}</div>
       </div>
       <div class="net">
         <div class="net-label">Net Pay</div>

@@ -204,7 +204,10 @@ export function ProfileDetailsSections({ user }: { user: AuthUser }) {
       label: "Employment Status",
       value: getOptionLabel(user.employment_status, EMPLOYMENT_STATUS_OPTIONS),
     },
-    { label: "Rank", value: user.rank?.trim() || "Not provided" },
+    {
+      label: "Monthly Salary",
+      value: user.monthly_salary?.trim() || "Not configured",
+    },
     {
       label: "Hire date",
       value: user.date_of_hiring

@@ -445,7 +445,6 @@ export function PayslipsClient() {
         employeeLabel,
         monthYear: `${formatMonth(selectedPayslip.month)} ${selectedPayslip.year ?? "-"}`,
         period: selectedPayslip.period ?? "-",
-        rank: selectedPayslip.rank ?? "-",
         status: selectedPayslip.released ? "Released" : "Draft",
         basePay: formatCurrency(summary.salary),
         grossPay: formatCurrency(summary.gross_pay),
@@ -759,7 +758,6 @@ export function PayslipsClient() {
                   <TableHead>Employee</TableHead>
                   <TableHead>Payroll Cutoff</TableHead>
                   <TableHead>Payroll Period</TableHead>
-                  <TableHead>Position Rank</TableHead>
                   <TableHead>Base Salary</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -768,7 +766,7 @@ export function PayslipsClient() {
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={6}>
                       <div className="space-y-2 py-1">
                         <Skeleton className="h-4 w-40" />
                         <Skeleton className="h-4 w-full" />
@@ -777,7 +775,7 @@ export function PayslipsClient() {
                   </TableRow>
                 ) : payslips.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7}>
+                    <TableCell colSpan={6}>
                       No payslips found for the selected filters.
                     </TableCell>
                   </TableRow>
@@ -810,7 +808,6 @@ export function PayslipsClient() {
                         <TableCell>
                           {formatMonth(payslip.month)} {payslip.year ?? "-"}
                         </TableCell>
-                        <TableCell>{payslip.rank ?? "-"}</TableCell>
                         <TableCell>{formatCurrency(payslip.salary)}</TableCell>
                         <TableCell>
                           <Badge

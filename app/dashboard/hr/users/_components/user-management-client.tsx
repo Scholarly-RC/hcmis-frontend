@@ -74,8 +74,7 @@ type UserFormState = {
   level_1_approver_id: string;
   level_2_approver_id: string;
   position_id: string;
-  rank_level: string;
-  step_number: string;
+  monthly_salary: string;
   assignment_effective_from: string;
   phone_number: string;
   date_of_birth: string;
@@ -110,8 +109,7 @@ function buildUserEditorSchema(mode: UserEditorMode) {
       level_1_approver_id: z.string(),
       level_2_approver_id: z.string(),
       position_id: z.string(),
-      rank_level: z.string(),
-      step_number: z.string(),
+      monthly_salary: z.string(),
       assignment_effective_from: z.string(),
       phone_number: z.string(),
       date_of_birth: z.string(),
@@ -181,36 +179,14 @@ function buildUserEditorSchema(mode: UserEditorMode) {
       }
 
       if (
-        values.rank_level.trim().length > 0 &&
-        !/^\d+$/.test(values.rank_level.trim())
+        values.monthly_salary.trim().length > 0 &&
+        (!/^\d+(\.\d{1,2})?$/.test(values.monthly_salary.trim()) ||
+          Number(values.monthly_salary.trim()) < 0)
       ) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["rank_level"],
-          message: "Rank level must be a whole number.",
-        });
-      }
-
-      if (
-        values.step_number.trim().length > 0 &&
-        !/^\d+$/.test(values.step_number.trim())
-      ) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["step_number"],
-          message: "Step number must be a whole number.",
-        });
-      }
-
-      const hasPosition =
-        values.position_id.trim().length > 0 &&
-        values.position_id.trim() !== "none";
-      const hasRankLevel = values.rank_level.trim().length > 0;
-      if (hasPosition !== hasRankLevel) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: hasPosition ? ["rank_level"] : ["position_id"],
-          message: "Position and rank level are required together.",
+          path: ["monthly_salary"],
+          message: "Monthly salary must be a non-negative amount.",
         });
       }
 
@@ -246,8 +222,7 @@ export type UserEditorPayload = {
   level_1_approver_id: string | null;
   level_2_approver_id: string | null;
   position_id: number | null;
-  rank_level: number | null;
-  step_number: number | null;
+  monthly_salary: number | null;
   assignment_effective_from: string | null;
   phone_number: string | null;
   date_of_birth: string | null;
@@ -286,8 +261,7 @@ const emptyFormState = (): UserFormState => ({
   level_1_approver_id: "none",
   level_2_approver_id: "none",
   position_id: "none",
-  rank_level: "",
-  step_number: "",
+  monthly_salary: "",
   assignment_effective_from: "",
   phone_number: "",
   date_of_birth: "",
@@ -429,8 +403,7 @@ function buildFormState(
         level_1_approver_id: user.level_1_approver_id ?? "none",
         level_2_approver_id: user.level_2_approver_id ?? "none",
         position_id: user.position_id?.toString() ?? "none",
-        rank_level: user.rank_level?.toString() ?? "",
-        step_number: user.step_number?.toString() ?? "",
+        monthly_salary: user.monthly_salary ?? "",
         assignment_effective_from: formatDateInput(user.date_of_hiring),
         phone_number: user.phone_number ?? "",
         date_of_birth: formatDateInput(user.date_of_birth),
@@ -743,14 +716,10 @@ export function UserEditorDialog({
           values.position_id.trim().length === 0
             ? null
             : Number(values.position_id.trim()),
-        rank_level:
-          values.rank_level.trim().length === 0
+        monthly_salary:
+          values.monthly_salary.trim().length === 0
             ? null
-            : Number(values.rank_level.trim()),
-        step_number:
-          values.step_number.trim().length === 0
-            ? null
-            : Number(values.step_number.trim()),
+            : Number(values.monthly_salary.trim()),
         assignment_effective_from: normalizeText(
           values.assignment_effective_from,
         ),
@@ -765,8 +734,10 @@ export function UserEditorDialog({
         const hasEmploymentValueChange =
           payload.department_id !== user.department_id ||
           payload.position_id !== user.position_id ||
-          payload.rank_level !== user.rank_level ||
-          payload.step_number !== user.step_number ||
+          payload.monthly_salary !==
+            (user.monthly_salary === null
+              ? null
+              : Number(user.monthly_salary)) ||
           payload.employee_type !== user.employee_type ||
           payload.employment_status !== user.employment_status ||
           payload.date_of_hiring !== formatDateInput(user.date_of_hiring);
@@ -1124,35 +1095,20 @@ export function UserEditorDialog({
                 />
 
                 <FormField
-                  label="Rank Level"
-                  htmlFor="user-rank-level"
-                  error={errors.rank_level?.message}
+                  label="Monthly Salary"
+                  htmlFor="user-monthly-salary"
+                  error={errors.monthly_salary?.message}
+                  hint="Optional basic monthly salary."
                 >
                   <Input
-                    id="user-rank-level"
+                    id="user-monthly-salary"
                     type="number"
-                    min="1"
-                    placeholder="1"
-                    className={controlHeightClass}
-                    aria-invalid={errors.rank_level ? "true" : "false"}
-                    {...register("rank_level")}
-                  />
-                </FormField>
-
-                <FormField
-                  label="Step Number"
-                  htmlFor="user-step-number"
-                  error={errors.step_number?.message}
-                  hint="Optional"
-                >
-                  <Input
-                    id="user-step-number"
-                    type="number"
-                    min="1"
+                    min="0"
+                    step="0.01"
                     placeholder="Optional"
                     className={controlHeightClass}
-                    aria-invalid={errors.step_number ? "true" : "false"}
-                    {...register("step_number")}
+                    aria-invalid={errors.monthly_salary ? "true" : "false"}
+                    {...register("monthly_salary")}
                   />
                 </FormField>
 
@@ -1160,7 +1116,7 @@ export function UserEditorDialog({
                   label="Assignment Effective From"
                   htmlFor="user-assignment-effective-from"
                   error={errors.assignment_effective_from?.message}
-                  hint="Used when creating a new assignment history record."
+                  hint="Used when recording a position or salary change."
                 >
                   <Input
                     id="user-assignment-effective-from"
@@ -1342,7 +1298,6 @@ export function UserManagementClient() {
         user.email.toLowerCase().includes(normalized) ||
         (user.username?.toLowerCase().includes(normalized) ?? false) ||
         (user.employee_number?.toLowerCase().includes(normalized) ?? false) ||
-        (user.rank?.toLowerCase().includes(normalized) ?? false) ||
         departmentText.toLowerCase().includes(normalized)
       );
     })();

@@ -30,7 +30,6 @@ import type { AuthDepartment } from "@/types/auth";
 type PositionForm = {
   title: string;
   code: string;
-  salary_grade: string;
   department_ids: number[];
   is_active: boolean;
 };
@@ -38,7 +37,6 @@ type PositionForm = {
 const emptyForm: PositionForm = {
   title: "",
   code: "",
-  salary_grade: "1",
   department_ids: [],
   is_active: true,
 };
@@ -94,7 +92,6 @@ export function SalaryStructureClient() {
     setForm({
       title: position.title,
       code: position.code,
-      salary_grade: String(position.salary_grade),
       department_ids: position.departments.map((department) => department.id),
       is_active: position.is_active,
     });
@@ -124,12 +121,11 @@ export function SalaryStructureClient() {
       const payload = {
         title: form.title.trim(),
         code: form.code.trim().toUpperCase(),
-        salary_grade: Number(form.salary_grade),
         department_ids: form.department_ids,
         is_active: form.is_active,
       };
 
-      if (!payload.title || !payload.code || payload.salary_grade < 1) {
+      if (!payload.title || !payload.code) {
         toast.error("Please fill valid position details.");
         return;
       }
@@ -177,7 +173,6 @@ export function SalaryStructureClient() {
           body: JSON.stringify({
             title: position.title,
             code: position.code,
-            salary_grade: position.salary_grade,
             department_ids: position.departments.map(
               (department) => department.id,
             ),
@@ -200,9 +195,9 @@ export function SalaryStructureClient() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Salary Structure</h1>
+          <h1 className="text-2xl font-semibold">Positions</h1>
           <p className="text-sm text-muted-foreground">
-            Manage position codes, salary grades, and department assignment.
+            Manage position codes and department assignment.
           </p>
         </div>
         <Button onClick={openCreate}>
@@ -217,7 +212,6 @@ export function SalaryStructureClient() {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Title</TableHead>
-              <TableHead>Salary Grade</TableHead>
               <TableHead>Departments</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -226,7 +220,7 @@ export function SalaryStructureClient() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6}>
+                <TableCell colSpan={5}>
                   <div className="space-y-2 py-1">
                     <Skeleton className="h-4 w-40" />
                     <Skeleton className="h-4 w-full" />
@@ -235,14 +229,13 @@ export function SalaryStructureClient() {
               </TableRow>
             ) : positions.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6}>No positions configured yet.</TableCell>
+                <TableCell colSpan={5}>No positions configured yet.</TableCell>
               </TableRow>
             ) : (
               positions.map((position) => (
                 <TableRow key={position.id}>
                   <TableCell>{position.code}</TableCell>
                   <TableCell>{position.title}</TableCell>
-                  <TableCell>{position.salary_grade}</TableCell>
                   <TableCell>
                     {position.departments
                       .map((department) => department.name)
@@ -285,7 +278,7 @@ export function SalaryStructureClient() {
               {editingPositionId ? "Edit Position" : "Add Position"}
             </DialogTitle>
             <DialogDescription>
-              Define position code, salary grade, and department mapping.
+              Define position code and department mapping.
             </DialogDescription>
           </DialogHeader>
 
@@ -313,21 +306,6 @@ export function SalaryStructureClient() {
                   setForm((current) => ({
                     ...current,
                     code: event.target.value.toUpperCase(),
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="salary_grade">Salary Grade</Label>
-              <Input
-                id="salary_grade"
-                type="number"
-                min={1}
-                value={form.salary_grade}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    salary_grade: event.target.value,
                   }))
                 }
               />

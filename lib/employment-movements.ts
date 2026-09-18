@@ -3,9 +3,7 @@ import type { AuthDepartment, AuthUser } from "@/types/auth";
 
 const FIELD_LABELS: Record<string, string> = {
   position_id: "Position",
-  rank_level: "Rank Level",
-  step_number: "Step Number",
-  rank: "Rank",
+  monthly_salary: "Monthly Salary",
   department_id: "Department",
   employee_type: "Employee Type",
   employment_status: "Employment Status",
