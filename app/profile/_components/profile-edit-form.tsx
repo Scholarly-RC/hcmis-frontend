@@ -411,7 +411,7 @@ export function ProfileEditForm({
             <div className="space-y-2">
               <Label>Position Assignment</Label>
               <div className="flex min-h-10 items-center rounded-md border border-border/70 bg-background px-3 text-sm text-muted-foreground">
-                {user.rank?.trim() || "Managed by HR"}
+                {user.position_id ? "Managed by HR" : "Not assigned"}
               </div>
               <p className="text-xs text-muted-foreground">
                 Payroll assignment changes are managed by HR.

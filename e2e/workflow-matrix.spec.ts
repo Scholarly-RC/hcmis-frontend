@@ -10,7 +10,7 @@ const hrWorkflowPages: Array<{ route: string; marker: string | RegExp }> = [
   },
   { route: "/hr/overtime-management", marker: "Overtime Management" },
   { route: "/hr/leave-management", marker: "Leave Management" },
-  { route: "/hr/salary-structure", marker: "Salary Structure" },
+  { route: "/hr/salary-structure", marker: "Positions" },
   { route: "/hr/payslips", marker: "Payslip Management" },
   { route: "/hr/payroll-settings", marker: "Payroll Settings" },
   { route: "/hr/reports", marker: "Reports and Analytics" },

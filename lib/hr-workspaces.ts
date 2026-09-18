@@ -142,12 +142,11 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
     },
     items: [
       {
-        label: "Salary Structure",
-        description:
-          "Manage positions, salary grades, and department mappings.",
+        label: "Positions",
+        description: "Manage positions and department mappings.",
         icon: BadgeDollarSign,
         href: "/hr/salary-structure",
-        keywords: ["positions", "salary grade", "mapping"],
+        keywords: ["positions", "mapping"],
         requiredCapabilities: ["manage_salary_structure"],
       },
       {

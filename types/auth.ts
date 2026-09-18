@@ -16,10 +16,8 @@ export type AuthUser = {
   highest_education_program: string | null;
   civil_status: string | null;
   religion: string | null;
-  rank: string | null;
   position_id: number | null;
-  rank_level: number | null;
-  step_number: number | null;
+  monthly_salary: string | null;
   employee_number: string | null;
   biometric_uid: number | null;
   role: string | null;
