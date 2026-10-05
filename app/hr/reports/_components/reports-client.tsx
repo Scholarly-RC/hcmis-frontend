@@ -10,7 +10,8 @@ import {
   UserRoundSearch,
   Users,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -26,6 +27,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  REPORT_PATHS,
+  type ReportActionKey,
+} from "@/app/hr/reports/report-routes";
 import { HrModulePageScaffold } from "@/components/hr/module-scaffold";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,13 +58,6 @@ import { cn } from "@/utils/cn";
 type RequestError = {
   detail?: string;
 };
-
-type ReportActionKey =
-  | "staffing"
-  | "payroll-expense"
-  | "payroll-summary"
-  | "user-demographics"
-  | "resignation";
 
 type DailyStaffingReport = {
   selected_date: string;
@@ -1141,9 +1139,12 @@ function ReportOutput({
 
 export function ReportsClient({
   canViewPayrollSummary,
+  initialReportKey = null,
 }: {
   canViewPayrollSummary: boolean;
+  initialReportKey?: ReportActionKey | null;
 }) {
+  const router = useRouter();
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(
     String(now.getMonth() + 1),
@@ -1155,17 +1156,16 @@ export function ReportsClient({
   const [result, setResult] = useState<ReportResult | null>(null);
   const [running, setRunning] = useState<ReportActionKey | null>(null);
   const [activeReportKey, setActiveReportKey] =
-    useState<ReportActionKey | null>(null);
+    useState<ReportActionKey | null>(initialReportKey);
 
   const actions = useMemo(
     () => [
       {
         key: "staffing" as const,
+        href: REPORT_PATHS.staffing,
         label: "Daily Staffing",
         description: "Attendance snapshot for the selected operating day.",
         icon: CalendarDays,
-        accent: "Daily",
-        controls: "Selected Date",
         run: async () => {
           const data = await requestJson<DailyStaffingReport>(
             `/api/reports/attendance/daily-staffing?selected_date=${encodeURIComponent(selectedDate)}`,
@@ -1175,11 +1175,10 @@ export function ReportsClient({
       },
       {
         key: "payroll-expense" as const,
+        href: REPORT_PATHS["payroll-expense"],
         label: "Yearly Payroll Expense",
         description: "Annual payroll cost summary for the selected year.",
         icon: Coins,
-        accent: "Finance",
-        controls: "Selected Year",
         run: async () => {
           const data = await requestJson<YearlyPayrollExpenseReport>(
             `/api/reports/payroll/yearly-expense?selected_year=${encodeURIComponent(selectedYear)}`,
@@ -1191,12 +1190,11 @@ export function ReportsClient({
         ? [
             {
               key: "payroll-summary" as const,
+              href: REPORT_PATHS["payroll-summary"],
               label: "Payroll Summary",
               description:
                 "Monthly released payroll register by employee and cutoff.",
               icon: ReceiptText,
-              accent: "Register",
-              controls: "Selected Month, Selected Year",
               run: async () => {
                 const data = await requestJson<PayrollSummaryReport>(
                   `/api/reports/payroll/summary?selected_month=${encodeURIComponent(selectedMonth)}&selected_year=${encodeURIComponent(selectedYear)}`,
@@ -1208,11 +1206,10 @@ export function ReportsClient({
         : []),
       {
         key: "user-demographics" as const,
+        href: REPORT_PATHS["user-demographics"],
         label: "User Demographics (Gender)",
         description: "Headcount mix by gender as of the selected date.",
         icon: Users,
-        accent: "People",
-        controls: "Selected Date",
         run: async () => {
           const data = await requestJson<GenderDemographicsReport>(
             `/api/reports/users/demographics/gender?as_of_date=${encodeURIComponent(selectedDate)}`,
@@ -1222,11 +1219,10 @@ export function ReportsClient({
       },
       {
         key: "resignation" as const,
+        href: REPORT_PATHS.resignation,
         label: "Resignation Report",
         description: "Separated employees within the chosen date range.",
         icon: UserRoundSearch,
-        accent: "Attrition",
-        controls: "From Date, To Date",
         run: async () => {
           const data = await requestJson<ResignationReport>(
             `/api/reports/users/resignations?from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`,
@@ -1263,6 +1259,24 @@ export function ReportsClient({
     }
   }
 
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+  const runActionRef = useRef(runAction);
+  runActionRef.current = runAction;
+
+  useEffect(() => {
+    if (!initialReportKey) {
+      return;
+    }
+
+    const action = actionsRef.current.find(
+      (item) => item.key === initialReportKey,
+    );
+    if (action) {
+      void runActionRef.current(action);
+    }
+  }, [initialReportKey]);
+
   return (
     <HrModulePageScaffold
       title="Reports and Analytics"
@@ -1284,36 +1298,56 @@ export function ReportsClient({
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
-              <div className="mb-4 flex items-center gap-2">
-                <CalendarDays className="size-4 text-muted-foreground" />
-                <p className="text-sm font-medium">Time Scope</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {activeReportKey === "payroll-summary" ? (
-                  <>
-                    <Label
-                      htmlFor="reports-selected-month"
-                      className="flex flex-col items-start gap-2 text-left text-sm"
-                    >
-                      <span className="text-left text-muted-foreground">
-                        Payroll Month
-                      </span>
-                      <Input
-                        id="reports-selected-month"
-                        type="number"
-                        min={1}
-                        max={12}
-                        value={selectedMonth}
-                        onChange={(event) =>
-                          setSelectedMonth(event.target.value)
-                        }
-                        className="w-full bg-background/80"
-                      />
-                    </Label>
+            {activeReportKey ? (
+              <div className="rounded-2xl border border-border/70 bg-background/70 p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <CalendarDays className="size-4 text-muted-foreground" />
+                  <p className="text-sm font-medium">Time Scope</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {activeReportKey === "payroll-summary" ? (
+                    <>
+                      <Label
+                        htmlFor="reports-selected-month"
+                        className="flex flex-col items-start gap-2 text-left text-sm"
+                      >
+                        <span className="text-left text-muted-foreground">
+                          Payroll Month
+                        </span>
+                        <Input
+                          id="reports-selected-month"
+                          type="number"
+                          min={1}
+                          max={12}
+                          value={selectedMonth}
+                          onChange={(event) =>
+                            setSelectedMonth(event.target.value)
+                          }
+                          className="w-full bg-background/80"
+                        />
+                      </Label>
+                      <Label
+                        htmlFor="reports-selected-year"
+                        className="flex flex-col items-start gap-2 text-left text-sm"
+                      >
+                        <span className="text-left text-muted-foreground">
+                          Selected Year
+                        </span>
+                        <Input
+                          id="reports-selected-year"
+                          value={selectedYear}
+                          onChange={(event) =>
+                            setSelectedYear(event.target.value)
+                          }
+                          className="w-full bg-background/80"
+                        />
+                      </Label>
+                    </>
+                  ) : null}
+                  {activeReportKey === "payroll-expense" ? (
                     <Label
                       htmlFor="reports-selected-year"
-                      className="flex flex-col items-start gap-2 text-left text-sm"
+                      className="flex flex-col items-start gap-2 text-left text-sm sm:col-span-2"
                     >
                       <span className="text-left text-muted-foreground">
                         Selected Year
@@ -1327,105 +1361,86 @@ export function ReportsClient({
                         className="w-full bg-background/80"
                       />
                     </Label>
-                  </>
-                ) : null}
-                {activeReportKey === "payroll-expense" ? (
-                  <Label
-                    htmlFor="reports-selected-year"
-                    className="flex flex-col items-start gap-2 text-left text-sm sm:col-span-2"
-                  >
-                    <span className="text-left text-muted-foreground">
-                      Selected Year
-                    </span>
-                    <Input
-                      id="reports-selected-year"
-                      value={selectedYear}
-                      onChange={(event) => setSelectedYear(event.target.value)}
-                      className="w-full bg-background/80"
-                    />
-                  </Label>
-                ) : null}
-                {activeReportKey === "staffing" ||
-                activeReportKey === "user-demographics" ? (
-                  <Label
-                    htmlFor="reports-selected-date"
-                    className="flex flex-col items-start gap-2 text-left text-sm sm:col-span-2"
-                  >
-                    <span className="text-left text-muted-foreground">
-                      Selected Date
-                    </span>
-                    <Input
-                      id="reports-selected-date"
-                      type="date"
-                      value={selectedDate}
-                      onChange={(event) => setSelectedDate(event.target.value)}
-                      className="w-full bg-background/80"
-                    />
-                  </Label>
-                ) : null}
-                {activeReportKey === "resignation" ? (
-                  <>
-                    <Label
-                      htmlFor="reports-from-date"
-                      className="flex flex-col items-start gap-2 text-left text-sm"
-                    >
-                      <span className="text-left text-muted-foreground">
-                        From Date
-                      </span>
-                      <Input
-                        id="reports-from-date"
-                        type="date"
-                        value={fromDate}
-                        onChange={(event) => setFromDate(event.target.value)}
-                        className="w-full bg-background/80"
-                      />
-                    </Label>
-                    <Label
-                      htmlFor="reports-to-date"
-                      className="flex flex-col items-start gap-2 text-left text-sm"
-                    >
-                      <span className="text-left text-muted-foreground">
-                        To Date
-                      </span>
-                      <Input
-                        id="reports-to-date"
-                        type="date"
-                        value={toDate}
-                        onChange={(event) => setToDate(event.target.value)}
-                        className="w-full bg-background/80"
-                      />
-                    </Label>
-                  </>
-                ) : null}
-                {activeReportKey === null ? (
-                  <p className="text-sm text-muted-foreground sm:col-span-2">
-                    Select a report to show its relevant filters.
-                  </p>
-                ) : null}
-              </div>
-              <div className="mt-4 space-y-2">
-                <Button
-                  type="button"
-                  className="w-full"
-                  onClick={() => {
-                    if (activeAction) {
-                      void runAction(activeAction);
-                    }
-                  }}
-                  disabled={running !== null || activeAction === null}
-                >
-                  {running === activeReportKey ? (
-                    <Loader2 className="size-4 animate-spin" />
                   ) : null}
-                  Apply Filters
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  {activeAction
-                    ? `Refreshes ${activeAction.label} using the current filter values.`
-                    : "Run a report first, then apply filter changes here."}
-                </p>
+                  {activeReportKey === "staffing" ||
+                  activeReportKey === "user-demographics" ? (
+                    <Label
+                      htmlFor="reports-selected-date"
+                      className="flex flex-col items-start gap-2 text-left text-sm sm:col-span-2"
+                    >
+                      <span className="text-left text-muted-foreground">
+                        Selected Date
+                      </span>
+                      <Input
+                        id="reports-selected-date"
+                        type="date"
+                        value={selectedDate}
+                        onChange={(event) =>
+                          setSelectedDate(event.target.value)
+                        }
+                        className="w-full bg-background/80"
+                      />
+                    </Label>
+                  ) : null}
+                  {activeReportKey === "resignation" ? (
+                    <>
+                      <Label
+                        htmlFor="reports-from-date"
+                        className="flex flex-col items-start gap-2 text-left text-sm"
+                      >
+                        <span className="text-left text-muted-foreground">
+                          From Date
+                        </span>
+                        <Input
+                          id="reports-from-date"
+                          type="date"
+                          value={fromDate}
+                          onChange={(event) => setFromDate(event.target.value)}
+                          className="w-full bg-background/80"
+                        />
+                      </Label>
+                      <Label
+                        htmlFor="reports-to-date"
+                        className="flex flex-col items-start gap-2 text-left text-sm"
+                      >
+                        <span className="text-left text-muted-foreground">
+                          To Date
+                        </span>
+                        <Input
+                          id="reports-to-date"
+                          type="date"
+                          value={toDate}
+                          onChange={(event) => setToDate(event.target.value)}
+                          className="w-full bg-background/80"
+                        />
+                      </Label>
+                    </>
+                  ) : null}
+                </div>
+                <div className="mt-4 space-y-2">
+                  <Button
+                    type="button"
+                    className="w-full"
+                    onClick={() => {
+                      if (activeAction) {
+                        void runAction(activeAction);
+                      }
+                    }}
+                    disabled={running !== null || activeAction === null}
+                  >
+                    {running === activeReportKey ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : null}
+                    Apply Filters
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {activeAction
+                      ? `Refreshes ${activeAction.label} using the current filter values.`
+                      : "Run a report first, then apply filter changes here."}
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : null}
 
             <div className="space-y-3">
               <div className="space-y-1">
@@ -1440,10 +1455,10 @@ export function ReportsClient({
                   key={action.key}
                   type="button"
                   variant="outline"
-                  onClick={() => void runAction(action)}
+                  onClick={() => router.push(action.href)}
                   disabled={running !== null}
                   className={cn(
-                    "h-auto w-full justify-start rounded-2xl border-border/70 bg-background/80 px-4 py-4 text-left shadow-none hover:bg-muted/40",
+                    "h-auto w-full justify-start whitespace-normal rounded-2xl border-border/70 bg-background/80 px-4 py-4 text-left shadow-none hover:bg-muted/40",
                     activeReportKey === action.key &&
                       "border-primary/40 bg-primary/5",
                     running === action.key && "border-primary/50",
@@ -1458,17 +1473,9 @@ export function ReportsClient({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span>{action.label}</span>
-                        <Badge variant="outline" className="rounded-full">
-                          {action.accent}
-                        </Badge>
-                      </div>
+                      <span>{action.label}</span>
                       <p className="mt-1 text-sm font-normal text-muted-foreground">
                         {action.description}
-                      </p>
-                      <p className="mt-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-                        Uses {action.controls}
                       </p>
                     </div>
                     <ArrowRight className="mt-1 size-4 text-muted-foreground" />

@@ -10,16 +10,19 @@ test("reports page can run multiple report actions", async ({ page }) => {
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Daily Staffing" }).click();
+  await expect(page).toHaveURL(/\/hr\/reports\/daily-staffing$/);
   await expect(
     page.getByRole("heading", { name: "Department Staffing" }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Yearly Payroll Expense" }).click();
+  await expect(page).toHaveURL(/\/hr\/reports\/yearly-payroll-expense$/);
   await expect(
     page.getByRole("heading", { name: "Monthly Payroll Trend" }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: "Payroll Summary" }).click();
+  await expect(page).toHaveURL(/\/hr\/reports\/payroll-summary$/);
   await expect(
     page.getByRole("heading", { name: "Monthly Payroll Register" }),
   ).toBeVisible();
