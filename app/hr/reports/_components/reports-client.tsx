@@ -4,7 +4,9 @@ import {
   ArrowRight,
   CalendarDays,
   Coins,
+  Download,
   Loader2,
+  ReceiptText,
   UserRoundSearch,
   Users,
 } from "lucide-react";
@@ -55,6 +57,7 @@ type RequestError = {
 type ReportActionKey =
   | "staffing"
   | "payroll-expense"
+  | "payroll-summary"
   | "user-demographics"
   | "resignation";
 
@@ -91,6 +94,44 @@ type YearlyPayrollExpenseReport = {
   total_expenses: number;
 };
 
+type PayrollTotals = {
+  gross_pay: number;
+  total_deductions: number;
+  net_salary: number;
+};
+
+type PayrollCutoff = PayrollTotals & {
+  payslip_id: number;
+};
+
+type PayrollSummaryReport = {
+  selected_month: number;
+  selected_year: number;
+  employee_count: number;
+  rows: Array<{
+    user: {
+      id: string;
+      employee_number?: string | null;
+      name?: string | null;
+      first_name?: string | null;
+      middle_name?: string | null;
+      last_name?: string | null;
+      department?: {
+        id: number;
+        name: string;
+      } | null;
+    };
+    first_cutoff: PayrollCutoff | null;
+    second_cutoff: PayrollCutoff | null;
+    monthly_total: PayrollTotals;
+  }>;
+  totals: {
+    first_cutoff: PayrollTotals;
+    second_cutoff: PayrollTotals;
+    monthly_total: PayrollTotals;
+  };
+};
+
 type GenderDemographicsReport = {
   as_of_date: string;
   gender_groups: string[];
@@ -119,8 +160,20 @@ type ResignationReport = {
 type ReportResult =
   | DailyStaffingReport
   | YearlyPayrollExpenseReport
+  | PayrollSummaryReport
   | GenderDemographicsReport
   | ResignationReport;
+
+function isPayrollSummaryReport(
+  result: ReportResult | null,
+): result is PayrollSummaryReport {
+  return Boolean(
+    result &&
+      "selected_month" in result &&
+      "employee_count" in result &&
+      "totals" in result,
+  );
+}
 
 async function requestJson<T>(pathname: string) {
   const response = await fetch(pathname, { cache: "no-store" });
@@ -183,6 +236,95 @@ function formatMonthLabel(value: string | null) {
   }).format(new Date(value));
 }
 
+function formatMonthYear(month: number, year: number) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date(year, month - 1, 1));
+}
+
+function formatPayrollValue(
+  summary: PayrollCutoff | null,
+  key: keyof PayrollTotals,
+) {
+  return summary ? formatCurrency(summary[key]) : "—";
+}
+
+function payrollCsvValue(
+  summary: PayrollCutoff | null,
+  key: keyof PayrollTotals,
+) {
+  return summary ? summary[key].toFixed(2) : "";
+}
+
+function csvEscape(value: string | number | null | undefined) {
+  const text = value == null ? "" : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function downloadPayrollSummaryCsv(report: PayrollSummaryReport) {
+  const csvRows: Array<Array<string | number | null>> = [
+    [
+      "Employee Number",
+      "Employee",
+      "Department",
+      "1ST Gross",
+      "1ST Deductions",
+      "1ST Net",
+      "2ND Gross",
+      "2ND Deductions",
+      "2ND Net",
+      "Monthly Gross",
+      "Monthly Deductions",
+      "Monthly Net",
+    ],
+    ...report.rows.map((row) => [
+      row.user.employee_number ?? "",
+      formatPersonName(row.user),
+      row.user.department?.name ?? "Unassigned",
+      payrollCsvValue(row.first_cutoff, "gross_pay"),
+      payrollCsvValue(row.first_cutoff, "total_deductions"),
+      payrollCsvValue(row.first_cutoff, "net_salary"),
+      payrollCsvValue(row.second_cutoff, "gross_pay"),
+      payrollCsvValue(row.second_cutoff, "total_deductions"),
+      payrollCsvValue(row.second_cutoff, "net_salary"),
+      row.monthly_total.gross_pay.toFixed(2),
+      row.monthly_total.total_deductions.toFixed(2),
+      row.monthly_total.net_salary.toFixed(2),
+    ]),
+    [
+      "Report Total",
+      "",
+      "",
+      report.totals.first_cutoff.gross_pay.toFixed(2),
+      report.totals.first_cutoff.total_deductions.toFixed(2),
+      report.totals.first_cutoff.net_salary.toFixed(2),
+      report.totals.second_cutoff.gross_pay.toFixed(2),
+      report.totals.second_cutoff.total_deductions.toFixed(2),
+      report.totals.second_cutoff.net_salary.toFixed(2),
+      report.totals.monthly_total.gross_pay.toFixed(2),
+      report.totals.monthly_total.total_deductions.toFixed(2),
+      report.totals.monthly_total.net_salary.toFixed(2),
+    ],
+  ];
+  const csv = `${csvRows
+    .map((row) => row.map(csvEscape).join(","))
+    .join("\r\n")}\r\n`;
+  const blob = new Blob([`\uFEFF${csv}`], {
+    type: "text/csv;charset=utf-8;",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const month = String(report.selected_month).padStart(2, "0");
+
+  link.href = url;
+  link.download = `payroll-summary-${report.selected_year}-${month}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function formatShiftWindow(start: string | null, end: string | null) {
   if (!start || !end) {
     return "Schedule Unavailable";
@@ -213,11 +355,13 @@ function MetricCard({
 }
 
 function EmptyReportState({
+  selectedMonth,
   selectedDate,
   selectedYear,
   fromDate,
   toDate,
 }: {
+  selectedMonth: string;
   selectedDate: string;
   selectedYear: string;
   fromDate: string;
@@ -242,6 +386,7 @@ function EmptyReportState({
       </div>
 
       <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+        <p>Payroll Month: {selectedMonth}</p>
         <p>Selected Date: {selectedDate}</p>
         <p>Selected Year: {selectedYear}</p>
         <p>From Date: {fromDate}</p>
@@ -497,6 +642,230 @@ function PayrollExpenseReportView({
   );
 }
 
+function PayrollSummaryReportView({
+  result,
+}: {
+  result: PayrollSummaryReport;
+}) {
+  const monthLabel = formatMonthYear(
+    result.selected_month,
+    result.selected_year,
+  );
+  const monthlyTotal = result.totals.monthly_total;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Employees"
+          value={String(result.employee_count)}
+          hint={`Released payroll rows for ${monthLabel}.`}
+        />
+        <MetricCard
+          label="Gross Pay"
+          value={formatCurrency(monthlyTotal.gross_pay)}
+          hint="Combined 1ST and 2ND cutoff gross pay."
+        />
+        <MetricCard
+          label="Deductions"
+          value={formatCurrency(monthlyTotal.total_deductions)}
+          hint="Combined released payroll deductions."
+        />
+        <MetricCard
+          label="Net Payroll"
+          value={formatCurrency(monthlyTotal.net_salary)}
+          hint="Total released net pay for the month."
+        />
+      </div>
+
+      <Card className="border-border/70 bg-background/70 shadow-none">
+        <CardHeader>
+          <CardTitle>Monthly Payroll Register</CardTitle>
+          <CardDescription>
+            Released regular payslips by employee and payroll cutoff for{" "}
+            {monthLabel}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-xl border">
+            <Table className="min-w-[1424px] table-fixed">
+              <colgroup>
+                <col style={{ width: "14rem" }} />
+                <col style={{ width: "10rem" }} />
+                <col style={{ width: "7rem" }} />
+                <col style={{ width: "8rem" }} />
+                <col style={{ width: "7rem" }} />
+                <col style={{ width: "7rem" }} />
+                <col style={{ width: "8rem" }} />
+                <col style={{ width: "7rem" }} />
+                <col style={{ width: "8rem" }} />
+                <col style={{ width: "9rem" }} />
+                <col style={{ width: "8rem" }} />
+              </colgroup>
+              <TableHeader>
+                <TableRow className="bg-muted/30">
+                  <TableHead rowSpan={2} className="w-[14rem] align-bottom">
+                    Employee
+                  </TableHead>
+                  <TableHead rowSpan={2} className="w-[10rem] align-bottom">
+                    Department
+                  </TableHead>
+                  <TableHead
+                    colSpan={3}
+                    className="border-l-2 border-r-2 border-border/70 text-center"
+                  >
+                    1ST Cutoff
+                  </TableHead>
+                  <TableHead
+                    colSpan={3}
+                    className="border-l-2 border-r-2 border-border/70 text-center"
+                  >
+                    2ND Cutoff
+                  </TableHead>
+                  <TableHead
+                    colSpan={3}
+                    className="border-l-2 border-r-2 border-border/70 text-center"
+                  >
+                    Monthly Total
+                  </TableHead>
+                </TableRow>
+                <TableRow className="bg-muted/30">
+                  <TableHead className="min-w-[7rem] border-l-2 border-border/70 text-left">
+                    Gross
+                  </TableHead>
+                  <TableHead className="min-w-[8rem] text-left">
+                    Deductions
+                  </TableHead>
+                  <TableHead className="min-w-[7rem] border-r-2 border-border/70 text-left">
+                    Net
+                  </TableHead>
+                  <TableHead className="min-w-[7rem] border-l-2 border-border/70 text-left">
+                    Gross
+                  </TableHead>
+                  <TableHead className="min-w-[8rem] text-left">
+                    Deductions
+                  </TableHead>
+                  <TableHead className="min-w-[7rem] border-r-2 border-border/70 text-left">
+                    Net
+                  </TableHead>
+                  <TableHead className="min-w-[8rem] border-l-2 border-border/70 text-left">
+                    Gross
+                  </TableHead>
+                  <TableHead className="min-w-[9rem] text-left">
+                    Deductions
+                  </TableHead>
+                  <TableHead className="min-w-[8rem] border-r-2 border-border/70 text-left">
+                    Net
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {result.rows.length > 0 ? (
+                  <>
+                    {result.rows.map((row) => (
+                      <TableRow key={row.user.id}>
+                        <TableCell className="font-medium">
+                          <div>
+                            <p>{formatPersonName(row.user)}</p>
+                            {row.user.employee_number ? (
+                              <p className="text-xs text-muted-foreground">
+                                {row.user.employee_number}
+                              </p>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {row.user.department?.name ?? "Unassigned"}
+                        </TableCell>
+                        <TableCell className="border-l-2 border-border/70 text-left tabular-nums">
+                          {formatPayrollValue(row.first_cutoff, "gross_pay")}
+                        </TableCell>
+                        <TableCell className="text-left tabular-nums">
+                          {formatPayrollValue(
+                            row.first_cutoff,
+                            "total_deductions",
+                          )}
+                        </TableCell>
+                        <TableCell className="border-r-2 border-border/70 text-left tabular-nums">
+                          {formatPayrollValue(row.first_cutoff, "net_salary")}
+                        </TableCell>
+                        <TableCell className="border-l-2 border-border/70 text-left tabular-nums">
+                          {formatPayrollValue(row.second_cutoff, "gross_pay")}
+                        </TableCell>
+                        <TableCell className="text-left tabular-nums">
+                          {formatPayrollValue(
+                            row.second_cutoff,
+                            "total_deductions",
+                          )}
+                        </TableCell>
+                        <TableCell className="border-r-2 border-border/70 text-left tabular-nums">
+                          {formatPayrollValue(row.second_cutoff, "net_salary")}
+                        </TableCell>
+                        <TableCell className="border-l-2 border-border/70 text-left tabular-nums">
+                          {formatCurrency(row.monthly_total.gross_pay)}
+                        </TableCell>
+                        <TableCell className="text-left tabular-nums">
+                          {formatCurrency(row.monthly_total.total_deductions)}
+                        </TableCell>
+                        <TableCell className="border-r-2 border-border/70 text-left font-semibold tabular-nums">
+                          {formatCurrency(row.monthly_total.net_salary)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="bg-muted/30 font-semibold">
+                      <TableCell colSpan={2}>Report Total</TableCell>
+                      <TableCell className="border-l-2 border-border/70 text-left tabular-nums">
+                        {formatCurrency(result.totals.first_cutoff.gross_pay)}
+                      </TableCell>
+                      <TableCell className="text-left tabular-nums">
+                        {formatCurrency(
+                          result.totals.first_cutoff.total_deductions,
+                        )}
+                      </TableCell>
+                      <TableCell className="border-r-2 border-border/70 text-left tabular-nums">
+                        {formatCurrency(result.totals.first_cutoff.net_salary)}
+                      </TableCell>
+                      <TableCell className="border-l-2 border-border/70 text-left tabular-nums">
+                        {formatCurrency(result.totals.second_cutoff.gross_pay)}
+                      </TableCell>
+                      <TableCell className="text-left tabular-nums">
+                        {formatCurrency(
+                          result.totals.second_cutoff.total_deductions,
+                        )}
+                      </TableCell>
+                      <TableCell className="border-r-2 border-border/70 text-left tabular-nums">
+                        {formatCurrency(result.totals.second_cutoff.net_salary)}
+                      </TableCell>
+                      <TableCell className="border-l-2 border-border/70 text-left tabular-nums">
+                        {formatCurrency(monthlyTotal.gross_pay)}
+                      </TableCell>
+                      <TableCell className="text-left tabular-nums">
+                        {formatCurrency(monthlyTotal.total_deductions)}
+                      </TableCell>
+                      <TableCell className="border-r-2 border-border/70 text-left tabular-nums">
+                        {formatCurrency(monthlyTotal.net_salary)}
+                      </TableCell>
+                    </TableRow>
+                  </>
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={11}
+                      className="py-8 text-center text-muted-foreground"
+                    >
+                      No released payroll data found for the selected month.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function GenderDemographicsReportView({
   result,
 }: {
@@ -720,6 +1089,7 @@ function ResignationReportView({ result }: { result: ResignationReport }) {
 function ReportOutput({
   result,
   reportKey,
+  selectedMonth,
   selectedDate,
   selectedYear,
   fromDate,
@@ -727,6 +1097,7 @@ function ReportOutput({
 }: {
   result: ReportResult | null;
   reportKey: ReportActionKey | null;
+  selectedMonth: string;
   selectedDate: string;
   selectedYear: string;
   fromDate: string;
@@ -736,6 +1107,7 @@ function ReportOutput({
     return (
       <EmptyReportState
         selectedDate={selectedDate}
+        selectedMonth={selectedMonth}
         selectedYear={selectedYear}
         fromDate={fromDate}
         toDate={toDate}
@@ -752,6 +1124,10 @@ function ReportOutput({
           result={result as YearlyPayrollExpenseReport}
         />
       );
+    case "payroll-summary":
+      return (
+        <PayrollSummaryReportView result={result as PayrollSummaryReport} />
+      );
     case "user-demographics":
       return (
         <GenderDemographicsReportView
@@ -763,8 +1139,15 @@ function ReportOutput({
   }
 }
 
-export function ReportsClient() {
+export function ReportsClient({
+  canViewPayrollSummary,
+}: {
+  canViewPayrollSummary: boolean;
+}) {
   const now = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(
+    String(now.getMonth() + 1),
+  );
   const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
   const [selectedDate, setSelectedDate] = useState(defaultDate());
   const [fromDate, setFromDate] = useState(defaultDate());
@@ -804,6 +1187,25 @@ export function ReportsClient() {
           setResult(data);
         },
       },
+      ...(canViewPayrollSummary
+        ? [
+            {
+              key: "payroll-summary" as const,
+              label: "Payroll Summary",
+              description:
+                "Monthly released payroll register by employee and cutoff.",
+              icon: ReceiptText,
+              accent: "Register",
+              controls: "Selected Month, Selected Year",
+              run: async () => {
+                const data = await requestJson<PayrollSummaryReport>(
+                  `/api/reports/payroll/summary?selected_month=${encodeURIComponent(selectedMonth)}&selected_year=${encodeURIComponent(selectedYear)}`,
+                );
+                setResult(data);
+              },
+            },
+          ]
+        : []),
       {
         key: "user-demographics" as const,
         label: "User Demographics (Gender)",
@@ -833,7 +1235,14 @@ export function ReportsClient() {
         },
       },
     ],
-    [fromDate, selectedDate, selectedYear, toDate],
+    [
+      canViewPayrollSummary,
+      fromDate,
+      selectedDate,
+      selectedMonth,
+      selectedYear,
+      toDate,
+    ],
   );
 
   const activeAction =
@@ -881,65 +1290,140 @@ export function ReportsClient() {
                 <p className="text-sm font-medium">Time Scope</p>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <Label
-                  htmlFor="reports-selected-year"
-                  className="flex flex-col items-start gap-2 text-left text-sm"
+                {activeReportKey === "payroll-summary" ? (
+                  <>
+                    <Label
+                      htmlFor="reports-selected-month"
+                      className="flex flex-col items-start gap-2 text-left text-sm"
+                    >
+                      <span className="text-left text-muted-foreground">
+                        Payroll Month
+                      </span>
+                      <Input
+                        id="reports-selected-month"
+                        type="number"
+                        min={1}
+                        max={12}
+                        value={selectedMonth}
+                        onChange={(event) =>
+                          setSelectedMonth(event.target.value)
+                        }
+                        className="w-full bg-background/80"
+                      />
+                    </Label>
+                    <Label
+                      htmlFor="reports-selected-year"
+                      className="flex flex-col items-start gap-2 text-left text-sm"
+                    >
+                      <span className="text-left text-muted-foreground">
+                        Selected Year
+                      </span>
+                      <Input
+                        id="reports-selected-year"
+                        value={selectedYear}
+                        onChange={(event) =>
+                          setSelectedYear(event.target.value)
+                        }
+                        className="w-full bg-background/80"
+                      />
+                    </Label>
+                  </>
+                ) : null}
+                {activeReportKey === "payroll-expense" ? (
+                  <Label
+                    htmlFor="reports-selected-year"
+                    className="flex flex-col items-start gap-2 text-left text-sm sm:col-span-2"
+                  >
+                    <span className="text-left text-muted-foreground">
+                      Selected Year
+                    </span>
+                    <Input
+                      id="reports-selected-year"
+                      value={selectedYear}
+                      onChange={(event) => setSelectedYear(event.target.value)}
+                      className="w-full bg-background/80"
+                    />
+                  </Label>
+                ) : null}
+                {activeReportKey === "staffing" ||
+                activeReportKey === "user-demographics" ? (
+                  <Label
+                    htmlFor="reports-selected-date"
+                    className="flex flex-col items-start gap-2 text-left text-sm sm:col-span-2"
+                  >
+                    <span className="text-left text-muted-foreground">
+                      Selected Date
+                    </span>
+                    <Input
+                      id="reports-selected-date"
+                      type="date"
+                      value={selectedDate}
+                      onChange={(event) => setSelectedDate(event.target.value)}
+                      className="w-full bg-background/80"
+                    />
+                  </Label>
+                ) : null}
+                {activeReportKey === "resignation" ? (
+                  <>
+                    <Label
+                      htmlFor="reports-from-date"
+                      className="flex flex-col items-start gap-2 text-left text-sm"
+                    >
+                      <span className="text-left text-muted-foreground">
+                        From Date
+                      </span>
+                      <Input
+                        id="reports-from-date"
+                        type="date"
+                        value={fromDate}
+                        onChange={(event) => setFromDate(event.target.value)}
+                        className="w-full bg-background/80"
+                      />
+                    </Label>
+                    <Label
+                      htmlFor="reports-to-date"
+                      className="flex flex-col items-start gap-2 text-left text-sm"
+                    >
+                      <span className="text-left text-muted-foreground">
+                        To Date
+                      </span>
+                      <Input
+                        id="reports-to-date"
+                        type="date"
+                        value={toDate}
+                        onChange={(event) => setToDate(event.target.value)}
+                        className="w-full bg-background/80"
+                      />
+                    </Label>
+                  </>
+                ) : null}
+                {activeReportKey === null ? (
+                  <p className="text-sm text-muted-foreground sm:col-span-2">
+                    Select a report to show its relevant filters.
+                  </p>
+                ) : null}
+              </div>
+              <div className="mt-4 space-y-2">
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={() => {
+                    if (activeAction) {
+                      void runAction(activeAction);
+                    }
+                  }}
+                  disabled={running !== null || activeAction === null}
                 >
-                  <span className="text-left text-muted-foreground">
-                    Selected Year
-                  </span>
-                  <Input
-                    id="reports-selected-year"
-                    value={selectedYear}
-                    onChange={(event) => setSelectedYear(event.target.value)}
-                    className="w-full bg-background/80"
-                  />
-                </Label>
-                <Label
-                  htmlFor="reports-selected-date"
-                  className="flex flex-col items-start gap-2 text-left text-sm"
-                >
-                  <span className="text-left text-muted-foreground">
-                    Selected Date
-                  </span>
-                  <Input
-                    id="reports-selected-date"
-                    type="date"
-                    value={selectedDate}
-                    onChange={(event) => setSelectedDate(event.target.value)}
-                    className="w-full bg-background/80"
-                  />
-                </Label>
-                <Label
-                  htmlFor="reports-from-date"
-                  className="flex flex-col items-start gap-2 text-left text-sm"
-                >
-                  <span className="text-left text-muted-foreground">
-                    From Date
-                  </span>
-                  <Input
-                    id="reports-from-date"
-                    type="date"
-                    value={fromDate}
-                    onChange={(event) => setFromDate(event.target.value)}
-                    className="w-full bg-background/80"
-                  />
-                </Label>
-                <Label
-                  htmlFor="reports-to-date"
-                  className="flex flex-col items-start gap-2 text-left text-sm"
-                >
-                  <span className="text-left text-muted-foreground">
-                    To Date
-                  </span>
-                  <Input
-                    id="reports-to-date"
-                    type="date"
-                    value={toDate}
-                    onChange={(event) => setToDate(event.target.value)}
-                    className="w-full bg-background/80"
-                  />
-                </Label>
+                  {running === activeReportKey ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : null}
+                  Apply Filters
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {activeAction
+                    ? `Refreshes ${activeAction.label} using the current filter values.`
+                    : "Run a report first, then apply filter changes here."}
+                </p>
               </div>
             </div>
 
@@ -1015,13 +1499,28 @@ export function ReportsClient() {
             {activeAction ? (
               <>
                 <Separator />
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className="rounded-full px-3 py-1">
-                    {activeAction.label}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {activeAction.description}
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="rounded-full px-3 py-1">
+                      {activeAction.label}
+                    </Badge>
+                    <span className="text-sm text-muted-foreground">
+                      {activeAction.description}
+                    </span>
+                  </div>
+                  {activeReportKey === "payroll-summary" &&
+                  isPayrollSummaryReport(result) ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadPayrollSummaryCsv(result)}
+                      disabled={running !== null}
+                    >
+                      <Download className="size-4" />
+                      Download CSV
+                    </Button>
+                  ) : null}
                 </div>
               </>
             ) : null}
@@ -1030,6 +1529,7 @@ export function ReportsClient() {
             <ReportOutput
               result={result}
               reportKey={activeReportKey}
+              selectedMonth={selectedMonth}
               selectedDate={selectedDate}
               selectedYear={selectedYear}
               fromDate={fromDate}

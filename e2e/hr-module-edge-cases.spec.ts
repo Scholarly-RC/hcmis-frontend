@@ -19,6 +19,11 @@ test("reports page can run multiple report actions", async ({ page }) => {
     page.getByRole("heading", { name: "Monthly Payroll Trend" }),
   ).toBeVisible();
 
+  await page.getByRole("button", { name: "Payroll Summary" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Monthly Payroll Register" }),
+  ).toBeVisible();
+
   await logout(page);
 });
 

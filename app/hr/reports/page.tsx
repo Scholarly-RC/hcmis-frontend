@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { ReportsClient } from "@/app/hr/reports/_components/reports-client";
-import { isStaff } from "@/utils/capabilities";
+import { CAP_VIEW_PAYROLL_SUMMARY } from "@/constants/capabilities";
+import { can, isStaff } from "@/utils/capabilities";
 
 export const metadata = {
   title: "Reports",
@@ -16,7 +17,11 @@ export default function ReportsPage() {
         if (!isStaff(user)) {
           redirect("/dashboard");
         }
-        return <ReportsClient />;
+        return (
+          <ReportsClient
+            canViewPayrollSummary={can(user, CAP_VIEW_PAYROLL_SUMMARY)}
+          />
+        );
       }}
     </DashboardPageFrame>
   );
