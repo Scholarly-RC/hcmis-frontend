@@ -11,6 +11,11 @@ const hrRoutes = [
   "/hr/payroll-settings",
   "/hr/salary-structure",
   "/hr/reports",
+  "/hr/reports/daily-staffing",
+  "/hr/reports/yearly-payroll-expense",
+  "/hr/reports/payroll-summary",
+  "/hr/reports/user-demographics",
+  "/hr/reports/resignations",
   "/hr/app-logs",
   "/hr/shared-resources",
 ] as const;
