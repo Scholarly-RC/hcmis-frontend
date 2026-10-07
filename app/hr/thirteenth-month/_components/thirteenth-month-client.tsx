@@ -74,6 +74,14 @@ function formatDateTime(value: string | null) {
   return parsed.toLocaleString();
 }
 
+function attendanceDeductionTotal(item: ThirteenthMonthPayout) {
+  return (
+    toNumber(item.annual_absence_deductions) +
+    toNumber(item.annual_late_deductions) +
+    toNumber(item.annual_undertime_deductions)
+  );
+}
+
 export function ThirteenthMonthClient() {
   const [year, setYear] = useState(String(currentYear()));
   const [users, setUsers] = useState<AuthUser[]>([]);
@@ -340,6 +348,8 @@ export function ThirteenthMonthClient() {
             <TableHeader>
               <TableRow>
                 <TableHead>Employee</TableHead>
+                <TableHead>Annual Basic</TableHead>
+                <TableHead>Attendance Deductions</TableHead>
                 <TableHead>Gross</TableHead>
                 <TableHead>Adjustments</TableHead>
                 <TableHead>Net</TableHead>
@@ -350,7 +360,7 @@ export function ThirteenthMonthClient() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={8}>
                     <div className="space-y-2 py-1">
                       <Skeleton className="h-4 w-40" />
                       <Skeleton className="h-4 w-full" />
@@ -359,7 +369,7 @@ export function ThirteenthMonthClient() {
                 </TableRow>
               ) : filteredPayouts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={8}>
                     No payouts found. Generate first for {year}.
                   </TableCell>
                 </TableRow>
@@ -369,6 +379,12 @@ export function ThirteenthMonthClient() {
                   return (
                     <TableRow key={item.id}>
                       <TableCell>{employeeName}</TableCell>
+                      <TableCell>
+                        {formatCurrency(item.annual_basic_salary)}
+                      </TableCell>
+                      <TableCell>
+                        {formatCurrency(attendanceDeductionTotal(item))}
+                      </TableCell>
                       <TableCell>{formatCurrency(item.gross_amount)}</TableCell>
                       <TableCell>
                         {item.adjustments.length} Item
@@ -433,6 +449,56 @@ export function ThirteenthMonthClient() {
                 Status: {activePayout.status} · Release date:{" "}
                 {formatDateTime(activePayout.released_at)}
               </p>
+              <div className="grid gap-3 rounded-lg border bg-muted/20 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Annual Basic Salary
+                  </p>
+                  <p className="font-medium">
+                    {formatCurrency(activePayout.annual_basic_salary)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Absence Deductions
+                  </p>
+                  <p className="font-medium">
+                    {formatCurrency(activePayout.annual_absence_deductions)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Late Deductions
+                  </p>
+                  <p className="font-medium">
+                    {formatCurrency(activePayout.annual_late_deductions)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Undertime Deductions
+                  </p>
+                  <p className="font-medium">
+                    {formatCurrency(activePayout.annual_undertime_deductions)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Eligible Basic Salary
+                  </p>
+                  <p className="font-medium">
+                    {formatCurrency(activePayout.eligible_basic_salary)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    13th Month Gross
+                  </p>
+                  <p className="font-medium">
+                    {formatCurrency(activePayout.gross_amount)}
+                  </p>
+                </div>
+              </div>
               <div className="grid gap-3 md:grid-cols-[160px_minmax(220px,1fr)_180px_minmax(220px,1fr)]">
                 <div className="space-y-2">
                   <Label htmlFor="adjustment-type">Type</Label>
