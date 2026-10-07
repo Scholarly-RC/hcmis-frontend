@@ -36,6 +36,7 @@ export type ShiftTemplateRecord = {
   end_time: string | null;
   start_time_2: string | null;
   end_time_2: string | null;
+  late_grace_minutes: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -49,6 +50,7 @@ type ShiftFormState = {
   end_time: string;
   start_time_2: string;
   end_time_2: string;
+  late_grace_minutes: string;
   is_active: boolean;
 };
 
@@ -59,6 +61,7 @@ const shiftSchema = z
     end_time: z.string().trim().min(1, "End time is required."),
     start_time_2: z.string(),
     end_time_2: z.string(),
+    late_grace_minutes: z.string().regex(/^\d+$/, "Use whole minutes."),
     is_active: z.boolean(),
   })
   .superRefine((values, context) => {
@@ -180,6 +183,7 @@ type ShiftPayload = {
   end_time: string;
   start_time_2?: string | null;
   end_time_2?: string | null;
+  late_grace_minutes: number;
   is_active: boolean;
 };
 
@@ -248,7 +252,7 @@ function formatShiftRange(shift: ShiftTemplateRecord) {
     return "No time range configured";
   }
 
-  return parts.join(" - ");
+  return `${parts.join(" - ")} · ${shift.late_grace_minutes ?? 0}m grace`;
 }
 
 function buildShiftSummary(shift: ShiftTemplateRecord) {
@@ -267,6 +271,7 @@ function buildShiftFormState(
     end_time: shift?.end_time ?? "",
     start_time_2: shift?.start_time_2 ?? "",
     end_time_2: shift?.end_time_2 ?? "",
+    late_grace_minutes: String(shift?.late_grace_minutes ?? 0),
     is_active: shift?.is_active ?? true,
   };
 }
@@ -367,6 +372,7 @@ function ShiftEditorDialog({
               start_time_2: null,
               end_time_2: null,
             }),
+        late_grace_minutes: Number.parseInt(values.late_grace_minutes, 10),
         is_active: values.is_active,
       });
       onOpenChange(false);
@@ -432,6 +438,14 @@ function ShiftEditorDialog({
               name="end_time_2"
               label="Second end time"
               type="time"
+            />
+
+            <ShiftTextField
+              control={control}
+              name="late_grace_minutes"
+              label="Late grace (minutes)"
+              type="number"
+              placeholder="0"
             />
           </div>
 

@@ -17,6 +17,7 @@ export type AttendanceShift = {
   end_time: string | null;
   start_time_2: string | null;
   end_time_2: string | null;
+  late_grace_minutes: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -64,7 +65,9 @@ export type AttendanceHolidayPayload = {
 export type AttendanceApprovedLeave = {
   id: number;
   leave_date: string;
-  leave_type: "PA" | "UN" | "WR";
+  leave_type: string;
+  duration: "FULL_DAY" | "FIRST_HALF" | "SECOND_HALF";
+  approval_type: "PAID" | "NON_PAID" | null;
   info: string | null;
 };
 
@@ -76,6 +79,12 @@ export type AttendanceSummaryDay = {
   holidays: AttendanceHoliday[];
   overtime_approved: boolean;
   approved_leave: AttendanceApprovedLeave | null;
+  status: string;
+  late_minutes: number;
+  scheduled_minutes: number;
+  absence_units: number;
+  deduction_units: number;
+  partial_record: boolean;
 };
 
 export type AttendanceSummary = {

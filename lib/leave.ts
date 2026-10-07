@@ -54,6 +54,7 @@ export type LeaveRequestRecord = {
   user_id: string;
   leave_date: string;
   leave_type: string;
+  duration: "FULL_DAY" | "FIRST_HALF" | "SECOND_HALF";
   approval_type?: "PAID" | "NON_PAID" | null;
   info: string | null;
   first_approver_id: string | null;
@@ -76,6 +77,7 @@ export type LeaveRequestRecord = {
 export type LeaveRequestCreatePayload = {
   leave_date: string;
   leave_type: string;
+  duration: "FULL_DAY" | "FIRST_HALF" | "SECOND_HALF";
   info: string | null;
 };
 

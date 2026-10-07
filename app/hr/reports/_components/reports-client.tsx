@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   ArrowRight,
   CalendarDays,
   Coins,
@@ -85,6 +86,43 @@ type DailyStaffingReport = {
   }>;
 };
 
+type AttendanceExceptionsReport = {
+  from_date: string;
+  to_date: string;
+  rows: Array<{
+    user: {
+      id: string;
+      name?: string | null;
+      first_name?: string | null;
+      middle_name?: string | null;
+      last_name?: string | null;
+      department?: { id: number; name: string } | null;
+    };
+    date: string;
+    status: string;
+    late_minutes: number;
+    scheduled_minutes: number;
+    absence_units: number;
+    deduction_units: number;
+    partial_record: boolean;
+    leave: {
+      id: number;
+      leave_type: string;
+      duration: string;
+      approval_type: string | null;
+    } | null;
+  }>;
+  totals: {
+    total_exceptions: number;
+    absent_days: number;
+    late_days: number;
+    partial_days: number;
+    unpaid_leave_days: number;
+    total_late_minutes: number;
+    total_deduction_units: number;
+  };
+};
+
 type YearlyPayrollExpenseReport = {
   selected_year: number;
   months: string[];
@@ -157,6 +195,7 @@ type ResignationReport = {
 
 type ReportResult =
   | DailyStaffingReport
+  | AttendanceExceptionsReport
   | YearlyPayrollExpenseReport
   | PayrollSummaryReport
   | GenderDemographicsReport
@@ -516,6 +555,116 @@ function DailyStaffingReportView({ result }: { result: DailyStaffingReport }) {
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function AttendanceExceptionsReportView({
+  result,
+}: {
+  result: AttendanceExceptionsReport;
+}) {
+  const statusLabel: Record<string, string> = {
+    ABSENT: "Absent",
+    LATE: "Late",
+    PARTIAL_RECORD: "Needs review",
+    ON_UNPAID_LEAVE: "Unpaid leave",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Exceptions"
+          value={String(result.totals.total_exceptions)}
+          hint={`Between ${formatDateLabel(result.from_date)} and ${formatDateLabel(result.to_date)}.`}
+        />
+        <MetricCard
+          label="Absences"
+          value={String(result.totals.absent_days)}
+          hint="Past scheduled days without a complete record."
+        />
+        <MetricCard
+          label="Late minutes"
+          value={String(result.totals.total_late_minutes)}
+          hint={`${result.totals.late_days} day(s) beyond shift grace.`}
+        />
+        <MetricCard
+          label="Deduction units"
+          value={result.totals.total_deduction_units.toFixed(2)}
+          hint="Preview of automatic payroll deduction days."
+        />
+      </div>
+
+      <Card className="border-border/70 bg-background/70 shadow-none">
+        <CardHeader>
+          <CardTitle>Attendance Exceptions</CardTitle>
+          <CardDescription>
+            Late, absent, unpaid-leave, and partial-punch records requiring HR
+            attention.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-xl border">
+            <Table className="min-w-[980px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Late</TableHead>
+                  <TableHead>Deduction units</TableHead>
+                  <TableHead>Leave</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {result.rows.length > 0 ? (
+                  result.rows.map((row) => (
+                    <TableRow key={`${row.user.id}-${row.date}`}>
+                      <TableCell className="font-medium">
+                        {formatPersonName(row.user)}
+                      </TableCell>
+                      <TableCell>
+                        {row.user.department?.name ?? "Unassigned"}
+                      </TableCell>
+                      <TableCell>{formatDateLabel(row.date)}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            row.status === "ABSENT" ||
+                            row.status === "ON_UNPAID_LEAVE"
+                              ? "destructive"
+                              : "secondary"
+                          }
+                        >
+                          {statusLabel[row.status] ?? row.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{row.late_minutes} min</TableCell>
+                      <TableCell>{row.deduction_units.toFixed(2)}</TableCell>
+                      <TableCell>
+                        {row.leave
+                          ? `${row.leave.leave_type} · ${row.leave.duration}`
+                          : "—"}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="py-8 text-center text-muted-foreground"
+                    >
+                      No attendance exceptions found for the selected range.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -1116,6 +1265,12 @@ function ReportOutput({
   switch (reportKey) {
     case "staffing":
       return <DailyStaffingReportView result={result as DailyStaffingReport} />;
+    case "attendance-exceptions":
+      return (
+        <AttendanceExceptionsReportView
+          result={result as AttendanceExceptionsReport}
+        />
+      );
     case "payroll-expense":
       return (
         <PayrollExpenseReportView
@@ -1173,6 +1328,24 @@ export function ReportsClient({
           setResult(data);
         },
       },
+      ...(canViewPayrollSummary
+        ? [
+            {
+              key: "attendance-exceptions" as const,
+              href: REPORT_PATHS["attendance-exceptions"],
+              label: "Attendance Exceptions",
+              description:
+                "Review absences, late punches, unpaid leave, and partial records.",
+              icon: AlertTriangle,
+              run: async () => {
+                const data = await requestJson<AttendanceExceptionsReport>(
+                  `/api/reports/attendance/exceptions?from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`,
+                );
+                setResult(data);
+              },
+            },
+          ]
+        : []),
       {
         key: "payroll-expense" as const,
         href: REPORT_PATHS["payroll-expense"],
@@ -1382,7 +1555,8 @@ export function ReportsClient({
                       />
                     </Label>
                   ) : null}
-                  {activeReportKey === "resignation" ? (
+                  {activeReportKey === "resignation" ||
+                  activeReportKey === "attendance-exceptions" ? (
                     <>
                       <Label
                         htmlFor="reports-from-date"

@@ -752,6 +752,7 @@ export function LeaveManagementClient({
                     <TableHead>Department</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Duration</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Approvers</TableHead>
                     <TableHead>Info</TableHead>
@@ -762,7 +763,7 @@ export function LeaveManagementClient({
                   {filteredRequests.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={8}
+                        colSpan={9}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No leave requests found.
@@ -793,6 +794,13 @@ export function LeaveManagementClient({
                           <TableCell>
                             {leaveTypeNameByCode.get(item.leave_type) ??
                               leaveTypeLabel(item.leave_type)}
+                          </TableCell>
+                          <TableCell>
+                            {item.duration === "FIRST_HALF"
+                              ? "AM"
+                              : item.duration === "SECOND_HALF"
+                                ? "PM"
+                                : "Full day"}
                           </TableCell>
                           <TableCell>
                             <Badge
