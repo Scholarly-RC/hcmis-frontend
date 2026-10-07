@@ -154,7 +154,7 @@ function getShiftRangeLabel(shift: AttendanceSummaryDay["shift"]) {
   ].filter(Boolean);
 
   return parts.length > 0
-    ? `${shift.shift.description} - ${parts.join(" - ")}`
+    ? `${shift.shift.description} - ${parts.join(" - ")} · ${shift.shift.late_grace_minutes ?? 0}m grace`
     : shift.shift.description;
 }
 
@@ -184,7 +184,8 @@ function getApprovedLeaveLabel(leave: AttendanceApprovedLeave | null) {
   if (!leave) {
     return null;
   }
-  return `${leaveTypeLabel(leave.leave_type)} Leave`;
+  const label = leaveTypeLabel(leave.leave_type);
+  return label.toLowerCase().endsWith("leave") ? label : `${label} Leave`;
 }
 
 function getSummaryStats(summary: AttendanceSummary) {
@@ -194,6 +195,9 @@ function getSummaryStats(summary: AttendanceSummary) {
   let leaveDays = 0;
   let overtimeDays = 0;
   let totalPunches = 0;
+  let lateDays = 0;
+  let absenceDays = 0;
+  let partialDays = 0;
 
   for (const day of summary.days) {
     if (day.shift) {
@@ -212,6 +216,15 @@ function getSummaryStats(summary: AttendanceSummary) {
     if (day.overtime_approved) {
       overtimeDays += 1;
     }
+    if (day.status === "LATE") {
+      lateDays += 1;
+    }
+    if (day.status === "ABSENT") {
+      absenceDays += 1;
+    }
+    if (day.status === "PARTIAL_RECORD" || day.partial_record) {
+      partialDays += 1;
+    }
   }
 
   return {
@@ -220,6 +233,9 @@ function getSummaryStats(summary: AttendanceSummary) {
     holidayDays,
     leaveDays,
     overtimeDays,
+    lateDays,
+    absenceDays,
+    partialDays,
     totalPunches,
     missingPunchDays: Math.max(daysWithShifts - daysWithPunches, 0),
   };
@@ -279,6 +295,28 @@ function getDayStatus(
   label: string;
   variant: "default" | "secondary" | "outline" | "destructive";
 } {
+  const backendStatus = day.status;
+  const backendLabels: Record<
+    string,
+    {
+      label: string;
+      variant: "default" | "secondary" | "outline" | "destructive";
+    }
+  > = {
+    HOLIDAY: { label: "Holiday", variant: "secondary" },
+    ON_PAID_LEAVE: { label: "Paid leave", variant: "secondary" },
+    ON_UNPAID_LEAVE: { label: "Unpaid leave", variant: "destructive" },
+    ABSENT: { label: "Absent", variant: "destructive" },
+    LATE: { label: "Late", variant: "secondary" },
+    PARTIAL_RECORD: { label: "Needs review", variant: "outline" },
+    PENDING: { label: "Pending", variant: "outline" },
+    PRESENT: { label: "Present", variant: "default" },
+    NO_SHIFT: { label: "No shift", variant: "outline" },
+  };
+  if (backendStatus && backendLabels[backendStatus]) {
+    return backendLabels[backendStatus];
+  }
+
   if (day.holidays.length > 0) {
     return { label: "Holiday", variant: "secondary" };
   }
@@ -676,6 +714,24 @@ export function AttendanceManagementClient({
           icon={Plus}
         />
         <StatCard
+          label="Late days"
+          value={stats.lateDays.toString()}
+          helper="Days outside the configured grace period"
+          icon={Clock3}
+        />
+        <StatCard
+          label="Absences"
+          value={stats.absenceDays.toString()}
+          helper="Past scheduled days without a complete record"
+          icon={CalendarDays}
+        />
+        <StatCard
+          label="Needs review"
+          value={stats.partialDays.toString()}
+          helper="One-sided or incomplete punches"
+          icon={Clock3}
+        />
+        <StatCard
           label="Total punches"
           value={stats.totalPunches.toString()}
           helper="All IN and OUT entries"
@@ -854,6 +910,16 @@ export function AttendanceManagementClient({
                     <p className="mt-1 font-medium text-foreground">
                       {getApprovedLeaveLabel(selectedDay.approved_leave)}
                     </p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {selectedDay.approved_leave.duration === "FIRST_HALF"
+                        ? "First half (AM)"
+                        : selectedDay.approved_leave.duration === "SECOND_HALF"
+                          ? "Second half (PM)"
+                          : "Full day"}
+                      {selectedDay.approved_leave.approval_type === "NON_PAID"
+                        ? " · unpaid"
+                        : " · paid"}
+                    </p>
                     {selectedDay.approved_leave.info ? (
                       <p className="mt-1 text-sm leading-6 text-muted-foreground">
                         {selectedDay.approved_leave.info}
@@ -861,6 +927,27 @@ export function AttendanceManagementClient({
                     ) : null}
                   </div>
                 ) : null}
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-2xl border border-border/70 bg-background p-4">
+                    <p className="text-sm text-muted-foreground">Status</p>
+                    <p className="mt-1 font-medium text-foreground">
+                      {getDayStatus(summary, selectedDay, referenceDate).label}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-border/70 bg-background p-4">
+                    <p className="text-sm text-muted-foreground">Late</p>
+                    <p className="mt-1 font-medium text-foreground">
+                      {selectedDay.late_minutes} min
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-border/70 bg-background p-4">
+                    <p className="text-sm text-muted-foreground">Deduction</p>
+                    <p className="mt-1 font-medium text-foreground">
+                      {selectedDay.deduction_units.toFixed(2)} day
+                    </p>
+                  </div>
+                </div>
 
                 <div className="rounded-2xl border border-border/70 bg-background p-4">
                   <p className="text-sm text-muted-foreground">Shift</p>

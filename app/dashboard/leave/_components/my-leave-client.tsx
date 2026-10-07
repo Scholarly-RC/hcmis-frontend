@@ -76,6 +76,7 @@ function getLeaveCreateErrorMessage(error: unknown) {
 const createLeaveRequestSchema = z.object({
   leave_date: z.string().min(1, "Date is required."),
   leave_type: z.string().min(1, "Type is required."),
+  duration: z.enum(["FULL_DAY", "FIRST_HALF", "SECOND_HALF"]),
   info: z.string().trim().min(1, "Info is required."),
 });
 
@@ -188,6 +189,7 @@ export function MyLeaveClient() {
     defaultValues: {
       leave_date: "",
       leave_type: "",
+      duration: "FULL_DAY",
       info: "",
     },
   });
@@ -277,6 +279,7 @@ export function MyLeaveClient() {
   }, [deepLinkedLeaveId, filteredRequests]);
 
   const selectedLeaveType = watch("leave_type");
+  const selectedDuration = watch("duration");
   const selectedLeaveDate = watch("leave_date");
   const leaveInfoValue = watch("info");
   const isCreateFormIncomplete =
@@ -288,6 +291,7 @@ export function MyLeaveClient() {
         leave_date: values.leave_date,
         leave_type:
           values.leave_type as LeaveRequestCreatePayload["leave_type"],
+        duration: values.duration,
         info: values.info.trim(),
       };
 
@@ -300,7 +304,12 @@ export function MyLeaveClient() {
       );
 
       setRequests((prev) => [created, ...prev]);
-      reset({ leave_date: "", leave_type: values.leave_type, info: "" });
+      reset({
+        leave_date: "",
+        leave_type: values.leave_type,
+        duration: values.duration,
+        info: "",
+      });
       setIsCreateDialogOpen(false);
       toast.success("Leave request submitted.");
     } catch (error) {
@@ -345,7 +354,8 @@ export function MyLeaveClient() {
               My Leave
             </h1>
             <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-              Submit leave requests and track approvals.
+              Submit full-day or AM/PM leave requests and track approvals.
+              Emergency Leave appears here when HR configures it.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -385,7 +395,7 @@ export function MyLeaveClient() {
                   className="space-y-4"
                   onSubmit={handleSubmit(handleCreateRequest)}
                 >
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-4 sm:grid-cols-3">
                     <div className="space-y-2">
                       <Label htmlFor="leave_date">Date</Label>
                       <Input
@@ -417,6 +427,27 @@ export function MyLeaveClient() {
                         label: item.label,
                       }))}
                       placeholder="Select type"
+                    />
+                    <SelectField
+                      id="leave_duration"
+                      label="Duration"
+                      value={selectedDuration}
+                      onChange={(_, value) =>
+                        setValue(
+                          "duration",
+                          value as CreateLeaveRequestFormValues["duration"],
+                          {
+                            shouldDirty: true,
+                            shouldValidate: true,
+                          },
+                        )
+                      }
+                      options={[
+                        { value: "FULL_DAY", label: "Full day" },
+                        { value: "FIRST_HALF", label: "First half (AM)" },
+                        { value: "SECOND_HALF", label: "Second half (PM)" },
+                      ]}
+                      placeholder="Select duration"
                     />
                   </div>
                   <div className="space-y-2">
@@ -519,6 +550,7 @@ export function MyLeaveClient() {
                   <TableRow>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Duration</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Approvals</TableHead>
                     <TableHead>Info</TableHead>
@@ -529,7 +561,7 @@ export function MyLeaveClient() {
                   {filteredRequests.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={6}
+                        colSpan={7}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No leave requests found.
@@ -555,6 +587,13 @@ export function MyLeaveClient() {
                           <TableCell>{formatDate(item.leave_date)}</TableCell>
                           <TableCell>
                             {leaveTypeLabel(item.leave_type)}
+                          </TableCell>
+                          <TableCell>
+                            {item.duration === "FIRST_HALF"
+                              ? "First half (AM)"
+                              : item.duration === "SECOND_HALF"
+                                ? "Second half (PM)"
+                                : "Full day"}
                           </TableCell>
                           <TableCell>
                             <Badge

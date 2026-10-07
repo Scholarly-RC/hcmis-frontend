@@ -446,6 +446,7 @@ export function LeaveInboxClient() {
                     <TableHead>Employee</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Duration</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Approvals</TableHead>
                     <TableHead>Info</TableHead>
@@ -456,7 +457,7 @@ export function LeaveInboxClient() {
                   {filteredRows.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={7}
+                        colSpan={8}
                         className="py-8 text-center text-muted-foreground"
                       >
                         No review requests found.
@@ -491,6 +492,13 @@ export function LeaveInboxClient() {
                           <TableCell>{formatDate(item.leave_date)}</TableCell>
                           <TableCell>
                             {leaveTypeLabel(item.leave_type)}
+                          </TableCell>
+                          <TableCell>
+                            {item.duration === "FIRST_HALF"
+                              ? "AM"
+                              : item.duration === "SECOND_HALF"
+                                ? "PM"
+                                : "Full day"}
                           </TableCell>
                           <TableCell>
                             <Badge
