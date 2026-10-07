@@ -46,6 +46,14 @@ function formatDateTime(value: string | null) {
   return parsed.toLocaleString();
 }
 
+function attendanceDeductionTotal(item: ThirteenthMonthPayout) {
+  return (
+    toNumber(item.annual_absence_deductions) +
+    toNumber(item.annual_late_deductions) +
+    toNumber(item.annual_undertime_deductions)
+  );
+}
+
 export function MyThirteenthMonthClient() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -87,8 +95,10 @@ export function MyThirteenthMonthClient() {
             <TableHeader>
               <TableRow>
                 <TableHead>Year</TableHead>
+                <TableHead>Annual Basic</TableHead>
+                <TableHead>Attendance Deductions</TableHead>
                 <TableHead>Gross</TableHead>
-                <TableHead>Deductions</TableHead>
+                <TableHead>Other Deductions</TableHead>
                 <TableHead>Net</TableHead>
                 <TableHead>Released</TableHead>
               </TableRow>
@@ -96,7 +106,7 @@ export function MyThirteenthMonthClient() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={7}>
                     <div className="space-y-2 py-1">
                       <Skeleton className="h-4 w-40" />
                       <Skeleton className="h-4 w-full" />
@@ -105,7 +115,7 @@ export function MyThirteenthMonthClient() {
                 </TableRow>
               ) : payouts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5}>
+                  <TableCell colSpan={7}>
                     No released payouts available yet.
                   </TableCell>
                 </TableRow>
@@ -120,6 +130,12 @@ export function MyThirteenthMonthClient() {
                     }
                   >
                     <TableCell>{item.year}</TableCell>
+                    <TableCell>
+                      {formatCurrency(item.annual_basic_salary)}
+                    </TableCell>
+                    <TableCell>
+                      {formatCurrency(attendanceDeductionTotal(item))}
+                    </TableCell>
                     <TableCell>{formatCurrency(item.gross_amount)}</TableCell>
                     <TableCell>
                       {formatCurrency(item.total_deductions)}

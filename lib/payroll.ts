@@ -210,6 +210,11 @@ export type ThirteenthMonthPayout = {
   id: number;
   user_id: string;
   year: number;
+  annual_basic_salary: string;
+  annual_absence_deductions: string;
+  annual_late_deductions: string;
+  annual_undertime_deductions: string;
+  eligible_basic_salary: string;
   gross_amount: string;
   total_deductions: string;
   net_amount: string;
