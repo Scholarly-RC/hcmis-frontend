@@ -48,6 +48,6 @@ export const EMPLOYEE_TYPE_OPTIONS: ProfileOption[] = [
 
 export const EMPLOYMENT_STATUS_OPTIONS: ProfileOption[] = [
   { value: "CONTRACTUAL", label: "Contractual" },
-  { value: "PROVISIONARY", label: "Provisionary" },
+  { value: "PROBATIONARY", label: "Probationary" },
   { value: "REGULAR", label: "Regular" },
 ];
