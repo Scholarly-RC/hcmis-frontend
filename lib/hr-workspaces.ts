@@ -193,9 +193,9 @@ export const HR_WORKSPACES: Record<HrWorkspaceKey, HrWorkspaceConfig> = {
       {
         label: "Performance Evaluations",
         description:
-          "Manage HR evaluation cycles and peer/self evaluation workflows.",
+          "Create evaluation cycles, assign evaluators, and review results.",
         icon: Vote,
-        href: "/performance-evaluations",
+        href: "/performance-evaluations?view=management",
         keywords: ["evaluation", "peer review", "self review"],
         requiredCapabilities: ["access_hr_workspace"],
       },

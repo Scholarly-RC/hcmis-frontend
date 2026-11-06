@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { DashboardPageFrame } from "@/app/dashboard/_components/dashboard-page-frame";
 import { WorkspaceHub } from "@/components/workspace-hub";
+import { isStaff } from "@/utils/capabilities";
 
 export const metadata = {
   title: "My Workflows",
@@ -83,7 +84,9 @@ export default function MyWorkflowsPage() {
               label: "Performance",
               description: "Review self and peer performance evaluations.",
               icon: ShieldCheck,
-              href: "/performance-evaluations",
+              href: isStaff(user)
+                ? "/performance-evaluations?view=evaluator"
+                : "/performance-evaluations",
               requiredCapabilities: ["view_performance_self"],
             },
             {
