@@ -297,6 +297,8 @@ export function PerformanceEvaluationsClient({
   isStaff: boolean;
 }) {
   const searchParams = useSearchParams();
+  const isEvaluatorView = searchParams.get("view") === "evaluator";
+  const isHrManagementView = isStaff && !isEvaluatorView;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -316,7 +318,7 @@ export function PerformanceEvaluationsClient({
     Record<number, string>
   >({});
   const [workspaceView, setWorkspaceView] = useState<WorkspaceView>(
-    isStaff ? "hr_cycle" : "self",
+    isHrManagementView ? "hr_cycle" : "self",
   );
   const [createCycleForm, setCreateCycleForm] = useState<CreateCycleFormState>({
     evaluateeId: "",
@@ -510,7 +512,7 @@ export function PerformanceEvaluationsClient({
       }
 
       try {
-        if (isStaff) {
+        if (isHrManagementView) {
           const [loadedCycles, loadedQuestionnaires, loadedUsers] =
             await Promise.all([
               requestJson<UserEvaluationRecord[]>(
@@ -598,7 +600,7 @@ export function PerformanceEvaluationsClient({
         setRefreshing(false);
       }
     },
-    [currentUser.id, isStaff, loadCycleDetails, selectedCycleId],
+    [currentUser.id, isHrManagementView, loadCycleDetails, selectedCycleId],
   );
 
   useEffect(() => {
@@ -615,7 +617,14 @@ export function PerformanceEvaluationsClient({
   }, [loadCycleDetails, selectedCycleId]);
 
   useEffect(() => {
-    if (isStaff && workspaceView === "hr_cycle") {
+    if (isHrManagementView) {
+      if (workspaceView !== "hr_cycle") {
+        setWorkspaceView("hr_cycle");
+      }
+      return;
+    }
+    if (workspaceView === "hr_cycle") {
+      setWorkspaceView(hasSelfForms ? "self" : hasPeerForms ? "peer" : "self");
       return;
     }
     if (workspaceView === "self" && hasSelfForms) {
@@ -632,15 +641,11 @@ export function PerformanceEvaluationsClient({
       setWorkspaceView("peer");
       return;
     }
-    if (isStaff) {
-      setWorkspaceView("hr_cycle");
-      return;
-    }
     setWorkspaceView("self");
-  }, [hasPeerForms, hasSelfForms, isStaff, workspaceView]);
+  }, [hasPeerForms, hasSelfForms, isHrManagementView, workspaceView]);
 
   useEffect(() => {
-    if (!isStaff) {
+    if (!isHrManagementView) {
       return;
     }
     if (users.length === 0) {
@@ -657,10 +662,10 @@ export function PerformanceEvaluationsClient({
       ? String(selectedCycle.evaluatee_id)
       : String(users[0].id);
     setSelectedEvaluateeId(preferredEvaluateeId);
-  }, [isStaff, selectedCycle, selectedEvaluateeId, users]);
+  }, [isHrManagementView, selectedCycle, selectedEvaluateeId, users]);
 
   useEffect(() => {
-    if (!isStaff) {
+    if (!isHrManagementView) {
       return;
     }
     if (!selectedEvaluateeId) {
@@ -674,10 +679,15 @@ export function PerformanceEvaluationsClient({
       return;
     }
     setSelectedCycleId(filteredStaffCycles[0]?.id ?? null);
-  }, [filteredStaffCycles, isStaff, selectedCycle, selectedEvaluateeId]);
+  }, [
+    filteredStaffCycles,
+    isHrManagementView,
+    selectedCycle,
+    selectedEvaluateeId,
+  ]);
 
   useEffect(() => {
-    if (!isStaff || !selectedEvaluateeId) {
+    if (!isHrManagementView || !selectedEvaluateeId) {
       return;
     }
     setCreateCycleForm((current) => {
@@ -689,10 +699,10 @@ export function PerformanceEvaluationsClient({
         evaluateeId: selectedEvaluateeId,
       };
     });
-  }, [isStaff, selectedEvaluateeId]);
+  }, [isHrManagementView, selectedEvaluateeId]);
 
   useEffect(() => {
-    if (!isStaff) {
+    if (!isHrManagementView) {
       return;
     }
     setCreateCycleForm((current) => {
@@ -704,7 +714,7 @@ export function PerformanceEvaluationsClient({
         questionnaireId: autoQuestionnaireIdForSelectedUser,
       };
     });
-  }, [autoQuestionnaireIdForSelectedUser, isStaff]);
+  }, [autoQuestionnaireIdForSelectedUser, isHrManagementView]);
 
   useEffect(() => {
     if (!deepLinkedCycleId || cycles.length === 0) {
@@ -718,7 +728,7 @@ export function PerformanceEvaluationsClient({
       return;
     }
     appliedDeepLinkCycleIdRef.current = deepLinkedCycleId;
-    if (isStaff) {
+    if (isHrManagementView) {
       setSelectedEvaluateeId(String(targetCycle.evaluatee_id));
     }
     setSelectedCycleId(targetCycle.id);
@@ -736,7 +746,7 @@ export function PerformanceEvaluationsClient({
     return () => {
       window.clearTimeout(timer);
     };
-  }, [cycles, deepLinkedCycleId, isStaff]);
+  }, [cycles, deepLinkedCycleId, isHrManagementView]);
 
   function updateEvaluationQuestionRating(
     evaluationId: number,
@@ -1238,7 +1248,7 @@ export function PerformanceEvaluationsClient({
     );
   }
 
-  if (isStaff) {
+  if (isHrManagementView) {
     return (
       <div className="flex w-full flex-col gap-6">
         <Card
@@ -1749,7 +1759,7 @@ export function PerformanceEvaluationsClient({
         </CardHeader>
       </Card>
 
-      {isStaff ? (
+      {isHrManagementView ? (
         <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
           <CardHeader>
             <CardTitle className="text-base">Create Evaluation Cycle</CardTitle>
@@ -1897,7 +1907,7 @@ export function PerformanceEvaluationsClient({
                 <Users className="size-4" />
                 Peer {peerSubmittedCount}/{myPeerForms.length}
               </Button>
-              {isStaff ? (
+              {isHrManagementView ? (
                 <Button
                   type="button"
                   size="sm"
@@ -1935,7 +1945,7 @@ export function PerformanceEvaluationsClient({
                   </span>
                 </div>
               </div>
-              {isStaff ? (
+              {isHrManagementView ? (
                 <div className="flex justify-start md:justify-end">
                   <Button
                     variant={
@@ -1954,7 +1964,7 @@ export function PerformanceEvaluationsClient({
             </CardContent>
           </Card>
 
-          {isStaff && workspaceView === "hr_cycle" ? (
+          {isHrManagementView && workspaceView === "hr_cycle" ? (
             <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
               <CardHeader>
                 <CardTitle className="text-base">
@@ -2157,7 +2167,7 @@ export function PerformanceEvaluationsClient({
                 </div>
               </CardContent>
             </Card>
-          ) : !isStaff &&
+          ) : !isHrManagementView &&
             selectedCycle.evaluatee_id === currentUser.id &&
             workspaceView === "self" ? (
             <Card className="border-border/70 bg-card/85 shadow-lg shadow-black/5">
