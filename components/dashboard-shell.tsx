@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 import { SidebarAccountMenu } from "@/components/sidebar-account-menu";
 import { SidebarNotificationMenu } from "@/components/sidebar-notification-menu";
@@ -313,6 +313,7 @@ export function DashboardShell({
   children,
 }: DashboardShellProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(() => {
     if (typeof window === "undefined") {
       return "";
@@ -338,7 +339,12 @@ export function DashboardShell({
     return {
       ...item,
       children: [
-        ...(item.children ?? []),
+        ...(item.children ?? []).map((child) =>
+          child.label === "Performance Evaluations" &&
+          can(user, "access_hr_workspace")
+            ? { ...child, href: "/performance-evaluations?view=evaluator" }
+            : child,
+        ),
         {
           label: "Announcements and Polls",
           href: "/announcements-and-polls",
@@ -393,10 +399,35 @@ export function DashboardShell({
       return false;
     }
 
-    return pathname === item.href || pathname.startsWith(`${item.href}/`);
+    const [hrefPath, hrefQuery] = item.href.split("?");
+    const matchesPath =
+      pathname === hrefPath || pathname.startsWith(`${hrefPath}/`);
+    if (!matchesPath) {
+      return false;
+    }
+
+    if (!hrefQuery) {
+      return true;
+    }
+
+    return [...new URLSearchParams(hrefQuery).entries()].every(
+      ([key, value]) => searchParams.get(key) === value,
+    );
   }
 
   function isActive(item: SidebarItem) {
+    const isHrPerformanceManagementRoute =
+      pathname === "/performance-evaluations" &&
+      can(user, "access_hr_workspace") &&
+      searchParams.get("view") !== "evaluator";
+
+    if (isHrPerformanceManagementRoute && item.label === "My Workflows") {
+      return false;
+    }
+    if (isHrPerformanceManagementRoute && item.label === "Performance") {
+      return true;
+    }
+
     const hasActiveChild = (item.children ?? []).some((child) =>
       isChildActive(child),
     );

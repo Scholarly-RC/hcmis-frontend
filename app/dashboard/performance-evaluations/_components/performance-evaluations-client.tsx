@@ -546,25 +546,14 @@ export function PerformanceEvaluationsClient({
           return;
         }
 
-        const [myCycles, myAssignments] = await Promise.all([
+        const [myCycles, assignedCycles] = await Promise.all([
           requestJson<UserEvaluationRecord[]>(
             `/api/performance/user-evaluations?evaluatee_id=${currentUser.id}&is_finalized=true`,
           ),
-          requestJson<EvaluationRecord[]>(
-            `/api/performance/evaluations?evaluator_id=${currentUser.id}&is_submitted=false`,
+          requestJson<UserEvaluationRecord[]>(
+            `/api/performance/user-evaluations?evaluator_id=${currentUser.id}&is_finalized=true&is_submitted=false`,
           ),
         ]);
-
-        const assignedCycleIds = new Set(
-          myAssignments.map((evaluation) => evaluation.user_evaluation_id),
-        );
-        const assignedCycles = assignedCycleIds.size
-          ? (
-              await requestJson<UserEvaluationRecord[]>(
-                "/api/performance/user-evaluations?is_finalized=true",
-              )
-            ).filter((cycle) => assignedCycleIds.has(cycle.id))
-          : [];
 
         const mergedCycles = [...myCycles, ...assignedCycles].filter(
           (cycle, index, items) =>
